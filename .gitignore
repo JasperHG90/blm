@@ -1,0 +1,6 @@
+*.zip
+.Rproj.user/*
+.RData
+.Rhistory
+.RDataTmp
+

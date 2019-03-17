@@ -1,0 +1,3 @@
+Requirements:
+  doFuture
+  magrittr
