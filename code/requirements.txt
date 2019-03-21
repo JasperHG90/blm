@@ -1,3 +1,8 @@
 Requirements:
   doFuture
   magrittr
+  reshape2
+  tibble
+  ggplot2
+  scales
+  stringr

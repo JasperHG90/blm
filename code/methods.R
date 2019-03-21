@@ -27,6 +27,9 @@ set_priors.blm <- function(blm, ...) {
       # Update priors
       priors[[i]] <- priors_new[[i]]
       
+      # Add marker 
+      priors[[i]]$informative <- TRUE
+      
     } else {
       
       # Keep track of warnings
@@ -50,8 +53,10 @@ set_priors.blm <- function(blm, ...) {
 # Do gibbs sampling on blm
 # This should be a class method
 # TODO: add thinning
+# Initial weight correction ==> divide coefficient weights by sqrt(sample size) to avoid them getting too large
+# when using uninformative priors
 sampling_options.blm <- function(blm, chains = 1, iterations = 10000, 
-                                 burn = 1000) {
+                                 burn = 1000, initial_weight_correction = FALSE) {
   
   ##### Checks ######
   
@@ -63,7 +68,7 @@ sampling_options.blm <- function(blm, chains = 1, iterations = 10000,
     stop("blm cannot sample fewer iterations than burn-in period")
   }
   
-  if (ceiling(iterations / burn) < 5) {
+  if (ceiling(iterations / burn) < 2) {
     warning("The number of iterations is very low. This will likely yield unstable results.")
   }
   
@@ -85,6 +90,9 @@ sampling_options.blm <- function(blm, chains = 1, iterations = 10000,
   } 
   if (!missing(burn)) {
     blm$sampling_settings$burn <- burn
+  }
+  if (!missing(initial_weight_correction)) {
+    blm$sampling_settings$initial_weight_correction <- initial_weight_correction
   }
   
   # Return
@@ -110,7 +118,30 @@ sample_posterior.blm <- function(blm) {
   y <- blm$input$y
   
   # Draw initial values for each chain
-  initial_values <- lapply(1:chains, function(x) initialize_chain_values(priors))
+  initial_values <- lapply(1:chains, function(x) {
+    
+    # Draw initial values
+    iv <- initialize_chain_values(priors)
+    
+    # Correct weights if desired
+    if(blm$sampling_settings$initial_weight_correction) {
+      
+      inf <- sapply(blm$priors, function(x) x$informative)
+      inf <- inf[-length(inf)] # remove sigma
+      # Correct initial values (if uninformative)
+      iv$w[!inf,] <- iv$w[!inf,] / sqrt(blm$input$n)
+      
+    }
+    
+    # Return
+    return(iv)
+    
+  }) 
+  
+  # Add to sampling options
+  blm$sampling_settings$initial_values <- initial_values
+  # (names)
+  names(blm$sampling_settings$initial_values) <- paste0("chain", 1:blm$sampling_settings$chains)
   
   # Run foreach (possibly parallel for each chain)
   posterior <- foreach(k = 1:chains, .export = c("initial_values", "iterations", "priors", "burn", "X", "y",
@@ -123,7 +154,7 @@ sample_posterior.blm <- function(blm) {
     initial_values_current <- initial_values[[k]]
     
     # Call the gibbs sampler
-    gibbs_sampler(X, y, initial_values_current, iterations, priors, burn) #posterior[[k]] <- 
+    gibbs_sampler(X, y, initial_values_current, iterations, priors, burn) 
     
   }
   
@@ -168,8 +199,7 @@ print.blm <- function(blm) {
     "Sampler:\n",
       "\tChains: ", blm$sampling_settings$chains , "\n",
       "\tIterations: ", blm$sampling_settings$iterations , "\n",
-      "\tBurn: ", blm$sampling_settings$burn , "\n\n",
-    "Priors:\n")
+      "\tBurn: ", blm$sampling_settings$burn , "\n\n")
   
   # Set up priors matrix
   pr_coef <- matrix(0L, ncol=length(blm$priors)-1, nrow = 2,
@@ -196,10 +226,8 @@ print.blm <- function(blm) {
   }
   
   cat(msg)
-  cat("\t")
-  print.listof(list("Coefficients" = pr_coef))
-  cat("\t")
-  print.listof(list("Variance" = pr_sigma))
+  print.listof(list("Priors (Coefficients)" = pr_coef))
+  print.listof(list("Priors (Residuals)" = pr_sigma))
 
 }
 
@@ -251,9 +279,11 @@ summary.blm <- function(blm) {
   ### Statistics
   
   # Calculate MAP for each chain & combine
-  MAPV <- round(do.call(rbind.data.frame, MAP(blm$posterior)), digits = 3)
+  MAPV <- do.call(rbind.data.frame, MAP(blm$posterior))
   # Add MC error
   MAPV[3,] <- MAPV[2,] / sqrt(blm$sampling_settings$iterations)
+  # Round
+  MAPV <- round(MAPV, digits = 3)
   
   # Amend names
   row.names(MAPV) <- c("Est.", "SE", "MCERR.")
@@ -275,6 +305,186 @@ summary.blm <- function(blm) {
   print.listof(list("Maximum a posteriori (MAP) estimates" = MAPV))
   print.listof(CIV)
   
+  # If multiple chains
+  if(blm$sampling_settings$chains > 1) {
+    # Calculate Gelman-Rubin
+    GRS <- list(
+      "Gelman-Rubin Statistic" = round(GR(blm$posterior, 
+                                          blm$sampling_settings$iterations), digits = 3)
+    )
+    print.listof(GRS)
+  }
+
+}
+
+# Plot method
+plot.blm <- function(blm, type=c("history", 
+                                 "autocorrelation",
+                                 "density"),
+                     ...) {
+  
+  
+  
+  # Retrieve posterior data
+  pd <- blm$posterior
+  
+  ## If autocorrelation plot
+  if(type == "autocorrelation") {
+    
+    # Get opts
+    opts <- list(...)
+    
+    # If not chain specified and multiple chains, choose chain 1 but raise error
+    if(!"chain" %in% names(opts) & blm$sampling_settings$chains > 1) {
+      
+      warning("Choosing chain 1 for autocorrelation plot. You can choose a different chain by passing 'chain = <number>' to the plot() function.")
+      
+      chain <- 1
+      
+    } else {
+      
+      chain <- opts$chain
+      
+    }
+    
+    # Get data from posterior
+    qd <- pd[[paste0("chain_", chain)]]
+    
+    # Lag data
+    qd <- qd %>%
+      as.data.frame() %>%
+      lapply(., function(x) autocor(x, n=40)) %>%
+      do.call(rbind.data.frame, .)
+    
+    # Add variable name
+    qd$id <- str_replace_all(row.names(qd), "\\.[0-9]{1,2}", "")
+    
+    # Plot  
+    ggplot(qd, aes(x=lag, y=correlation, group=id)) +
+        geom_bar(stat="identity") +
+        scale_x_continuous(breaks= pretty_breaks()) +
+        scale_y_continuous(limits = c(-1,1)) + 
+        facet_wrap(id ~ .)
+    
+  } else {
+    
+    # Bind data
+    for(i in seq_along(pd)) {
+      df <- data.frame(pd[[i]])
+      df$chain <- i
+      df$iteration <- (blm$sampling_settings$burn + 1):blm$sampling_settings$iterations
+      pd[[i]] <- df
+    }
+    
+    # To long format
+    pd <- pd %>% 
+      do.call(rbind.data.frame, .) %>%
+      gather(key = parameter, value = value, -chain, -iteration)
+    
+    #### Plot
+    
+    # Make into factor
+    pd$chain <- as.factor(pd$chain)
+    
+    ## History plot
+    
+    if(type == "history") {
+      
+      ggplot(pd, aes(x = iteration, 
+                     y=value, 
+                     color=as.factor(chain), 
+                     group = parameter)) +
+        geom_line(alpha=0.4) +
+        theme_bw() +
+        theme(legend.position = "None") +
+        facet_wrap("parameter ~ .", scales = "free_y",
+                   ncol=1)
+      
+    ## Density plot  
+      
+    } else if(type == "density") {
+      
+      ggplot(pd, aes(x=value,
+                     fill = chain)) +
+        geom_density(alpha=0.4) +
+        theme_bw() +
+        theme(legend.position = "None") +
+        facet_wrap("parameter ~ .", scales = "free")
+      
+    } else { ## Unknown! Raise error
+      
+      ## Raise error
+      stop(paste0("Type '", type, "' not a allowed."))
+    
+    } 
+    
+  }
+  
+}
+
+# ppd 
+posterior_predictive_checks.blm <- function(blm, normality = TRUE, homoskedasticity = TRUE,
+                                           iterations = 2000, burn = 1000) {
+  
+  # Set up posterior predictive check by sampling from the posterior
+  inputs <- list(
+    tests = list(
+      "normality" = normality,
+      "homoskedasticity" = homoskedasticity
+    ),
+    settings = list(
+      iterations = iterations,
+      burn = burn
+    )
+  )
+  
+  # Get priors etc.
+  priors <- blm$priors
+  X <- blm$input$X
+  y <- blm$input$y
+  
+  # Draw values 
+  iv <- initialize_chain_values(priors)
+  
+  # Correct weights if desired
+  if(blm$sampling_settings$initial_weight_correction) {
+    
+    inf <- sapply(priors, function(x) x$informative)
+    inf <- inf[-length(inf)] # remove sigma
+    # Correct initial values (if uninformative)
+    iv$w[!inf,] <- iv$w[!inf,] / sqrt(blm$input$n)
+    
+  }
+  
+  # Call the gibbs sampler
+  ppdata <- gibbs_sampler(X, y, iv, iterations, priors, burn)
+  
+  # Precompute linear combinations (predictions to simulate from)
+  lincom <- X %*% t(ppdata[,-(ncol(ppdata))])
+  
+  # Precompute simulated yhat
+  yhat <- lapply(1:ncol(lincom), function(x) {
+    
+    rnorm(nrow(lincom), mean=lincom[,x], sd=sqrt(ppdata[x,ncol(ppdata)]))
+    
+  })
+  
+  # Precompute residuals
+  resids <- compute_residuals(X, y, yhat, lincom, iterations, burn)
+  
+  # Add results
+  inputs$data$initial_values <- iv
+  inputs$data$posterior <- ppdata
+  inputs$data$pred_y <- lincom
+  inputs$data$sim_y <- yhat
+  inputs$data$residuals <- resids
+  
+  # Add class to input
+  class(inputs) <- "ppd"
+  
+  # Return
+  return(inputs)
+  
 }
 
 # Evaluate method
@@ -291,8 +501,9 @@ draw_value.normal <- function(prior) {
 }
 
 # Drawing from a gamma distribution
+# Add a small value to prevent sigma being 0 (bad stuff happens)
 draw_value.gamma <- function(prior) {
   
-  rgamma(1, prior$alpha, prior$beta) + 1e-10
+  rgamma(1, prior$alpha, prior$beta) + runif(1, 1e-10, 1e-08) 
   
 }

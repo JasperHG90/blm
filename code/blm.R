@@ -26,6 +26,7 @@ blm <- function(formula, data, center = FALSE) {
     if (param == max(j+1)) {
       
       priors[["sigma"]] <- prior("gamma", alpha=0.01, beta=0.01)
+      priors[["sigma"]]$informative <- FALSE
       
     } else {
       
@@ -43,6 +44,8 @@ blm <- function(formula, data, center = FALSE) {
         
       }
       
+      priors[[coef_name]]$informative <- FALSE
+      
     }
     
   }
@@ -54,7 +57,8 @@ blm <- function(formula, data, center = FALSE) {
       "chains" = 1,
       "iterations" = 10000,
       "burn" = 1000,
-      "parallel" = "sequential"
+      "parallel" = "sequential",
+      "initial_weight_correction" = FALSE
     ),
     "priors" = priors
   )
@@ -107,3 +111,4 @@ prior <- function(density, ...) {
   return(opts)
   
 }
+

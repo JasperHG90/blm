@@ -34,3 +34,10 @@ draw_value <- function(x) {
   UseMethod("draw_value")
 }
 
+# ---------- Functions for posterior predictive checks ----------
+
+# Set up posterior predictive checks
+posterior_predictive_checks <- function(x, ...) {
+  UseMethod("posterior_predictive_tests")
+}
+

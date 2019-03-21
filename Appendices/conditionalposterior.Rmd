@@ -660,7 +660,7 @@ posterior_coef <- function(X, y, w, j, priors, sigma) {
   X <- matrix(X[,-(j+1)], nrow=n, ncol=m-1)
   
   # Calculate mu
-  mu1 <- posterior_mu(X, xj, y, w, sigma, prior$mu, prior$sd)
+  mu1 <- posterior_mu(X, xj, y, w, sigma, priors$mu, priors$sd)
   
   # Calculate tau
   tau1 <- posterior_tau(xj, sigma, priors$sd)
@@ -701,7 +701,7 @@ The code below defines the starting values and priors and samples the posterior 
 
 ```{r}
 # Starting values
-sigma <- rgamma(1, 0.001, 0.001)#0.1
+sigma <- rgamma(1, 0.001, 0.001) + 1e-10#0.1
 b0 <- rnorm(1,0,1000) / sqrt(nrow(X)) #0
 b1 <- rnorm(1,0,1000) / sqrt(nrow(X))#0
 b2 <- rnorm(1,0,1000) / sqrt(nrow(X))#0
@@ -710,18 +710,18 @@ b4 <- rnorm(1,0,1000) / sqrt(nrow(X))#0
 b5 <- rnorm(1,0,1000) / sqrt(nrow(X))#0
 # Priors
 priors <- list(
-  "b0" = list("mu"=0, "tau"=1000),
-  "b1" = list("mu"=0, "tau"=1000),
-  "b2" = list("mu"=0, "tau"=1000),
-  "b3" = list("mu"=0, "tau"=1000),
-  "b4" = list("mu"=0, "tau"=1000),
-  "b5" = list("mu"=0, "tau"=1000),
+  "b0" = list("mu"=0, "sd"=1000),
+  "b1" = list("mu"=0, "sd"=1000),
+  "b2" = list("mu"=0, "sd"=1000),
+  "b3" = list("mu"=0, "sd"=1000),
+  "b4" = list("mu"=0, "sd"=1000),
+  "b5" = list("mu"=0, "sd"=1000),
   "sigma" = list("alpha"=0.001, "beta"=0.001)
 )
 # To column vector
 w <- matrix(c(b0,b1,b2,b3,b4,b5), ncol=1)
 # Iterations
-k <- 20000
+k <- 10000
 # Matrix to store data
 results <- matrix(0L, nrow=k, ncol = length(priors))
 # For each
@@ -763,7 +763,7 @@ library(tidyr)
 library(ggplot2)
 library(forcats)
 
-results %>%
+results[-1:-1000,] %>%
   as_tibble() %>%
   mutate(iteration = 1:n()) %>%
   gather(variable, value, -iteration) %>%
@@ -781,7 +781,7 @@ library(tidyr)
 library(ggplot2)
 library(forcats)
 
-results %>%
+results[-1:-1000,] %>%
   as_tibble() %>%
   mutate(iteration = 1:n()) %>%
   gather(variable, value, -iteration) %>%
