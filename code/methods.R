@@ -294,6 +294,9 @@ summary.blm <- function(blm) {
     "95% credible interval" = round(CI(blm$posterior), digits = 3)
   )
   
+  # Burn-in diagnostics
+  burning_diag <- round(burnin_diagnostic(blm$posterior), digits=3)
+  
   # Print MAP & SE
   cat("Bayesian Linear Model (BLM) results:")
   cat("\n\n")
@@ -304,6 +307,7 @@ summary.blm <- function(blm) {
   print.listof(obs)
   print.listof(list("Maximum a posteriori (MAP) estimates" = MAPV))
   print.listof(CIV)
+  print.listof(list("Burn-in diagnostics" = burning_diag))
   
   # If multiple chains
   if(blm$sampling_settings$chains > 1) {
@@ -422,7 +426,8 @@ plot.blm <- function(blm, type=c("history",
   
 }
 
-# ppd 
+# posterior predictive checks
+# This returns a SEPARATE object ==> all them simulations are heavy on the memory.
 posterior_predictive_checks.blm <- function(blm, normality = TRUE, homoskedasticity = TRUE,
                                            iterations = 2000, burn = 1000) {
   
@@ -474,13 +479,19 @@ posterior_predictive_checks.blm <- function(blm, normality = TRUE, homoskedastic
   
   # Add results
   inputs$data$initial_values <- iv
+  inputs$data$X <- X
   inputs$data$posterior <- ppdata
   inputs$data$pred_y <- lincom
   inputs$data$sim_y <- yhat
   inputs$data$residuals <- resids
   
   # Add class to input
-  class(inputs) <- "ppd"
+  class(inputs) <- "ppc"
+  
+  # Calculate statistics
+  inputs <- normality_check(inputs)
+  inputs <- homoskedast_check(inputs)
+  inputs <- model_rmse(inputs)
   
   # Return
   return(inputs)
@@ -505,5 +516,188 @@ draw_value.normal <- function(prior) {
 draw_value.gamma <- function(prior) {
   
   rgamma(1, prior$alpha, prior$beta) + runif(1, 1e-10, 1e-08) 
+  
+}
+
+# Class 'ppc' methods -----
+
+# Check normality of errors assumption
+normality_check.ppc <- function(ppc) {
+  
+  # Unroll data
+  iterations <- ppc$settings$iterations
+  burn <- ppc$settings$burn
+  resids <- ppc$data$residuals
+  
+  # Effective iterations
+  eff <- (iterations - burn)
+  
+  # 3. Calculate the skewness for each sample
+  skewed <- matrix(0L, nrow = eff, ncol=2)
+  colnames(skewed) <- c("simulated", "observed")
+  
+  # For each desired sample, calculate
+  for(i in 1:eff) {
+    
+    # Compute skewness
+    skewed[i,] <- c(e1071::skewness(resids[,i,1]), 
+                    e1071::skewness(resids[,i,2]))
+    
+  }
+  
+  # Compute where sim > obs (bayesian p-value)
+  bpv <- mean(skewed[,1] > skewed[,2])
+  
+  # To list
+  ppc$data$skewness <- skewed
+  
+  # Add results
+  if(!"results" %in% names(ppc)) {
+    ppc$results <- list(
+      "normality" = bpv
+    )
+  } else {
+    ppc$results$normality <- bpv
+  }
+  
+  # Return
+  return(ppc)
+  
+}
+
+# Check homoskedasticity assumption
+homoskedast_check.ppc <- function(ppc) {
+  
+  # Unroll data
+  iterations <- ppc$settings$iterations
+  burn <- ppc$settings$burn
+  resids <- ppc$data$residuals
+  
+  # Effective iterations
+  eff <- (iterations - burn)
+  
+  # 3. Calculate the skewness for each sample
+  homosked <- matrix(0L, nrow = eff, ncol=2)
+  colnames(homosked) <- c("simulated", "observed")
+  
+  # For each desired sample, calculate
+  for(i in 1:eff) {
+    
+    # Square residuals (no negative)
+    ys <- resids[,i,1]^2
+    yo <- resids[,i,2]^2
+    
+    # Calculate homoskedasticity
+    homosked[i,1] <- test_for_homoskedasticity(ys, X)
+    homosked[i,2] <- test_for_homoskedasticity(yo, X)
+    
+  }
+  
+  # Compute where sim > obs (bayesian p-value)
+  bpv <- mean(homosked[,1] > homosked[,2])
+  
+  # To list
+  ppc$data$homosked <- homosked
+  
+  # Add results
+  if(!"results" %in% names(ppc)) {
+    ppc$results <- list(
+      "homosked" = bpv
+    )
+  } else {
+    ppc$results$homosked <- bpv
+  }
+  
+  # Return
+  return(ppc)
+  
+}
+
+# Check model fit
+model_rmse.ppc <- function(ppc) {
+  
+  # Unroll data
+  iterations <- ppc$settings$iterations
+  burn <- ppc$settings$burn
+  resids <- ppc$data$residuals
+  
+  # Effective iterations
+  eff <- (iterations - burn)
+  
+  # 3. Calculate the skewness for each sample
+  rmse <- matrix(0L, nrow = eff, ncol=2)
+  colnames(rmse) <- c("simulated", "observed")
+  
+  # For each desired sample, calculate statistic
+  for(i in 1:eff) {
+    
+    # Compute skewness
+    rmse[i,] <- c(rmse(resids[,i,1]), 
+                  rmse(resids[,i,2]))
+    
+  }
+  
+  # Compute where sim > obs (bayesian p-value)
+  bpv <- mean(rmse[,1] > rmse[,2])
+  
+  # To list
+  ppc$data$rmse <- rmse
+  
+  # Add results
+  if(!"results" %in% names(ppc)) {
+    ppc$results <- list(
+      "rmse" = bpv
+    )
+  } else {
+    ppc$results$rmse <- bpv
+  }
+  
+  # Return
+  return(ppc)
+  
+}
+
+# Summary
+summary.ppc <- function(ppc) {
+  
+  msg <- paste0(
+    "Posterior Predictive Checks (PPC) for blm object:",
+    "\n\n"
+  )
+  
+  # Bind results
+  bpr <- round(do.call(cbind.data.frame, post_pc$results), digits=3)
+  colnames(bpr) <- c("Normality", "Heteroskedasticity", "RMSE")
+  row.names(bpr) <- c("p")
+  
+  res <- list(
+    "Bayesian p-value" = bpr
+  )
+  
+  # Cat
+  cat(msg)
+  print.listof(res)
+  
+}
+
+# Plot method
+plot.ppc <- function(ppc, type=c("normality", "heteroskedasticity", "rmse")) {
+  
+  # Get data
+  data <- switch(
+    type,
+    "normality" = ppc$data$skewness,
+    "heteroskedasticity" = ppc$data$homosked,
+    "rmse" = ppc$data$rmse
+  )
+  
+  # Plot data
+  data %>% 
+    as_tibble() %>%
+    gather(data, value) %>%
+    ggplot(., aes(x=value, fill=data)) +
+      geom_density(alpha=0.6) +
+      theme_bw() +
+      ggtitle(paste0("Observed and simulated results for test '", type, "'"))
   
 }

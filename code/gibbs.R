@@ -109,3 +109,48 @@ gibbs_sampler <- function(X, y, initial_values, iterations, priors, burn) {
   return(results)
   
 }
+
+# Burn-in period diagnostics
+# Run a linear regression on squared coefficient draws from posterior
+burnin_diagnostic <- function(posterior) {
+  
+  out_post <- lapply(seq_along(posterior), function(chain_it) {
+    
+    # Get current chain
+    chain <- posterior[[chain_it]]
+    
+    # For each column, compute linear coef
+    out <- lapply(seq_along(1:ncol(chain)), function(x) {
+      
+      df <- data.frame(
+        "y" = chain[,x]^2,
+        "index"= (1:nrow(chain)) 
+      )
+      
+      # Linear reg
+      linr <- lm("y ~ index", data=df)
+      
+      # Get coef
+      linr$coefficients["index"]
+      
+    })
+    
+    # Name out
+    names(out) <- colnames(chain)
+    
+    # Bind
+    out <- do.call(cbind.data.frame, out)
+    row.names(out) <- paste0("chain ", chain_it)
+    
+    # Return
+    return(out)
+    
+  })
+  
+  # Bind
+  diagnostics <- do.call(rbind.data.frame, out_post)
+  
+  # Return
+  return(diagnostics)
+  
+}

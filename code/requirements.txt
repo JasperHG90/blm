@@ -1,8 +1,9 @@
 Requirements:
   doFuture
   magrittr
-  reshape2
+  tidyr
   tibble
   ggplot2
   scales
   stringr
+  e1071

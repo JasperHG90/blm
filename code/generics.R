@@ -27,6 +27,11 @@ sample_posterior <- function(x) {
   UseMethod("sample_posterior", x)
 }
 
+# Set up posterior predictive checks
+posterior_predictive_checks <- function(x, ...) {
+  UseMethod("posterior_predictive_checks")
+}
+
 # ---------- Functions for priors ---------------
 
 # Draw value from a prior
@@ -36,8 +41,16 @@ draw_value <- function(x) {
 
 # ---------- Functions for posterior predictive checks ----------
 
-# Set up posterior predictive checks
-posterior_predictive_checks <- function(x, ...) {
-  UseMethod("posterior_predictive_tests")
+normality_check <- function(x) {
+  UseMethod("normality_check")
 }
 
+# Generic for homoskedasticity
+homoskedast_check <- function(x) {
+  UseMethod("homoskedast_check")
+}
+
+# Generic for model rmse
+model_rmse <- function(x) {
+  UseMethod("model_rmse")
+}
