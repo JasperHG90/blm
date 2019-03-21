@@ -39,13 +39,14 @@ X <- cbind(d$rm, d$lstat, d$dis)
 df <- as.data.frame(cbind(y, X))
 #df$V3 <- as.factor(df$V3)
 summary(df)
+names(df) <- c("medv", "rm", "lstat", "dis")
 #df$V2 <- df$V2 - mean(df$V2)
 #df$V3 <- df$V3 - mean(df$V3)
 ##df$V5 <- df$V5 - mean(df$V5)
 #df$V6 <- df$V6 - mean(df$V6)
 
 # Linear model for comparison
-ffit <- lm("y ~ .", data=df)
+ffit <- lm("medv ~ .", data=df)
 summary(ffit)
 
 plot(predict(ffit), resid(ffit))
@@ -57,7 +58,7 @@ registerDoFuture()
 ## Multicore (4 chains, 20.000 iterations) ==> +- 36 seconds
 
 # Set up a BLM object
-bfit <- blm("y ~ .", data=df, center = TRUE) %>%
+bfit <- blm("medv ~ .", data=df, center = TRUE) %>%
   # Update sampling settings
   sampling_options(., chains = 2, iterations = 10000, burn = 1000,
                    initial_weight_correction = FALSE) %>%

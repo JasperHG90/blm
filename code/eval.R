@@ -94,12 +94,6 @@ calc_mode <- function(x) {
   uniqv[which.max(tabulate(match(x, uniqv)))]
 }
 
-# Log likelihood function
-LL = function(y, coef) {
-  #sum of log likelihoods = log of product of likelihoods
-  sum( dnorm(y, mu, sqrt(sigma2), log=TRUE) )
-}
-
 # Model DIC
 # See: http://kylehardman.com/BlogPosts/View/6
 DIC <- function(X, y, posterior) {
@@ -114,40 +108,42 @@ DIC <- function(X, y, posterior) {
   sigma <- unname(MAP["sigma"])
   coefs <- matrix(MAP[-length(MAP)], ncol=1)
   
-  ## DHAT (likelihood given MAP estimate)
-  ## sum == product because of log
+  ## Two parts to DIC ==> (1) sum of log of likelihood P(y|theta_MAP)
   
   # Mu for each point in the likelihood
   mu <- X %*% coefs
   # Draw from normal
-  DHAT <- sum(-2*log(dnorm(y, mean=mu, sd=sqrt(sigma))))
+  LL <- sum(log(dnorm(y, mean=mu, sd=sqrt(sigma))))
   
-  ## DBAR 
+  ## Part two: effective number of parameters p_dic
   
   ## Multiply X by the posterior coefficients from the sample
   # Result: n x k matrix (n==examples, k==# gibbs samples across ALL chains)
   lincom <- X %*% t(pb[,-ncol(pb)])
   
   # For each gibbs sample, calculate the log likelihood
-  DBAR <- lapply(seq_along(1:ncol(lincom)), function(x) {
+  P <- lapply(seq_along(1:ncol(lincom)), function(x) {
     
     # For each gibbs sample, draw sample 
-    sum(-2*log(dnorm(y, mean=lincom[,x], sd=sqrt(pb[x,ncol(pb)]))))
+    sum(log(dnorm(y, mean=lincom[,x], sd=sqrt(pb[x,ncol(pb)]))))
     
   })
   
   ## Average of all samples
-  DBAR <- mean(unlist(DBAR))
+  P <- mean(unlist(P))
+  
+  ## Effective Params
+  P_eff <- 2*(LL-P)
   
   ## Return model fit
   return(
   do.call(cbind.data.frame,
           list(
-          'fit'=DHAT + 2*(DBAR - DHAT),
-          'dbar' = DBAR,
-          'dhat' = DHAT,
-          'pd' = DBAR-DHAT)
-          )
+          'DIC' = -2*LL + 2*P_eff,
+          'LL' = LL,
+          "P" = P,
+          "Eff. P" = P_eff
+          ))
   )
   
 }
