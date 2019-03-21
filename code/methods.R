@@ -401,6 +401,7 @@ plot.blm <- function(blm, type=c("history",
         geom_line(alpha=0.4) +
         theme_bw() +
         theme(legend.position = "None") +
+        #geom_smooth(method="lm") +
         facet_wrap("parameter ~ .", scales = "free_y",
                    ncol=1)
       
@@ -426,17 +427,46 @@ plot.blm <- function(blm, type=c("history",
   
 }
 
+# Get coefficients from blm object
+coef.blm <- function(blm, type = c("mean", "mode", "median")) {
+  
+  # Match arg if user does not specify type
+  type <- match.arg(type)
+  
+  # Bind posterior data
+  pb <- do.call(rbind.data.frame, blm$posterior)
+  # Remove sigma
+  pb <- pb[,-ncol(pb)]
+  
+  # Compute
+  r <- switch(type,
+              "mode" = apply(pb, 2, calc_mode),
+              "mean" = apply(pb, 2, mean),
+              "median" = apple(pb, 2, median))
+  
+  # Return
+  return(r)
+  
+}
+
+# Call coef method using coefficients
+coefficients.blm <- function(blm, type = c("mean", "mode", "median")) {
+  
+  # Match arg
+  type <- match.arg(type)
+  
+  # Call coef
+  return(coef(blm, type))
+  
+}
+
 # posterior predictive checks
 # This returns a SEPARATE object ==> all them simulations are heavy on the memory.
-posterior_predictive_checks.blm <- function(blm, normality = TRUE, homoskedasticity = TRUE,
-                                           iterations = 2000, burn = 1000) {
+posterior_predictive_checks.blm <- function(blm, 
+                                            iterations = 2000, burn = 1000) {
   
   # Set up posterior predictive check by sampling from the posterior
   inputs <- list(
-    tests = list(
-      "normality" = normality,
-      "homoskedasticity" = homoskedasticity
-    ),
     settings = list(
       iterations = iterations,
       burn = burn
@@ -495,6 +525,31 @@ posterior_predictive_checks.blm <- function(blm, normality = TRUE, homoskedastic
   
   # Return
   return(inputs)
+  
+}
+
+# Model fit
+model_fit.blm <- function(blm) {
+  
+  # Model fit
+  mfit <- DIC(blm$input$X, blm$input$y, blm$posterior)
+  
+  # Intercept-only model
+  mfitIO <- DIC(matrix(blm$input$X[,1],ncol=1), 
+                blm$input$y, lapply(blm$posterior, function(x){
+                  x[,c(1,ncol(x))]
+  }))
+  
+  # Bind models
+  final <- round(do.call(rbind.data.frame, list(mfit, mfitIO)), digits=3)
+  
+  # Row names
+  row.names(final) <- c("(Model)", "(Null model)")
+  
+  # Print
+  print.listof(
+    list("Model DIC"=final)
+  )
   
 }
 

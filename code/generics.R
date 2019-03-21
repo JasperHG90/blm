@@ -32,6 +32,11 @@ posterior_predictive_checks <- function(x, ...) {
   UseMethod("posterior_predictive_checks")
 }
 
+# Model fit
+model_fit <- function(x) {
+  UseMethod("model_fit")
+}
+
 # ---------- Functions for priors ---------------
 
 # Draw value from a prior

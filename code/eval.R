@@ -88,4 +88,66 @@ GR <- function(posterior, iterations) {
     
 }
 
+# Calculate mode
+calc_mode <- function(x) {
+  uniqv <- unique(x)
+  uniqv[which.max(tabulate(match(x, uniqv)))]
+}
 
+# Log likelihood function
+LL = function(y, coef) {
+  #sum of log likelihoods = log of product of likelihoods
+  sum( dnorm(y, mu, sqrt(sigma2), log=TRUE) )
+}
+
+# Model DIC
+# See: http://kylehardman.com/BlogPosts/View/6
+DIC <- function(X, y, posterior) {
+  
+  ## Join posterior
+  pb <- do.call(rbind.data.frame, posterior)
+  
+  ## MAP values
+  MAP <- apply(pb, 2, mean)
+  
+  ## Coef separate from sigma
+  sigma <- unname(MAP["sigma"])
+  coefs <- matrix(MAP[-length(MAP)], ncol=1)
+  
+  ## DHAT (likelihood given MAP estimate)
+  ## sum == product because of log
+  
+  # Mu for each point in the likelihood
+  mu <- X %*% coefs
+  # Draw from normal
+  DHAT <- sum(-2*log(dnorm(y, mean=mu, sd=sqrt(sigma))))
+  
+  ## DBAR 
+  
+  ## Multiply X by the posterior coefficients from the sample
+  # Result: n x k matrix (n==examples, k==# gibbs samples across ALL chains)
+  lincom <- X %*% t(pb[,-ncol(pb)])
+  
+  # For each gibbs sample, calculate the log likelihood
+  DBAR <- lapply(seq_along(1:ncol(lincom)), function(x) {
+    
+    # For each gibbs sample, draw sample 
+    sum(-2*log(dnorm(y, mean=lincom[,x], sd=sqrt(pb[x,ncol(pb)]))))
+    
+  })
+  
+  ## Average of all samples
+  DBAR <- mean(unlist(DBAR))
+  
+  ## Return model fit
+  return(
+  do.call(cbind.data.frame,
+          list(
+          'fit'=DHAT + 2*(DBAR - DHAT),
+          'dbar' = DBAR,
+          'dhat' = DHAT,
+          'pd' = DBAR-DHAT)
+          )
+  )
+  
+}

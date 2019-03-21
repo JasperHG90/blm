@@ -25,7 +25,8 @@ library(stringr)
 library(tibble)
 
 # Setting up a dataset
-d <- generate_dataset(center = FALSE, seed = 687, n=1000, j=3)
+d <- generate_dataset(center = FALSE, seed = 687, n=1000, j=3,
+                      heteroskedastic = FALSE)
 X <- d$X[, -1]
 y <- d$y
 df <- as.data.frame(cbind(y, X))
@@ -34,9 +35,10 @@ df$V3 <- as.factor(df$V3)
 #library(readr)
 d <- read.csv("Appendices/boston-housing/train.csv")
 y <- d$medv
-X <- cbind(d$rm, d$crim, d$chas, d$lstat, d$dis)
+X <- cbind(d$rm, d$lstat, d$dis)
 df <- as.data.frame(cbind(y, X))
-df$V4 <- as.factor(df$V4)
+#df$V3 <- as.factor(df$V3)
+summary(df)
 #df$V2 <- df$V2 - mean(df$V2)
 #df$V3 <- df$V3 - mean(df$V3)
 ##df$V5 <- df$V5 - mean(df$V5)
@@ -45,6 +47,8 @@ df$V4 <- as.factor(df$V4)
 # Linear model for comparison
 ffit <- lm("y ~ .", data=df)
 summary(ffit)
+
+plot(predict(ffit), resid(ffit))
 
 # Set up parallel backend for doFuture package
 registerDoFuture()
@@ -55,18 +59,19 @@ registerDoFuture()
 # Set up a BLM object
 bfit <- blm("y ~ .", data=df, center = TRUE) %>%
   # Update sampling settings
-  sampling_options(., chains = 2, iterations = 10000, burn = 2000,
-                   initial_weight_correction = TRUE) %>%
+  sampling_options(., chains = 2, iterations = 10000, burn = 1000,
+                   initial_weight_correction = FALSE) %>%
   # Set prior for coefficient b2
-  set_priors("b2" = prior("normal", mu=3, sd=4)) %>%
+  #set_priors("b2" = prior("normal", mu=3, sd=4),
+  #           "sigma" = prior("gamma", alpha=0.001, beta=0.001)) %>%
   # Sample posterior
   sample_posterior()
 
-# Call summary
-summary(bfit)
-
 # Print object information
 print(bfit)
+
+# Call summary
+summary(bfit)
 
 # Plot
 plot(bfit, "history")
@@ -75,7 +80,7 @@ plot(bfit, "autocorrelation", chain=1)
 
 # Posterior predictive checks
 post_pc <- bfit %>%
-  posterior_predictive_checks(iterations=5000, burn=4000)
+  posterior_predictive_checks(iterations=2000, burn=1000)
 
 # Call summary
 summary(post_pc)
@@ -85,8 +90,10 @@ plot(post_pc, "normality")
 plot(post_pc, "heteroskedasticity")
 plot(post_pc, "rmse")
 
+# Model fit
+model_fit(bfit)
+
 # TODO: Add DIC (model fit)
 # TODO: sigma in output
 # TODO: burn-in period for PPC ==> always 1.000?
 # TODO: for DIC ==> sample posterior for a subset
-# TODO: add diagnostic check for proper burn-in period ==> that is, run a linear regression that checks whether there is a pattern in the data over time.

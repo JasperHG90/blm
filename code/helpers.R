@@ -277,6 +277,13 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
       X[,i] <- X[,i] + seq(1,mean(X[,i]) + degree*sd(X[,i]), length.out = n)
       # Set sigma
       pw <- runif(1, 1, 1.6)
+      # Scale power for degree
+      if(degree <= 1) {
+        degreepw <- 1
+      } else {
+        degreepw <- degree
+      }
+      pw <- (pw + (1-(1/degreepw)))/pw
       sigmaSq <- sigmaSq + (abs(X[,i])^pw)
     }
     sigmaSq
