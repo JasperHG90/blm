@@ -139,10 +139,9 @@ DIC <- function(X, y, posterior) {
   return(
   do.call(cbind.data.frame,
           list(
-          'DIC' = -2*LL + 2*P_eff,
-          'LL' = LL,
-          "P" = P,
-          "Eff. P" = P_eff
+            'DIC' = -2*LL + 2*P_eff,
+            'LL' = LL,
+            "Eff. P" = P_eff
           ))
   )
   

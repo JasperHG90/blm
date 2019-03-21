@@ -116,6 +116,9 @@ perform_checks <- function(formula, data, center) {
                                       paste0(vars$IV, collapse = "+"))), 
                     data)
   
+  ## Subset y by rows (may be deleted)
+  y <- y[as.numeric(row.names(X))]
+  
   # Center
   if(center) {
     # Index for IV

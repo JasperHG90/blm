@@ -627,6 +627,7 @@ homoskedast_check.ppc <- function(ppc) {
   iterations <- ppc$settings$iterations
   burn <- ppc$settings$burn
   resids <- ppc$data$residuals
+  X <- ppc$data$X
   
   # Effective iterations
   eff <- (iterations - burn)
