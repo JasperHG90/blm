@@ -74,3 +74,9 @@ posterior_sigma <- function(X, y, w, priors) {
   )
   
 }
+
+# Turn functions into byte-compiled
+posterior_mu <- compiler::cmpfun(posterior_mu)
+posterior_tau <- compiler::cmpfun(posterior_tau)
+posterior_coef <- compiler::cmpfun(posterior_coef)
+posterior_sigma <- compiler::cmpfun(posterior_sigma)

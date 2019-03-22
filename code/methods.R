@@ -147,8 +147,6 @@ sample_posterior.blm <- function(blm) {
   posterior <- foreach(k = 1:chains, .export = c("initial_values", "iterations", "priors", "burn", "X", "y",
                                                  "gibbs_sampler", "gibbs_one_iteration", "posterior_sigma",
                                                  "posterior_coef", "posterior_mu", "posterior_tau")) %dopar% {
-  #posterior <- list()
-  #for(k in seq_along(1:chains)) {
     
     # Initial values for the current chain
     initial_values_current <- initial_values[[k]]

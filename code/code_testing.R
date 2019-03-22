@@ -23,6 +23,7 @@ library(ggplot2)
 library(scales)
 library(stringr)
 library(tibble)
+library(compiler)
 
 # Setting up a dataset
 d <- generate_dataset(center = FALSE, seed = 687, n=1000, j=3,
@@ -36,8 +37,11 @@ df$V3 <- as.factor(df$V3)
 d <- haven::read_sav("Exercise 2 - Data.sav")
 df <- as.data.frame(d)
 
+df$extraversion <- df$extraversion - mean(df$extraversion)
+df$agreeableness <- df$agreeableness - mean(df$agreeableness)
+
 # Linear model for comparison
-ffit <- lm("attitude ~ .", data=df)
+ffit <- lm("attitude ~ extraversion * agreeableness", data=df)
 summary(ffit)
 
 plot(predict(ffit), resid(ffit))
@@ -49,21 +53,22 @@ registerDoFuture()
 ## Multicore (4 chains, 20.000 iterations) ==> +- 36 seconds
 
 # Set up a BLM object
-bfit <- blm("attitude ~ .", data=df, center = TRUE) %>%
-  # Update sampling settings
-  sampling_options(., chains = 2, iterations = 10000, burn = 1500,
-                   initial_weight_correction = FALSE) %>%
-  # Set prior for coefficient b2
-  #set_priors("b2" = prior("normal", mu=3, sd=4),
-  #           "sigma" = prior("gamma", alpha=0.001, beta=0.001)) %>%
-  # Sample posterior
-  sample_posterior()
-
-# Print object information
-print(bfit)
+# TODO: check for interactions in checks init function
+t1 <- Sys.time()
+bfit <- blm("attitude ~ extraversion + agreeableness", 
+            data=df, center = TRUE) %>%
+            # Update sampling settings
+            sampling_options(., chains = 4, iterations = 20000, burn = 2000,
+                             initial_weight_correction = FALSE) %>%
+              # Sample posterior
+              sample_posterior()
+Sys.time() - t1
 
 # Call summary
 summary(bfit)
+
+# Print object information
+print(bfit)
 
 # Plot
 plot(bfit, "history")

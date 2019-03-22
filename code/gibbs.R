@@ -154,3 +154,7 @@ burnin_diagnostic <- function(posterior) {
   return(diagnostics)
   
 }
+
+# Compile functions
+gibbs_one_iteration <- compiler::cmpfun(gibbs_one_iteration)
+gibbs_sampler <- compiler::cmpfun(gibbs_sampler)

@@ -41,7 +41,7 @@ check_formula <- function(varnames, formula) {
     IVs <- strsplit(IV,"(\\s)?\\+(\\s)?")[[1]]
     
     # Check for each if in dataset
-    if( !all(IVs %in% varnames) ) {
+    if( !all(IVs[which(!grepl("\\*", IVs))] %in% varnames) ) {
       
       stop("Not all independent variables found in dataset")
       
@@ -57,7 +57,7 @@ check_formula <- function(varnames, formula) {
     
     ## We have the situation that there is only one IV
     
-    if( !(IV %in% varnames) ) {
+    if( !(IV[which(!grepl("\\*", IVs))] %in% varnames) ) {
       
       stop("Independent variable not found in dataset.")
       
@@ -110,6 +110,16 @@ perform_checks <- function(formula, data, center) {
     
   }
   
+  # Center
+  if(center) {
+    # Index for IV
+    iv_index <- setdiff(names(data), vars$DV)
+    # Retrieve numeric
+    numeric_vars <- iv_index[sapply(data[, iv_index], is.numeric)]
+    # Center variables
+    data[,numeric_vars] <- apply(data[,numeric_vars], 2, function(x) x - mean(x))
+  }
+  
   ## Create design matrix
   ## (-1 ignores the intercept)
   X <- model.matrix(as.formula(paste0(vars$DV, " ~ ", 
@@ -118,16 +128,6 @@ perform_checks <- function(formula, data, center) {
   
   ## Subset y by rows (may be deleted)
   y <- y[as.numeric(row.names(X))]
-  
-  # Center
-  if(center) {
-    # Index for IV
-    iv_index <- setdiff(names(data), vars$DV)
-    # Retrieve numeric
-    numeric_vars <- iv_index[sapply(data[, iv_index], is.numeric)]
-    # Center variables
-    X[,numeric_vars] <- apply(X[,numeric_vars], 2, function(x) x - mean(x))
-  }
   
   ## Number of observations
   n <- nrow(X)
