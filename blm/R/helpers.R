@@ -259,6 +259,19 @@ gibbs_sampler <- function(X, y, initial_values, iterations, priors, burn) {
 
 }
 
+# Posterior predictive checks in julia
+ppc_julia <- function(X, y, initial_values, iterations, priors, burn) {
+
+  # Unroll initial values
+  w <- initial_values$w
+  sigma <- initial_values$sigma
+  #browser()
+  return(
+    .blm$julia$eval("ppc_draws")(X, y, w, sigma, as.integer(iterations), as.integer(burn), unname(priors))
+  )
+
+}
+
 # Generate a dataset with normal variables and outcome for testing purposes
 #
 # @param n number of examples

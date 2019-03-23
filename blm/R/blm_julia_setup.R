@@ -22,4 +22,5 @@ blm_setup <- function(...) {
   .blm$julia$library("Distributions")
   # Source gibbs sampler julia functions
   .blm$julia$source(system.file("julia/gibbs_blm.jl", package = "blm"))
+  .blm$julia$source(system.file("julia/ppc_blm.jl", package = "blm"))
 }

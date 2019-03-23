@@ -57,8 +57,8 @@ set_priors.blm <- function(blm, ...) {
 # Initial weight correction ==> divide coefficient weights by sqrt(sample size) to avoid them getting too large
 # when using uninformative priors
 #' @export
-sampling_options.blm <- function(blm, chains = 1, iterations = 10000,
-                                 burn = 1000, initial_weight_correction = FALSE) {
+sampling_options.blm <- function(blm, chains = 1, iterations = 10000, thinning = 3,
+                                 burn = 1000) {
 
   ##### Checks ######
 
@@ -84,8 +84,6 @@ sampling_options.blm <- function(blm, chains = 1, iterations = 10000,
   if(!missing(chains)) {
     # Update # chains
     blm$sampling_settings$chains <- chains
-    # Update parallel processing
-    blm$sampling_settings$parallel = ifelse(chains > 1, "multisession", "sequential")
   }
   if (!missing(iterations)) {
     blm$sampling_settings$iterations <- iterations
@@ -93,8 +91,8 @@ sampling_options.blm <- function(blm, chains = 1, iterations = 10000,
   if (!missing(burn)) {
     blm$sampling_settings$burn <- burn
   }
-  if (!missing(initial_weight_correction)) {
-    blm$sampling_settings$initial_weight_correction <- initial_weight_correction
+  if (!missing(thinning)) {
+    blm$sampling_settings$thinning <- thinning
   }
 
   # Return
@@ -121,16 +119,6 @@ sample_posterior.blm <- function(blm) {
 
     # Draw initial values
     iv <- initialize_chain_values(priors)
-
-    # Correct weights if desired
-    if(blm$sampling_settings$initial_weight_correction) {
-
-      inf <- sapply(blm$priors, function(x) x$informative)
-      inf <- inf[-length(inf)] # remove sigma
-      # Correct initial values (if uninformative)
-      iv$w[!inf,] <- iv$w[!inf,] / sqrt(blm$input$n)
-
-    }
 
     # Return
     return(iv)
@@ -486,40 +474,14 @@ posterior_predictive_checks.blm <- function(blm,
   # Draw values
   iv <- initialize_chain_values(priors)
 
-  # Correct weights if desired
-  if(blm$sampling_settings$initial_weight_correction) {
-
-    inf <- sapply(priors, function(x) x$informative)
-    inf <- inf[-length(inf)] # remove sigma
-    # Correct initial values (if uninformative)
-    iv$w[!inf,] <- iv$w[!inf,] / sqrt(blm$input$n)
-
-  }
-
-  # Call the gibbs sampler
-  ppdata <- gibbs_sampler(X, y, iv, iterations, priors, burn)
-
-  # Precompute linear combinations (predictions to simulate from)
-  lincom <- X %*% t(ppdata[,-(ncol(ppdata))])
-
-  # Precompute simulated yhat
-  yhat <- lapply(1:ncol(lincom), function(x) {
-
-    rnorm(nrow(lincom), mean=lincom[,x],
-          sd=sqrt(ppdata[x,ncol(ppdata)]))
-
-  })
-
-  # Precompute residuals
-  resids <- compute_residuals(X, y, yhat, lincom, iterations, burn)
+  # Call the gibbs sampler, simulate y values and compute residuals
+  r <- ppc_julia(X, y, iv, iterations, priors, burn)
 
   # Add results
   inputs$data$initial_values <- iv
   inputs$data$X <- X
-  inputs$data$posterior <- ppdata
-  inputs$data$pred_y <- lincom
-  inputs$data$sim_y <- yhat
-  inputs$data$residuals <- resids
+  inputs$data$sim_y <- r$sim_y
+  inputs$data$residuals <- r$residuals
 
   # Add class to input
   class(inputs) <- "ppc"
@@ -527,7 +489,6 @@ posterior_predictive_checks.blm <- function(blm,
   # Calculate statistics
   inputs <- normality_check(inputs)
   inputs <- homoskedast_check(inputs)
-  inputs <- model_rmse(inputs)
 
   # Return
   return(inputs)
@@ -606,8 +567,8 @@ normality_check.ppc <- function(ppc) {
   for(i in 1:eff) {
 
     # Compute skewness
-    skewed[i,] <- c(e1071::skewness(resids[,i,1]),
-                    e1071::skewness(resids[,i,2]))
+    skewed[i,] <- c(e1071::skewness(resids[i,,1]),
+                    e1071::skewness(resids[i,,2]))
 
   }
 
@@ -652,8 +613,8 @@ homoskedast_check.ppc <- function(ppc) {
   for(i in 1:eff) {
 
     # Square residuals (no negative)
-    ys <- resids[,i,1]^2
-    yo <- resids[,i,2]^2
+    ys <- resids[i,,1]^2
+    yo <- resids[i,,2]^2
 
     # Calculate homoskedasticity
     homosked[i,1] <- test_for_homoskedasticity(ys, X)
@@ -681,51 +642,6 @@ homoskedast_check.ppc <- function(ppc) {
 
 }
 
-# Check model fit
-#' @export
-model_rmse.ppc <- function(ppc) {
-
-  # Unroll data
-  iterations <- ppc$settings$iterations
-  burn <- ppc$settings$burn
-  resids <- ppc$data$residuals
-
-  # Effective iterations
-  eff <- (iterations - burn)
-
-  # 3. Calculate the skewness for each sample
-  rmse <- matrix(0L, nrow = eff, ncol=2)
-  colnames(rmse) <- c("simulated", "observed")
-
-  # For each desired sample, calculate statistic
-  for(i in 1:eff) {
-
-    # Compute skewness
-    rmse[i,] <- c(rmse(resids[,i,1]),
-                  rmse(resids[,i,2]))
-
-  }
-
-  # Compute where sim > obs (bayesian p-value)
-  bpv <- mean(rmse[,1] > rmse[,2])
-
-  # To list
-  ppc$data$rmse <- rmse
-
-  # Add results
-  if(!"results" %in% names(ppc)) {
-    ppc$results <- list(
-      "rmse" = bpv
-    )
-  } else {
-    ppc$results$rmse <- bpv
-  }
-
-  # Return
-  return(ppc)
-
-}
-
 # Summary
 #' @export
 summary.ppc <- function(ppc) {
@@ -737,7 +653,7 @@ summary.ppc <- function(ppc) {
 
   # Bind results
   bpr <- round(do.call(cbind.data.frame, post_pc$results), digits=3)
-  colnames(bpr) <- c("Normality", "Heteroskedasticity", "RMSE")
+  colnames(bpr) <- c("Normality", "Heteroskedasticity")
   row.names(bpr) <- c("p")
 
   res <- list(
