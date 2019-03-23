@@ -76,11 +76,12 @@ blm <- function(formula, data, center = FALSE) {
 
 }
 
-# Sets up a prior object
-#
-# @param density either Normal or Gamma density
-#
-# @return prior object
+#' Sets up a prior object
+#'
+#' @param density either Normal or Gamma density
+#'
+#' @return prior object
+#' @export
 prior <- function(density, ...) {
 
   # Get options

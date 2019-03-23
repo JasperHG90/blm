@@ -652,7 +652,7 @@ summary.ppc <- function(ppc) {
   )
 
   # Bind results
-  bpr <- round(do.call(cbind.data.frame, post_pc$results), digits=3)
+  bpr <- round(do.call(cbind.data.frame, ppc$results), digits=3)
   colnames(bpr) <- c("Normality", "Heteroskedasticity")
   row.names(bpr) <- c("p")
 

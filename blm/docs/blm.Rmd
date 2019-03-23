@@ -1,0 +1,182 @@
+---
+title: "Bayesian Linear Model with the blm package"
+author: "Jasper Ginn"
+output:
+  pdf_document: 
+    number_sections: true
+header-includes:
+ \usepackage{float}
+ \usepackage{setspace}
+ \usepackage{xcolor}
+ \definecolor{mypurple}{rgb}{146,76,239}
+ \doublespacing
+ \floatplacement{figure}{H}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.pos="H", fig.width = 5, fig.height = 4, echo = TRUE, 
+                      fig.align="center", warning = FALSE, message = TRUE)
+```
+
+The `blm` package contains a simple Gibbs sampler to run a Bayesian Linear Regression model. It is written partly in R and partly in Julia. The bridge between these two languages is handled by the JuliaCall package.
+
+Julia is a high-performing and high-level language that provides a +- 18x speedup compared to R. In the case of a Gibbs sampler, we repeatedly sample from conditional posterior distributions, which amplifies the need for speed and efficiency.
+
+## Setting up blm
+
+To set up the blm package, we load in in R
+
+```{r}
+library(blm)
+```
+
+This also loads the magrittr package, which is helpful because we can chain commands using the forward-operating pipe command (`%>%`).
+
+Next, we load the Julia environment
+
+```{r}
+blm_setup()
+```
+
+This can take a couple of seconds.
+
+## The data
+
+The data we will use comes from the exercises
+
+```{r}
+## Exercise 2 data
+d <- haven::read_sav("../../Exercise 2 - Data.sav")
+df <- as.data.frame(d)
+knitr::kable(head(df))
+```
+
+This is simulated data. We can plot it with a simple 3D scatterplot
+
+```{r}
+# Plot data
+library(scatterplot3d)
+scatterplot3d(df$extraversion, df$agreeableness, df$attitude, color="lightgreen", xlab="extraversion", 
+              pch=21, ylab="agreeableness", zlab="attitude", main="Attitude ~ agreeableness + extraversion")
+```
+
+For comparison purposes, we run a linear regression (lm) model using Maximum Likelihood
+
+```{r}
+# Linear model for comparison
+ffit <- lm("attitude ~ extraversion + agreeableness", data=df)
+summary(ffit)
+```
+
+## Running a blm model
+
+To fit a blm model, we call the `blm()` function, which is similar to the `lm()` function.
+
+```{r}
+bfit <- blm("attitude ~ extraversion + agreeableness", 
+            data=df, center = TRUE)
+```
+
+The `center = TRUE` option centers the data so that we can remove traces of autocorrelation.
+
+At this point, we can call `print()` and `summary()` on the data to check the model status.
+
+```{r}
+print(bfit)
+```
+
+This gives us information about the data, the sampling options and the priors, which are uninformative at this point.
+
+```{r}
+summary(bfit)
+```
+
+`summary()` gives us information about the model fit, MAP estimates and so on. Given that we have not sampled the posterior, however, these statistics are not yet supplied.
+
+We can update sampling settings as follows
+
+```{r}
+bfit <- bfit %>%
+  # Update sampling settings
+  sampling_options(., chains = 3, iterations = 10000, burn = 2000)
+```
+
+Priors may be made informative as follows
+
+```{r}
+bfit <- bfit %>%
+  set_priors("b2" = prior("normal", mu=0.5, sd=2))
+print(bfit)
+```
+
+If we are happy with these settings, we can sample from the posterior distribution. This process takes the longest during the first time you call the `sample_posterior()` function. This happens because Julia's Just-In-Time (JIT) compiler compiles the code when it is called the first time. In subsequent evaluations of the code, it then uses the already compiled code.
+
+```{r}
+# First time we call the Julia code
+t1 <- Sys.time()
+bfit <- bfit %>%
+  sample_posterior()
+print(Sys.time() - t1)
+```
+
+```{r}
+# Subsequent iterations
+t1 <- Sys.time()
+bfit <- bfit %>%
+  sample_posterior()
+print(Sys.time() - t1)
+```
+
+To observe the diagnostic information about the posterior sampling, we call `summary()`
+
+```{r}
+summary(bfit)
+```
+
+These diagnostics give us the MAP estimates, credible intervals and Gelman-Rubin statistic for each of the coefficients. The Burn-in diagnostics are the coefficient of a linear regression performed on the squared posterior values against the iteration values. If there is a trend in the posterior values, the coefficient will be removed further away from 0.
+
+Next, we can plot the history plots, density plots for the posterior values and autocorrelation plots.
+
+```{r}
+plot(bfit, "history")
+```
+
+```{r}
+plot(bfit, "density")
+```
+
+```{r}
+plot(bfit, "autocorrelation", chain=1)
+```
+
+If these values seem OK, we can move on to the posterior predictive checks. These are simulations that check certain assumptions of the data, in this case normality and heteroskedasticity, both of which are violated by our data, as we can see from the residual plot from the linear regression model
+
+```{r}
+library(ggplot2)
+ggplot(data.frame("pr" = predict(ffit),
+                  "re" = resid(ffit)),
+       aes(x=pr, y=re)) +
+    geom_point() +
+    geom_smooth()
+```
+
+We can run the posterior predictive checks to test these assumptions as follows
+
+```{r}
+ppc <- bfit %>%
+  posterior_predictive_checks()
+summary(ppc)
+```
+
+We see that we are mainly violating the normality or errors assumption
+
+```{r}
+hist(resid(ffit))
+```
+
+Finally, we can check the fit of the model against an intercept-only model using the DIC
+
+```{r}
+bfit %>%
+  model_fit()
+```
