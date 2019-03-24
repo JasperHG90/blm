@@ -1,7 +1,7 @@
 ## Gibbs sampler -------
 
 function gibbs_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
-                       sigma::Float64, iterations::Int, priors)
+                       sigma::Float64, iterations::Int, thinning::Int, priors)
 
     #=
     Run the Gibbs sampler to obtain the conditional posterior coefficients / sigma values
@@ -23,18 +23,25 @@ function gibbs_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     # For each iterations
     for i in 1:iterations
 
-        # One step of the gibbs sampler
-        r = gibbs_one_step(X, y, w, sigma, priors)
+        for j in 1:thinning
 
-        # Set new values for weights and sigma
-        w = r["w"]
-        sigma = r["sigma"]
+          # One step of the gibbs sampler
+          r = gibbs_one_step(X, y, w, sigma, priors)
+
+          # Set new values for weights and sigma
+          w = r["w"]
+          sigma = r["sigma"]
+
+          end;
 
         # Add to results
         res[i,1:end-1] = w
-        res[i,size(res)[2]] = sqrt(sigma)
+        res[i,end] = sigma
 
         end;
+
+    # Square-root the sigma values
+    res[:,end] = sqrt.(res[:,end])
 
     # Return results
     return(res)
@@ -97,14 +104,14 @@ function gibbs_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
 ## Posterior densities
 function posterior_mu(X::Array{Float64}, xj::Array{Float64}, y::Array{Float64},
-                      w::Array{Float64}, sigma::Float64, mu0, tau0)
+                      w::Array{Float64}, sigma::Float64, mu0::Float64, tau0::Float64)
 
     # Numerator
     return(((sum(xj .* (y - X * w)) / sigma) + (mu0/tau0)) / ((transpose(xj) * xj / sigma) + (1 / tau0)))
 
     end;
 
-function posterior_tau(xj::Array{Float64}, sigma::Float64, tau0)
+function posterior_tau(xj::Array{Float64}, sigma::Float64, tau0::Float64)
 
     return( 1 / ( (transpose(xj) * (xj ./ sigma)) + (1/tau0)) )
 

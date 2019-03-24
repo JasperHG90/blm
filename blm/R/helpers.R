@@ -55,11 +55,16 @@ check_formula <- function(varnames, formula) {
 
   } else {
 
+    # Split the IVs
+    IVs <- strsplit(IV,"(\\s)?\\+(\\s)?")[[1]]
+
     ## We have the situation that there is only one IV
 
     if( !(IV[which(!grepl("\\*", IVs))] %in% varnames) ) {
 
-      stop("Independent variable not found in dataset.")
+      if( (IV[which(!grepl("\\*", IVs))] != "1") ) {
+        stop("Independent variable not found in dataset.")
+      }
 
     }
 
@@ -244,7 +249,7 @@ initialize_chain_values <- function(priors) {
 }
 
 # Helper function that calls the Julia Gibbs sampler
-gibbs_sampler <- function(X, y, initial_values, iterations, priors, burn) {
+gibbs_sampler <- function(X, y, initial_values, iterations, thinning, priors, burn) {
 
   # Unroll initial values
   w <- initial_values$w
@@ -252,7 +257,7 @@ gibbs_sampler <- function(X, y, initial_values, iterations, priors, burn) {
 
   # TODO: ensure that user passes valid iterations / priors (integers)
   r <- .blm$julia$eval("gibbs_sampler")(X, y, w, sigma, as.integer(iterations),
-                                        unname(priors))
+                                        as.integer(thinning), unname(priors))
 
   # Burn
   return(r[-1:-burn,])

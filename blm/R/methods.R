@@ -57,7 +57,7 @@ set_priors.blm <- function(blm, ...) {
 # Initial weight correction ==> divide coefficient weights by sqrt(sample size) to avoid them getting too large
 # when using uninformative priors
 #' @export
-sampling_options.blm <- function(blm, chains = 1, iterations = 10000, thinning = 3,
+sampling_options.blm <- function(blm, chains = 1, iterations = 10000, thinning = 1,
                                  burn = 1000) {
 
   ##### Checks ######
@@ -109,6 +109,7 @@ sample_posterior.blm <- function(blm) {
   iterations <- blm$sampling_settings$iterations
   priors <- blm$priors
   burn <- blm$sampling_settings$burn
+  thinning <- blm$sampling_settings$thinning
 
   # unroll data
   X <- blm$input$X
@@ -140,7 +141,7 @@ sample_posterior.blm <- function(blm) {
     initial_values_current <- initial_values[[i]]
 
     # Call the gibbs sampler (helpers.R)
-    posterior[[i]] <- gibbs_sampler(X, y, initial_values_current, iterations, priors, burn)
+    posterior[[i]] <- gibbs_sampler(X, y, initial_values_current, iterations, thinning, priors, burn)
 
   }
 
@@ -186,6 +187,7 @@ print.blm <- function(blm) {
     "Sampler:\n",
       "\tChains: ", blm$sampling_settings$chains , "\n",
       "\tIterations: ", blm$sampling_settings$iterations , "\n",
+      "\tThinning: ", blm$sampling_settings$thinning, "\n",
       "\tBurn: ", blm$sampling_settings$burn , "\n\n")
 
   # Set up priors matrix
@@ -241,7 +243,7 @@ summary.blm <- function(blm) {
   ## num. observations + predictors
   obs <- list(
     "Sampling settings" = matrix(c(blm$input$n,blm$input$m - 1,blm$sampling_settings$chains,
-                  blm$sampling_settings$iterations,blm$sampling_settings$burn),
+                  blm$sampling_settings$iterations,blm$sampling_settings$thinning, blm$sampling_settings$burn),
                 nrow = 1,
                 dimnames = list(
                   c(""),
@@ -249,6 +251,7 @@ summary.blm <- function(blm) {
                     "Predictors",
                     "Chains",
                     "Iterations",
+                    "Thinning",
                     "Burn")
                 )))
 
@@ -449,6 +452,49 @@ coefficients.blm <- function(blm, type = c("mean", "mode", "median")) {
 
   # Call coef
   return(coef(blm, type))
+
+}
+
+# Predict method
+#' @export
+predict.blm <- function(blm, type = c("mean", "mode", "median")) {
+
+  # Match arg
+  type <- match.arg(type)
+
+  # Get coefficients
+  w <- matrix(coef(blm, type = type), ncol=1)
+
+  # Predict
+  return(
+    blm$input$X %*% w
+  )
+
+}
+
+# Residuals
+#' @export
+residuals.blm <- function(blm, type = c("mean", "mode", "median")) {
+
+  # Match arg
+  type <- match.arg(type)
+
+  # Predict
+  pred <- predict(blm, type=type)
+
+  # Subtract
+  return(blm$input$y - pred)
+
+}
+
+# Residuals
+#' @export
+resid.blm <- function(blm, type = c("mean", "mode", "median")) {
+
+  # Match arg
+  type <- match.arg(type)
+
+  return(residuals(blm, type = type))
 
 }
 

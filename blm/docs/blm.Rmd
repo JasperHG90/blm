@@ -98,7 +98,7 @@ We can update sampling settings as follows
 ```{r}
 bfit <- bfit %>%
   # Update sampling settings
-  sampling_options(., chains = 3, iterations = 10000, burn = 2000)
+  sampling_options(., chains = 5, iterations = 15000, thinning = 3, burn = 2000)
 ```
 
 Priors may be made informative as follows

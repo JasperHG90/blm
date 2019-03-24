@@ -11,7 +11,7 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     =#
 
     # 1. Call the gibbs sampler
-    sampled = gibbs_sampler(X, y, w, sigma, iterations, priors)
+    sampled = gibbs_sampler(X, y, w, sigma, iterations, 1, priors)
 
     # 2. Burn
     sampled = sampled[burn+1:end, :]
@@ -29,7 +29,7 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     for j in 1:(iterations - burn)
 
         # Simulate y
-        res[j,:] = simulate_y(lincom[:,j], sampled[j,size(sampled)[2]])
+        res[j,:] = simulate_y(lincom[:,j], sampled[j,end])
 
         # Compute residuals (simulated)
         resids[j, :, 1] = res[j, :] .- lincom[:, j]
