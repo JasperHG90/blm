@@ -27,7 +27,7 @@ CI <- function(posterior) {
   D <- do.call(rbind.data.frame, posterior)
 
   # Calculate 95% CI
-  post_credint <- apply(D, 2, 
+  post_credint <- apply(D, 2,
                         function(x) quantile(x, c(0.025, 0.975)))
 
   # Return
@@ -97,7 +97,6 @@ calc_mode <- function(x) {
 
 # Model DIC
 # See: http://kylehardman.com/BlogPosts/View/6
-# TODO: transfer to Julia
 DIC <- function(X, y, posterior) {
 
   ## Join posterior

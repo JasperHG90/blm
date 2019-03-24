@@ -53,7 +53,6 @@ set_priors.blm <- function(blm, ...) {
 
 # Do gibbs sampling on blm
 # This should be a class method
-# TODO: add thinning
 # Initial weight correction ==> divide coefficient weights by sqrt(sample size) to avoid them getting too large
 # when using uninformative priors
 #' @export
@@ -274,19 +273,19 @@ summary.blm <- function(blm) {
   # Add MC error
   MAPV[3,] <- MAPV[2,] / sqrt(blm$sampling_settings$iterations)
   # Round
-  MAPV <- round(MAPV, digits = 3)
+  MAPV <- round(MAPV, digits = 4)
 
   # Amend names
-  row.names(MAPV) <- c("Est.", "SE", "MCERR.")
-  colnames(MAPV) <-var_names
+  row.names(MAPV) <- c("Est.", "SD", "MCERR.")
+  colnames(MAPV) <- var_names
 
   # Calculate CI
   CIV <- list(
-    "95% credible interval" = round(CI(blm$posterior), digits = 3)
+    "95% credible interval" = round(CI(blm$posterior), digits = 4)
   )
 
   # Burn-in diagnostics
-  burning_diag <- round(burnin_diagnostic(blm$posterior), digits=3)
+  burning_diag <- round(burnin_diagnostic(blm$posterior), digits=4)
 
   # Print MAP & SE
   cat("Bayesian Linear Model (BLM) results:")
