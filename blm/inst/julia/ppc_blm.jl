@@ -41,7 +41,7 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
         # Adjusted R^2 values for simulated & observed data
         heterosked[j, 1] = adjR2(X, resids[j, :, 1].^2)
-        heterosked[j, 2] = adjR2(X, resids[j, :, 2].^2))
+        heterosked[j, 2] = adjR2(X, resids[j, :, 2].^2)
 
         # Skewness for simulated & observed data
         skewed[j, 1] = skewness(resids[j, :, 1])
@@ -54,7 +54,7 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
       "sim_y" => res,
       "residuals" => resids,
       "heteroskedasticity" => heterosked,
-      "skewness" => skewness
+      "skewness" => skewed
     ))
 
     end;
@@ -86,7 +86,7 @@ function simulate_y(computed_y::Array{Float64}, sd::Float64)
 
     end;
 
-function predict_y(X,y)
+function predict_y(X::Array{Float64}, y::Array{Float64})
 
   #=
   Predict outcome variable y
@@ -97,15 +97,15 @@ function predict_y(X,y)
 
   end;
 
-function adjR2(X, y)
+function adjR2(X::Array{Float64}, y::Array{Float64})
 
   #=
   Calculate sums of squares & R2
   =#
 
-  TSS::Float64
-  RSS::Float64
-  R2::Float64
+  local TSS::Float64
+  local RSS::Float64
+  local R2::Float64
 
   # TSS
   TSS = sum((y .- mean(y)).^2)
@@ -117,16 +117,16 @@ function adjR2(X, y)
   R2 = 1 - (RSS / TSS)
 
   # Adjusted R2
-  return( 1 - ((1 - R2) * (size(X)[1] - 1)) / (size(X)[1] - (size(X)[2]-1) - 1) )
+  return( 1 - ((1 - R2) * (size(X)[1] - 1)) / (size(X)[1] - (size(X)[2]-1) - 1 - 1) ) # Last 1 == intercept
 
   end;
 
-function skewness(x)
+function skewness(x::Array{Float64})
 
   #=
   Calculate skewness in vector standardized vector x
   =#
 
-  return((sum(x^3) / size(x)[1]) / ((sum(x^2) / size(x)[1])^1.5))
+  return((sum(x.^3) / size(x)[1]) / ((sum(x.^2) / size(x)[1])^1.5))
 
   end;

@@ -4,7 +4,7 @@
 \alias{normality_check}
 \title{Check a posterior sample for normality assumption}
 \usage{
-normality_check(x)
+normality_check(x, ...)
 }
 \arguments{
 \item{x}{ppc object}

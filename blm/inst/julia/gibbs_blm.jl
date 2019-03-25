@@ -64,19 +64,13 @@ function gibbs_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     :seealso:
     =#
 
-    # Number of params
-    nparam = length(priors)
-
-    # Number of examples
-    n = size(X)[1]
-
     # For each, do
-    for j in 1:nparam
+    for j in 1:length(priors)
 
         # If j == nparam, then sigma
-        if j == nparam
+        if j == length(priors)
 
-            sigma = rand(InverseGamma(posterior_rate(n, priors[j][:alpha]),
+            sigma = rand(InverseGamma(posterior_rate(size(X)[1], priors[j][:alpha]),
                                       posterior_scale(X, w, y, priors[j][:beta])))
 
         # Else, coefficient

@@ -4,7 +4,7 @@
 \alias{homoskedast_check}
 \title{Check a posterior sample for homoskedasticity assumption}
 \usage{
-homoskedast_check(x)
+homoskedast_check(x, ...)
 }
 \arguments{
 \item{x}{ppc object}

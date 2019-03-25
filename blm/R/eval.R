@@ -28,7 +28,7 @@ CI <- function(posterior) {
 
   # Calculate 95% CI
   post_credint <- apply(D, 2,
-                        function(x) quantile(x, c(0.025, 0.975)))
+                        function(x) quantile(x, c(0.025, 0.25, 0.5, 0.75, 0.975)))
 
   # Return
   post_credint
@@ -100,7 +100,7 @@ calc_mode <- function(x) {
 DIC <- function(X, y, posterior) {
 
   ## Join posterior
-  pb <- do.call(rbind.data.frame, posterior)
+  pb <- do.call(rbind, posterior)
 
   ## MAP values
   MAP <- apply(pb, 2, mean)
@@ -111,39 +111,13 @@ DIC <- function(X, y, posterior) {
 
   ## Two parts to DIC ==> (1) sum of log of likelihood P(y|theta_MAP)
 
-  # Mu for each point in the likelihood
-  mu <- X %*% coefs
-  # Draw from normal
-  LL <- sum(log(dnorm(y, mean=mu, sd=sqrt(sigma))))
-
-  ## Part two: effective number of parameters p_dic
-
-  ## Multiply X by the posterior coefficients from the sample
-  # Result: n x k matrix (n==examples, k==# gibbs samples across ALL chains)
-  lincom <- X %*% t(pb[,-ncol(pb)])
-
-  # Open up results matrix
-  P <- matrix(0.0, ncol = 1, nrow=ncol(lincom))
-
-  # For each
-  for(i in 1:ncol(lincom)) {
-    P[i, 1] = sum(log(dnorm(y, mean=lincom[,i], sd=sqrt(pb[i,ncol(pb)]))))
-  }
-
-  ## Average of all samples
-  P <- mean(P[,1])
-
-  ## Effective Params
-  P_eff <- 2*(LL-P)
+  # Call Julia implementation
+  r <- .blm$julia$eval("DIC")(X, y, coefs, sigma, pb)
 
   ## Return model fit
   return(
   do.call(cbind.data.frame,
-          list(
-            'DIC' = -2*LL + 2*P_eff,
-            'LL' = LL,
-            "Eff. P" = P_eff
-          ))
+          r)
   )
 
 }

@@ -276,7 +276,7 @@ summary.blm <- function(blm) {
   MAPV <- round(MAPV, digits = 4)
 
   # Amend names
-  row.names(MAPV) <- c("Est.", "SD", "MCERR.")
+  row.names(MAPV) <- c("Est. (mean)", "SD", "MCERR.")
   colnames(MAPV) <- var_names
 
   # Calculate CI
@@ -531,9 +531,9 @@ posterior_predictive_checks.blm <- function(blm,
   # Add class to input
   class(inputs) <- "ppc"
 
-  # Calculate statistics
-  inputs <- normality_check(inputs)
-  inputs <- homoskedast_check(inputs)
+  # Add the results to the data
+  inputs <- normality_check(inputs, r$skewness)
+  inputs <- homoskedast_check(inputs, r$heteroskedasticity)
 
   # Return
   return(inputs)
@@ -547,18 +547,11 @@ model_fit.blm <- function(blm) {
   # Model fit
   mfit <- DIC(blm$input$X, blm$input$y, blm$posterior)
 
-  # Intercept-only model
-  mfitIO <- DIC(matrix(blm$input$X[,1],ncol=1),
-                blm$input$y, lapply(blm$posterior, function(x){
-                  x[,c(1,ncol(x))]
-  }))
-
   # Bind models
-  final <- round(do.call(rbind.data.frame,
-                         list(mfit, mfitIO)), digits=3)
+  final <- round(mfit, digits=3)
 
   # Row names
-  row.names(final) <- c("(Model)", "(Null model)")
+  row.names(final) <- c("(Model)")
 
   # Print
   print.listof(
@@ -593,29 +586,7 @@ draw_value.gamma <- function(prior) {
 # Class 'ppc' methods -----
 
 # Check normality of errors assumption
-#' @export
-normality_check.ppc <- function(ppc) {
-
-  # Unroll data
-  iterations <- ppc$settings$iterations
-  burn <- ppc$settings$burn
-  resids <- ppc$data$residuals
-
-  # Effective iterations
-  eff <- (iterations - burn)
-
-  # 3. Calculate the skewness for each sample
-  skewed <- matrix(0L, nrow = eff, ncol=2)
-  colnames(skewed) <- c("simulated", "observed")
-
-  # For each desired sample, calculate
-  for(i in 1:eff) {
-
-    # Compute skewness
-    skewed[i,] <- c(e1071::skewness(resids[i,,1]),
-                    e1071::skewness(resids[i,,2]))
-
-  }
+normality_check.ppc <- function(ppc, skewed) {
 
   # Compute where sim > obs (bayesian p-value)
   bpv <- mean(skewed[,1] > skewed[,2])
@@ -638,34 +609,10 @@ normality_check.ppc <- function(ppc) {
 }
 
 # Check homoskedasticity assumption
-#' @export
-homoskedast_check.ppc <- function(ppc) {
+homoskedast_check.ppc <- function(ppc, heterosked) {
 
-  # Unroll data
-  iterations <- ppc$settings$iterations
-  burn <- ppc$settings$burn
-  resids <- ppc$data$residuals
-  X <- ppc$data$X
-
-  # Effective iterations
-  eff <- (iterations - burn)
-
-  # 3. Calculate the skewness for each sample
-  homosked <- matrix(0L, nrow = eff, ncol=2)
-  colnames(homosked) <- c("simulated", "observed")
-
-  # For each desired sample, calculate
-  for(i in 1:eff) {
-
-    # Square residuals (no negative)
-    ys <- resids[i,,1]^2
-    yo <- resids[i,,2]^2
-
-    # Calculate homoskedasticity
-    homosked[i,1] <- test_for_homoskedasticity(ys, X)
-    homosked[i,2] <- test_for_homoskedasticity(yo, X)
-
-  }
+  # Legacy
+  homosked <- heterosked
 
   # Compute where sim > obs (bayesian p-value)
   bpv <- mean(homosked[,1] > homosked[,2])
@@ -724,10 +671,16 @@ plot.ppc <- function(ppc, type=c("normality", "heteroskedasticity", "rmse")) {
   )
 
   # Plot data
-  data %>%
+  data <- data %>%
     as.data.frame() %>%
-    tidyr::gather(data, value) %>%
-    ggplot2::ggplot(., ggplot2::aes(x=value, fill=data)) +
+    tidyr::gather(dataset, value)
+
+  # Update labels
+  data$dataset <- ifelse(data$dataset == "V1", "Simulated", "Observed")
+
+  # Plot
+  data %>%
+    ggplot2::ggplot(., ggplot2::aes(x=value, fill=dataset)) +
       ggplot2::geom_density(alpha=0.6) +
       ggplot2::theme_bw() +
       ggplot2::ggtitle(paste0("Observed and simulated results for test '", type, "'"))

@@ -4,7 +4,7 @@
 #'
 #' @param blm blm object
 #' @param ... optional arguments needed to specify a prior
-#' 
+#'
 #' @return blm object with new priors
 #' @export
 set_priors <- function(x, ...) {
@@ -18,7 +18,7 @@ set_priors <- function(x, ...) {
 #' @param iterations number of iterations per chain
 #' @param burn number of burn-in iterations
 #' @param julia use julia for computations?
-#' 
+#'
 #' @return updated blm object
 #' @export
 sampling_options <- function(x, ...) {
@@ -28,7 +28,7 @@ sampling_options <- function(x, ...) {
 #' Sample the posterior distribution
 #'
 #' @param x blm object
-#' 
+#'
 #' @return blm object containing sampled posterior
 #' @export
 sample_posterior <- function(x) {
@@ -36,9 +36,9 @@ sample_posterior <- function(x) {
 }
 
 #' Set up posterior predictive checks
-#' 
+#'
 #' @param x blm object
-#' 
+#'
 #' @return prints summary of the ppc to the R console
 #' @export
 posterior_predictive_checks <- function(x, ...) {
@@ -46,9 +46,9 @@ posterior_predictive_checks <- function(x, ...) {
 }
 
 #' Assess blm model fit
-#' 
+#'
 #' @param x blm object
-#' 
+#'
 #' @return prints summary of model fit (DIC) to the R console
 #' @export
 model_fit <- function(x) {
@@ -58,9 +58,9 @@ model_fit <- function(x) {
 # ---------- Functions for priors ---------------
 
 #' Draw a value from a prior distribution
-#' 
+#'
 #' @param x prior object
-#' 
+#'
 #' @return random variate drawn from a Normal or Gamma distribution
 #' @export
 draw_value <- function(x) {
@@ -70,31 +70,21 @@ draw_value <- function(x) {
 # ---------- Functions for posterior predictive checks ----------
 
 #' Check a posterior sample for normality assumption
-#' 
+#'
 #' @param x ppc object
-#' 
+#'
 #' @return posterior predictive check for normality assumption
 #' @export
-normality_check <- function(x) {
+normality_check <- function(x, ...) {
   UseMethod("normality_check")
 }
 
 #' Check a posterior sample for homoskedasticity assumption
-#' 
+#'
 #' @param x ppc object
-#' 
+#'
 #' @return posterior predictive check for homoskedasticity assumption
 #' @export
-homoskedast_check <- function(x) {
+homoskedast_check <- function(x, ...) {
   UseMethod("homoskedast_check")
-}
-
-#' Check a posterior sample for RMSE assumption
-#' 
-#' @param x ppc object
-#' 
-#' @return posterior predictive check for RMSE assumption
-#' @export
-model_rmse <- function(x) {
-  UseMethod("model_rmse")
 }
