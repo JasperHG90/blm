@@ -88,3 +88,13 @@ normality_check <- function(x, ...) {
 homoskedast_check <- function(x, ...) {
   UseMethod("homoskedast_check")
 }
+
+#' Check a posterior sample for independence of errors assumption
+#'
+#' @param x ppc object
+#'
+#' @return posterior predictive check for independence of errors assumption
+#' @export
+independence_check <- function(x, ...) {
+  UseMethod("independence_check")
+}

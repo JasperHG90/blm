@@ -534,6 +534,7 @@ posterior_predictive_checks.blm <- function(blm,
   # Add the results to the data
   inputs <- normality_check(inputs, r$skewness)
   inputs <- homoskedast_check(inputs, r$heteroskedasticity)
+  inputs <- independence_check(inputs, r$independence)
 
   # Return
   return(inputs)
@@ -634,6 +635,28 @@ homoskedast_check.ppc <- function(ppc, heterosked) {
 
 }
 
+# Check independence of errors assumption
+independence_check.ppc <- function(ppc, independence) {
+
+  # Compute where sim > obs (bayesian p-value)
+  bpv <- mean(independence[,1] > independence[,2])
+
+  # To list
+  ppc$data$independence <- independence
+
+  # Add results
+  if(!"results" %in% names(ppc)) {
+    ppc$results <- list(
+      "independence" = bpv
+    )
+  } else {
+    ppc$results$independence <- bpv
+  }
+
+  # Return
+  return(ppc)
+}
+
 # Summary
 #' @export
 summary.ppc <- function(ppc) {
@@ -645,7 +668,7 @@ summary.ppc <- function(ppc) {
 
   # Bind results
   bpr <- round(do.call(cbind.data.frame, ppc$results), digits=3)
-  colnames(bpr) <- c("Normality", "Heteroskedasticity")
+  colnames(bpr) <- c("Normality", "Heteroskedasticity", "Independence")
   row.names(bpr) <- c("p")
 
   res <- list(
@@ -660,14 +683,16 @@ summary.ppc <- function(ppc) {
 
 # Plot method
 #' @export
-plot.ppc <- function(ppc, type=c("normality", "heteroskedasticity", "rmse")) {
+plot.ppc <- function(ppc, type=c("normality", "heteroskedasticity", "independence")) {
+
+  type <- match.arg(type)
 
   # Get data
   data <- switch(
     type,
     "normality" = ppc$data$skewness,
     "heteroskedasticity" = ppc$data$homosked,
-    "rmse" = ppc$data$rmse
+    "independence" = ppc$data$independence
   )
 
   # Plot data
