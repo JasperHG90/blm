@@ -1,9 +1,0 @@
-Requirements:
-  doFuture
-  magrittr
-  tidyr
-  tibble
-  ggplot2
-  scales
-  stringr
-  e1071

@@ -1,3 +1,0 @@
-# Julia setup
-
-Run: Pkg.update(); Pkg.add("Distributions")
