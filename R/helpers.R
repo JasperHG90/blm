@@ -386,3 +386,20 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
   )
 
 }
+
+# Special print used by blm package
+# Adapted from print.listof() function
+print_special <- function(x, ...) {
+  # Get list names
+  nn <- paste0("\033[1m", names(x), "\033[22m")
+  # Get values
+  ll <- length(x)
+  if (length(nn) != ll)
+    nn <- paste("Component", seq.int(ll))
+  for (i in seq_len(ll)) {
+    cat(nn[i], ":\n")
+    print(x[[i]], ...)
+    cat("\n")
+  }
+  invisible(x)
+}

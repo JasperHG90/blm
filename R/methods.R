@@ -221,6 +221,9 @@ print.blm <- function(blm) {
 
 # Summary method
 #' @export
+#' @importFrom crayon bold
+#' @importFrom crayon green
+#' @importFrom crayon red
 summary.blm <- function(blm) {
 
   var_names <- c(colnames(blm$input$X), "sigma")
@@ -231,12 +234,14 @@ summary.blm <- function(blm) {
 
   ## Construct individual parts
   general <- paste0(
-    "Formula: '", formchar, "'"
+    "Formula: '", crayon::green(formchar), "'"
   )
 
   ## User has already sampled or not
   has_sampled <- paste0(
-    "Sampled: ", "posterior" %in% names(blm)
+    "Sampled: ", ifelse("posterior" %in% names(blm),
+                        crayon::green('TRUE'),
+                        crayon::red('FALSE'))
   )
 
   ## num. observations + predictors
@@ -256,7 +261,7 @@ summary.blm <- function(blm) {
 
   ### If not sampled yet ...
   if(!"posterior" %in% names(blm)) {
-    cat("Bayesian Linear Model (BLM) results:")
+    cat(crayon::bold("Bayesian Linear Model (BLM) results:"))
     cat("\n\n")
     cat(general)
     cat("\n\n")
@@ -288,7 +293,7 @@ summary.blm <- function(blm) {
   burning_diag <- round(burnin_diagnostic(blm$posterior), digits=4)
 
   # Print MAP & SE
-  cat("Bayesian Linear Model (BLM) results:")
+  cat(crayon::bold("Bayesian Linear Model (BLM) results:"))
   cat("\n\n")
   cat(general)
   cat("\n\n")

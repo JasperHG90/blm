@@ -5,7 +5,8 @@ BLM (Bayesian Linear Model)
 Written by: Jasper Ginn
 Course: Introduction to Bayesian Statistics
           @Utrecht University
-          @instructor: Prof. Herbert Hoijtink
+          @instructor1: Prof. Herbert Hoijtink
+          @instructor2: Fayette Klaassen
 
 =#
 
@@ -33,7 +34,7 @@ function gibbs_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     # Open up a results matrix
     res = Array{Float64}(undef, iterations, (size(X)[2] + 1))
 
-    # For each iterations
+    # For each iteration
     for i in 1:iterations
 
         for j in 1:thinning
@@ -239,7 +240,7 @@ function predict_y(X::Array{Float64}, y::Array{Float64})
   =#
 
   # Linear model, prediction and return
-  return(X * (inv( transpose(X) * X ) * transpose(X) * y))
+  return(X * ( inv( transpose(X) * X ) * transpose(X) * y))
 
   end;
 
@@ -270,7 +271,7 @@ function adjR2(X::Array{Float64}, y::Array{Float64})
 function skewness(x::Array{Float64})
 
   #=
-  Calculate skewness in vector standardized vector x
+  Calculate skewness in standardized vector x
   =#
 
   return((sum(x.^3) / size(x)[1]) / ((sum(x.^2) / size(x)[1])^1.5))

@@ -13,12 +13,14 @@ Encoding: UTF-8
 LazyData: true
 suggests: testthat
 SystemRequirements: Julia (>= 1.0.0), Distributions.jl
-Imports: 
+Imports:
   JuliaCall (>= 0.16.4),
   tidyr,
   ggplot2,
   scales,
-  e1071
+  crayon
 Depends:
-  magrittr
+  magrittr,
+  R (>= 3.4.0)
 RoxygenNote: 6.1.0
+Suggests: testthat

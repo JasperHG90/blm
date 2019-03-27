@@ -17,8 +17,7 @@ blm_setup <- function(...) {
   # Set up Julia
   .blm$julia <- JuliaCall::julia_setup(...)
   # Install Distributions/statistics package if needed
-  #.blm$julia$install_package_if_needed("Distributions")
-  #.blm$julia$install_package_if_needed("Statistics")
+  .blm$julia$install_package_if_needed("Distributions")
   # Load Distributions/statistics package
   .blm$julia$library("Distributions")
   # Source gibbs sampler julia functions
