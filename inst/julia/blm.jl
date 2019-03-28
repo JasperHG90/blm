@@ -1,6 +1,6 @@
 #=
 
-BLM (Bayesian Linear Model)
+BLM (Bayesian Linear Model) helper functions in Julia
 
 Written by: Jasper Ginn
 Course: Introduction to Bayesian Statistics
@@ -278,7 +278,7 @@ function skewness(x::Array{Float64})
 
   end;
 
-function center(x)
+function center(x::Array{Float64})
 
   #=
   Convenience function used to center a vector by its mean
@@ -288,7 +288,7 @@ function center(x)
 
   end;
 
-function cor(x, y)
+function cor(x::Array{Float64}, y::Array{Float64})
 
   #=
   Pearson correlation coefficient
@@ -298,7 +298,7 @@ function cor(x, y)
 
   end;
 
-function independence(x, k)
+function independence(x::Array{Float64}, k::Int)
 
   #=
   Check correlation of x against x lagged by one

@@ -387,19 +387,71 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
 
 }
 
-# Special print used by blm package
-# Adapted from print.listof() function
-print_special <- function(x, ...) {
-  # Get list names
-  nn <- paste0("\033[1m", names(x), "\033[22m")
-  # Get values
-  ll <- length(x)
-  if (length(nn) != ll)
-    nn <- paste("Component", seq.int(ll))
-  for (i in seq_len(ll)) {
-    cat(nn[i], ":\n")
-    print(x[[i]], ...)
-    cat("\n")
-  }
-  invisible(x)
+cat.burnin <- function(x) {
+
+  # Dims
+  j <- dim(x)[2]
+  n <- dim(x)[1]
+
+  # Fill setting for cat()
+  f <- (nchar(green("0.00")) + 1) * j + (j-1) + nchar("chain 1 ")
+
+  # Round
+  x <- round(x, digits=2)
+
+  # Determine colors
+  is_zero <- x == 0
+  less_than_05 <- abs(x) < 0.05
+
+  # Turn x into a character vector
+  x_v <- as.character(round(unname(unlist(x)), digits=2))
+
+  # For those elements of length 1, add decimals
+  x_v_l1 <- nchar(x_v) == 1
+  x_v_l3 <- nchar(x_v) == 3
+
+  # Set
+  x_v[x_v_l1] <- paste0(x_v[x_v_l1], ".00")
+  x_v[x_v_l3] <- paste0(x_v[x_v_l3], "0")
+
+  # Paste
+  cat(paste0("        ", paste0("b", 0:(j-1), collapse="   "), "\n"))
+  cat(ifelse(is_zero, crayon::green(x_v),
+             ifelse(less_than_05, crayon::yellow(x_v),
+                    crayon::red(x_v))), fill=f, labels=paste0("Chain ", 1:2), sep = " ")
+}
+
+# Cat GR statistic
+cat.GR <- function(x) {
+
+  # Round
+  x <- round(x, digits=2)
+
+  # To vector
+  x <- unname(x[1,])
+
+  # Length
+  j <- length(x)
+
+  # Fill setting for cat()
+  f <- (nchar(green("0.00")) + 1) * j + (j-1) + nchar("chain 1 ")
+
+  # Determine colors
+  is_one <- x == 1
+
+  # Turn x into a character vector
+  x_v <- as.character(x)
+
+  # For those elements of length 1, add decimals
+  x_v_l1 <- nchar(x_v) == 1
+  x_v_l3 <- nchar(x_v) == 3
+
+  # Set
+  x_v[x_v_l1] <- paste0(x_v[x_v_l1], ".00")
+  x_v[x_v_l3] <- paste0(x_v[x_v_l3], "0")
+
+  # Paste
+  cat(paste0("        ", paste0("b", 0:(j-1), collapse="   "), "\n"))
+  cat(ifelse(is_one, crayon::green(x_v), crayon::red(x_v)), fill=f, labels="Value  ", sep = " ")
+
 }

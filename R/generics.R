@@ -55,6 +55,16 @@ model_fit <- function(x) {
   UseMethod("model_fit")
 }
 
+#' Print diagnostics
+#'
+#' @param x blm object
+#'
+#' @return prints summary of convergence diagnostics to R console
+#' @export
+convergence_diagnostics <- function(x) {
+  UseMethod("convergence_diagnostics")
+}
+
 # ---------- Functions for priors ---------------
 
 #' Draw a value from a prior distribution

@@ -178,7 +178,7 @@ print.blm <- function(blm) {
 
   # Print information
   msg <- paste0(
-    "Bayesian Linear Model (BLM) object:\n\n",
+    crayon::bold("Bayesian Linear Model (BLM) object:\n\n"),
     "Data:\n",
       "\tPredictors: ", blm$input$m - 1, "\n",
       "\tOutcome: ", blm$input$variables$DV, "\n",
@@ -219,6 +219,63 @@ print.blm <- function(blm) {
 
 }
 
+# Convergence diagnostics
+#' @export
+convergence_diagnostics.blm <- function(blm) {
+
+  var_names <- c(colnames(blm$input$X), "sigma")
+
+  ### Formula
+  form <- as.character(blm$input$formula)
+  formchar <- paste0(form[2], " ", form[1], " ", form[3])
+
+  ## Construct individual parts
+  general <- paste0(
+    "Formula: '", crayon::italic(formchar), "'"
+  )
+
+  ## User has already sampled or not
+  has_sampled <- paste0(
+    "Sampled: ", ifelse("posterior" %in% names(blm),
+                        crayon::green('TRUE'),
+                        crayon::red('FALSE'))
+  )
+
+  ### If not sampled yet ...
+  if(!"posterior" %in% names(blm)) {
+    cat(crayon::bold("Bayesian Linear Model (BLM) convergence diagnostics:"))
+    cat("\n\n")
+    cat(general)
+    cat("\n\n")
+    cat(has_sampled)
+    return(cat(""))
+  } else {
+
+    # Burn-in diagnostics
+    burning_diag <- burnin_diagnostic(blm$posterior)
+
+    # If multiple chains
+    if(blm$sampling_settings$chains > 1) {
+      # Calculate Gelman-Rubin
+      GRS <- GR(blm$posterior, blm$sampling_settings$iterations)
+    }
+
+    # Cat
+    cat(crayon::bold("Bayesian Linear Model (BLM) convergence diagnostics:"))
+    cat("\n\n")
+    cat(general)
+    cat("\n\n")
+    cat(has_sampled)
+    cat("\n\n")
+    cat("Burn-in diagnostic:\n")
+    cat.burnin(burning_diag)
+    cat("\n")
+    cat("Gelman-Rubin statistic:\n")
+    cat.GR(GRS)
+  }
+
+}
+
 # Summary method
 #' @export
 #' @importFrom crayon bold
@@ -234,7 +291,7 @@ summary.blm <- function(blm) {
 
   ## Construct individual parts
   general <- paste0(
-    "Formula: '", crayon::green(formchar), "'"
+    "Formula: '", crayon::italic(formchar), "'"
   )
 
   ## User has already sampled or not
@@ -289,9 +346,6 @@ summary.blm <- function(blm) {
     "95% credible interval" = round(CI(blm$posterior), digits = 4)
   )
 
-  # Burn-in diagnostics
-  burning_diag <- round(burnin_diagnostic(blm$posterior), digits=4)
-
   # Print MAP & SE
   cat(crayon::bold("Bayesian Linear Model (BLM) results:"))
   cat("\n\n")
@@ -302,17 +356,6 @@ summary.blm <- function(blm) {
   print.listof(obs)
   print.listof(list("Maximum a posteriori (MAP) estimates" = MAPV))
   print.listof(CIV)
-  print.listof(list("Burn-in diagnostics" = burning_diag))
-
-  # If multiple chains
-  if(blm$sampling_settings$chains > 1) {
-    # Calculate Gelman-Rubin
-    GRS <- list(
-      "Gelman-Rubin Statistic" = round(GR(blm$posterior,
-                                          blm$sampling_settings$iterations), digits = 3)
-    )
-    print.listof(GRS)
-  }
 
 }
 
@@ -667,7 +710,7 @@ independence_check.ppc <- function(ppc, independence) {
 summary.ppc <- function(ppc) {
 
   msg <- paste0(
-    "Posterior Predictive Checks (PPC) for blm object:",
+    crayon::bold("Posterior Predictive Checks (PPC) for blm object:"),
     "\n\n"
   )
 
@@ -684,6 +727,12 @@ summary.ppc <- function(ppc) {
   cat(msg)
   print.listof(res)
 
+}
+
+# Print method == summary method for ppc
+#' @export
+print.ppc <- function(ppc) {
+  summary(ppc)
 }
 
 # Plot method
