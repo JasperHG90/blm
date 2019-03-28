@@ -387,6 +387,7 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
 
 }
 
+# Special cat function for burn-in statistic
 cat.burnin <- function(x) {
 
   # Dims
@@ -394,7 +395,7 @@ cat.burnin <- function(x) {
   n <- dim(x)[1]
 
   # Fill setting for cat()
-  f <- (nchar(green("0.00")) + 1) * j + (j-1) + nchar("chain 1 ")
+  f <- (nchar(crayon::green("0.00")) + 1) * j + (j-1) + nchar("chain 1 ")
 
   # Round
   x <- round(x, digits=2)
@@ -421,7 +422,7 @@ cat.burnin <- function(x) {
                     crayon::red(x_v))), fill=f, labels=paste0("Chain ", 1:2), sep = " ")
 }
 
-# Cat GR statistic
+# Special cat function for Gelman-Rubin statistic
 cat.GR <- function(x) {
 
   # Round
@@ -434,7 +435,7 @@ cat.GR <- function(x) {
   j <- length(x)
 
   # Fill setting for cat()
-  f <- (nchar(green("0.00")) + 1) * j + (j-1) + nchar("chain 1 ")
+  f <- (nchar(crayon::green("0.00")) + 1) * j + (j-1) + nchar("chain 1 ")
 
   # Determine colors
   is_one <- x == 1

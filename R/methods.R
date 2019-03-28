@@ -40,7 +40,7 @@ set_priors.blm <- function(blm, ...) {
 
   }
 
-  # Emit warnings
+  # TODO: Emit warnings
   #  ...
 
   # Set new priors and return
@@ -243,7 +243,7 @@ convergence_diagnostics.blm <- function(blm) {
 
   ### If not sampled yet ...
   if(!"posterior" %in% names(blm)) {
-    cat(crayon::bold("Bayesian Linear Model (BLM) convergence diagnostics:"))
+    cat(crayon::bold("Convergence diagnostics for blm object:"))
     cat("\n\n")
     cat(general)
     cat("\n\n")
@@ -261,7 +261,7 @@ convergence_diagnostics.blm <- function(blm) {
     }
 
     # Cat
-    cat(crayon::bold("Bayesian Linear Model (BLM) convergence diagnostics:"))
+    cat(crayon::bold("Convergence diagnostics for blm object:"))
     cat("\n\n")
     cat(general)
     cat("\n\n")
@@ -318,7 +318,7 @@ summary.blm <- function(blm) {
 
   ### If not sampled yet ...
   if(!"posterior" %in% names(blm)) {
-    cat(crayon::bold("Bayesian Linear Model (BLM) results:"))
+    cat(crayon::bold("Model results for blm object:"))
     cat("\n\n")
     cat(general)
     cat("\n\n")
@@ -331,23 +331,23 @@ summary.blm <- function(blm) {
   ### Statistics
 
   # Calculate MAP for each chain & combine
-  MAPV <- do.call(rbind.data.frame, MAP(blm$posterior))
+  MAPV <- do.call(cbind.data.frame, MAP(blm$posterior))
   # Add MC error
-  MAPV[3,] <- MAPV[2,] / sqrt(blm$sampling_settings$iterations)
+  MAPV[,3] <- MAPV[,2] / sqrt(blm$sampling_settings$iterations)
   # Round
-  MAPV <- round(MAPV, digits = 4)
+  MAPV <- round(MAPV, digits = 3)
 
   # Amend names
-  row.names(MAPV) <- c("Est. (mean)", "SD", "MCERR.")
-  colnames(MAPV) <- var_names
+  colnames(MAPV) <- c("Est. (mean)", "SD", "MCERR.")
+  rownames(MAPV) <- c(paste0("b", 0:(length(var_names)-2)), "sigma")
 
   # Calculate CI
-  CIV <- list(
-    "95% credible interval" = round(CI(blm$posterior), digits = 4)
-  )
+  CIV <- t(round(CI(blm$posterior), digits = 3))
+  # Rownames
+  rownames(CIV) <- c(paste0("b", 0:(length(var_names)-2)), "sigma")
 
   # Print MAP & SE
-  cat(crayon::bold("Bayesian Linear Model (BLM) results:"))
+  cat(crayon::bold("Model results for blm object:"))
   cat("\n\n")
   cat(general)
   cat("\n\n")
@@ -355,7 +355,7 @@ summary.blm <- function(blm) {
   cat("\n\n")
   print.listof(obs)
   print.listof(list("Maximum a posteriori (MAP) estimates" = MAPV))
-  print.listof(CIV)
+  print.listof(list("95% credible interval" = CIV))
 
 }
 
@@ -603,6 +603,7 @@ model_fit.blm <- function(blm) {
   row.names(final) <- c("(Model)")
 
   # Print
+  cat(crayon::bold("Model fit for blm object:\n\n"))
   print.listof(
     list("Model DIC"=final)
   )
