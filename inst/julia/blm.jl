@@ -142,7 +142,7 @@ PART II: Posterior Predictive Checks
 =#
 
 function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
-                       sigma::Float64, iterations::Int, burn::Int, priors)
+                       sigma::Float64, iterations::Int, thinning::Int, burn::Int, priors)
 
     #=
     This function is used to draw data from the posterior using the gibbs sampler and to simulate values of the
@@ -152,7 +152,7 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     =#
 
     # 1. Call the gibbs sampler
-    sampled = gibbs_sampler(X, y, w, sigma, iterations, 1, priors)
+    sampled = gibbs_sampler(X, y, w, sigma, iterations, thinning, priors)
 
     # 2. Burn
     sampled = sampled[burn+1:end, :]
