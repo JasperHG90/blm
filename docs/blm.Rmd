@@ -46,7 +46,7 @@ The data we will use comes from the exercises
 
 ```{r}
 ## Exercise 2 data
-d <- haven::read_sav("../../Exercise 2 - Data.sav")
+d <- haven::read_sav("../testing/Exercise 2 - Data.sav")
 df <- as.data.frame(d)
 knitr::kable(head(df))
 ```
