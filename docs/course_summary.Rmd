@@ -208,7 +208,7 @@ mod1 <- 'model{
 library(rjags)
 con <- textConnection(mod1)
 # Create a jags model
-jmod <- jags.model(file="jags_models/ex_jmod1.txt", data=dat, n.chains=2)
+jmod <- jags.model(file=con, data=dat, n.chains=2)
 close(con)
 ```
 
