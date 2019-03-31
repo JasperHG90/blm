@@ -218,7 +218,7 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
     :return: Dictionary containing:
         1. sim_y              [==>] 2D Tensor ([iterations - burn] * 1) of simulated y values
-        2. residuals          [==>] 3D Tensor ([iterations - burn] * n. examples * 2) cotaining residuals for simulated and observed data
+        2. residuals          [==>] 3D Tensor ([iterations - burn] * n. examples * 2) containing residuals for simulated and observed data
         3. heteroskedasticity [==>] 2D Tensor ([iterations - burn] * 2) containing test values (simulatd and observed data) on the test for heteroskedasticity
         4. skewness           [==>] 2D Tensor ([iterations - burn] * 2) containing test values on the test for normality of errors
         5. independence       [==>] 2D Tensor ([iterations - burn] * 2) containing test values on the test for independence of errors
@@ -310,6 +310,9 @@ function predict_y(X::Array{Float64}, y::Array{Float64})
 
   #=
   Predict outcome variable y
+
+  :param X:
+  :param y:
   =#
 
   # Linear model, prediction and return
