@@ -142,7 +142,7 @@ $$
 
 # Defining the likelihood of the data
 
-Let $k_i = \beta_0 + \beta_1X_{1i} + \beta_2X_{2i} + \beta_jX_{ji}$. We assume that the outcome variable $y$ is normally distributed, or $y_i \sim N(k_i, \sigma^2)$. Hence, for the $i^{th}$ example in the data, we can represent the likelihood for this example as
+Let $k_i = \beta_0 + \beta_1X_{1i} + \beta_2X_{2i} + \dots + \beta_jX_{ji}$. We assume that the outcome variable $y$ is normally distributed, or $y_i \sim N(k_i, \sigma^2)$. Hence, for the $i^{th}$ example in the data, we can represent the likelihood for this example as
 
 $$
 \tag{2.1.1}
@@ -162,7 +162,7 @@ $$
 
 # Specifying the prior distribution
 
-For each of the parameters $\beta_0, \beta_1, \beta_2$, we assume a normal prior distribution. For example, the slope coefficient is assumed to be distributed as $f(\beta_0) \sim N(\mu_{0,0}, \tau_{0,0}^2)$, or:
+For each of the parameters $\beta_0, \beta_1, \beta_2, \dots, \beta_j$, we assume a normal prior distribution. For example, the intercept coefficient is assumed to be distributed as $f(\beta_0) \sim N(\mu_{0,0}, \tau_{0,0}^2)$, or:
 
 $$
 \tag{3.1.1}
@@ -205,7 +205,7 @@ $$
 
 Here, we are making the posterior conditional on all parameters other than $\beta_0$, and hence we are effectively turning the joint prior distribution into a single prior distribution.
 
-Plugging in the likelihood and prior distribution into $(6)$, we get
+Plugging in the likelihood and prior distribution into $(4.1)$, we get
 
 $$
 \tag{4.1.1}
@@ -216,7 +216,7 @@ $$
 
 To arrive at the conditional posterior for $\beta_0$, we simply drop all elements that do not contain $\beta_0$. We can do this because, in the conditional posterior distribution, such terms are nothing but normalization constants.
 
-First, we drop the leading coefficients from $(7)$
+First, we drop the leading coefficients from $(4.1.1)$
 
 $$
 \tag{4.1.2}
@@ -233,7 +233,7 @@ $$
 &e^{-\left[\begingroup\color{red}\frac{(y_i - k_i)^2}{2\sigma^2} \endgroup \right]} \longrightarrow  \\ 
 &\begingroup\color{red}\frac{(y_i - k_i)^2}{2\sigma^2} \endgroup = \\
 &\frac{1}{2\sigma^2} \left[y_i^2 - 2y_i k_i + k_i^2 \right] = \\
-&\frac{1}{2\sigma^2} \left[y_i^2 - 2y_i[\beta_0 + \beta_1X_{1i} + \beta_2X_{2i}] + (\beta_0 + \beta_1X_{1i} + \beta_2X_{2i})^2\right]
+&\frac{1}{2\sigma^2} \left[y_i^2 - 2y_i[\beta_0 + \beta_1X_{1i} + \beta_2X_{2i} + \dots + \beta_jX_{ji}] + (\beta_0 + \beta_1X_{1i} + \beta_2X_{2i} + \dots + \beta_jX_{ji})^2\right]
 \end{aligned}
 $$
 
@@ -242,7 +242,7 @@ Expanding the terms and dropping all terms without $\beta_0$ yields
 $$
 \tag{4.1.4}
 \begin{aligned}
-&f(y | \dots) \propto \prod_{i=1}^N e^{\left[-\frac{\beta_0^2}{2\sigma^2} + \beta_0\frac{y_i - \beta_1x_{1i} - \beta_2x_{2i}}{\sigma^2} \right]}
+&f(y | \dots) \propto \prod_{i=1}^N e^{\left[-\frac{\beta_0^2}{2\sigma^2} + \beta_0\frac{y_i - \beta_1x_{1i} - \beta_2x_{2i} - \dots - \beta_jx_{ji}}{\sigma^2} \right]}
 \end{aligned}
 $$
 
@@ -260,16 +260,16 @@ Recall the following exponent rules
 - $e^a e^b = e^{\left[a + b\right]}$
 - $\prod_{i=1}^N e^{\left[i+j\right]} = e^{\left[\left(\sum_{i=1}^N i\right) + \left(\sum_{i=1}^N j\right)\right]}= e^{\left[\left(\sum_{i=1}^N i\right) + Nj\right]}$
 
-Applying these rules to $(9)$ and $(10)$ and factoring the exponent yields
+Applying these rules to $(4.1.4)$ and $(4.1.5)$ and factoring the exponent yields
 
 $$
 \tag{4.1.6}
 \begin{aligned}
 f(\beta_0 | \dots) 
-&\propto e^{\left[-\frac{\beta_0^2N}{2\sigma^2} + \beta_0\frac{\sum_{i=1}^N y_i - \beta_1x_{1i} - \beta_2x_{2i}}{\sigma^2} \right]} 
+&\propto e^{\left[-\frac{\beta_0^2N}{2\sigma^2} + \beta_0\frac{\sum_{i=1}^N y_i - \beta_1x_{1i} - \beta_2x_{2i} - \dots - \beta_jx_{ji}}{\sigma^2} \right]} 
   \times e^{\left[-\frac{\beta_0^2}{2\tau_{0,0}^2} + \frac{\beta_0 \mu_{0,0}}{\tau_{0,0}^2}\right]} \\
-&\propto e^{\left[-\frac{\beta_0^2N}{2\sigma^2} + \beta_0\frac{\sum_{i=1}^N y_i - \beta_1x_{1i} - \beta_2x_{2i}}{\sigma^2} -\frac{\beta_0^2}{2\tau_{0,0}^2} + \frac{\beta_0 \mu_{0,0}}{\tau_{0,0}^2} \right] } \\
-&\propto e^{\left[-\beta_0^2\left(\frac{N}{2\sigma^2} + \frac{1}{2\tau_{0,0}^2}\right) + \beta_0\left(\frac{\sum_{i=1}^N y_i - \beta_1x_{1i} - \beta_2x_{2i}}{\sigma^2} + \frac{\mu_{0,0}}{\tau_{0,0}^2}\right)\right]} 
+&\propto e^{\left[-\frac{\beta_0^2N}{2\sigma^2} + \beta_0\frac{\sum_{i=1}^N y_i - \beta_1x_{1i} - \beta_2x_{2i} - \dots - \beta_jx_{ji}}{\sigma^2} -\frac{\beta_0^2}{2\tau_{0,0}^2} + \frac{\beta_0 \mu_{0,0}}{\tau_{0,0}^2} \right] } \\
+&\propto e^{\left[-\beta_0^2\left(\frac{N}{2\sigma^2} + \frac{1}{2\tau_{0,0}^2}\right) + \beta_0\left(\frac{\sum_{i=1}^N y_i - \beta_1x_{1i} - \beta_2x_{2i} - \dots - \beta_jx_{ji}}{\sigma^2} + \frac{\mu_{0,0}}{\tau_{0,0}^2}\right)\right]} 
 \end{aligned}
 $$
 
@@ -295,8 +295,8 @@ And so we get
 $$
 \tag{4.1.9}
 \begin{aligned}
-&\tau_{0,1}^2\frac{1}{\left(\frac{N}{2\sigma^2} + \frac{1}{2\tau_{0,0}^2}\right)} \\
-&\mu_{0,1}\frac{\left(\frac{\sum_{i=1}^N y_i - \beta_1x_{1i} - \beta_2x_{2i}}{\sigma^2} + \frac{\mu_{0,0}}{\tau_{0,0}^2}\right)}{\left(\frac{N}{\sigma^2} + \frac{1}{\tau_{0,0}^2}\right)}
+&\tau_{0,1}=^2\frac{1}{\left(\frac{N}{\sigma^2} + \frac{1}{\tau_{0,0}^2}\right)} \\
+&\mu_{0,1}=\frac{\left(\frac{\sum_{i=1}^N y_i - \beta_1x_{1i} - \beta_2x_{2i} - \dots - \beta_jx_{ji}}{\sigma^2} + \frac{\mu_{0,0}}{\tau_{0,0}^2}\right)}{\left(\frac{N}{\sigma^2} + \frac{1}{\tau_{0,0}^2}\right)}
 \end{aligned}
 $$
 
@@ -304,16 +304,16 @@ From $(12)$ we can see the effect of the prior distribution. If the prior varian
 
 $$
 \tag{4.1.10}
-\tau_{0,1}^2 = \frac{1}{\frac{N}{2\sigma^2}} = \frac{2\sigma^2}{N} = \sqrt{2} \frac{\sigma}{\sqrt{N}}
+\tau_{0,1}^2 = \frac{1}{\frac{N}{\sigma^2}} = \frac{\sigma^2}{N} = \frac{\sigma}{\sqrt{N}}
 $$
 
-which is simply the variance scaled by the number of examples in the data and similar to the standard error obtained by the central limit theorem.
+which is simply the standard deviation scaled by the number of examples in the data and similar to the standard error obtained by the central limit theorem.
 
 ## The conditional distribution for the slope coefficients
 
 The slope coefficients $\beta_1, \dots, \beta_j$ are derived similarly to the intercept coefficient $\beta_0$. For the moment, assume that $\beta_j$ is the *last slope coefficient*. That is, assume that $j = \text{max}(j)$
 
-First, we define the posterior for $\beta_j$ as the product of the likelihood of the data and the prior distribution for $\beta_j$ and drop all terms in the prior distribution that do not contain this parameter
+First, we define the posterior for $\beta_j$ as the product of the likelihood of the data and the prior distribution for $\beta_j$.
 
 $$
 \tag{4.2.1}
@@ -323,13 +323,13 @@ f(\beta_j | \beta_0, \beta_1, \dots, \beta_j, \sigma^2)
 \end{aligned}
 $$
 
-Next, we drop all terms that do not contain $\beta_j$ from the prior distribution
+Next, we drop all terms that do not contain $\beta_j$ from this distribution
 
 $$
 \tag{4.2.2}
 \begin{aligned}
 f(\beta_j | \dots) 
-&\propto \left[\prod_{i=1}^N e^{-\left[\frac{\begingroup \color{green}(y_i - k_i)^2 \endgroup}{2\sigma^2} \right]}\right] \times e^{-\left[\frac{(\beta_j - \mu_{j,0})^2}{2\tau_{j,0}^2}
+&\propto \left[\prod_{i=1}^N e^{-\left[\frac{\begingroup \color{green}(y_i - k_i)^2 \endgroup}{2\sigma^2} \right]}\right] \times e^{-\left[\frac{\begingroup \color{blue}(\beta_j - \mu_{j,0})^2 \endgroup}{2\tau_{j,0}^2}
 \right]} 
 \end{aligned}
 $$
@@ -348,7 +348,7 @@ $$
 \end{aligned}
 $$
 
-Plugging this back into equation XX and expanding the exponential containing the priors yields
+Plugging this back into equation $(4.2.2)$ and expanding the exponent in the prior distribution (blue in equation $(4.2.2)$) containing the priors yields
 
 $$
 \tag{4.2.4}
@@ -359,7 +359,7 @@ f(\beta_j | \dots)
 \end{aligned}
 $$
 
-Applying exponent properties to YY and combining the terms yields
+Applying exponent properties to $(4.2.4)$ and combining the terms yields
 
 $$
 \tag{4.2.5}
@@ -393,7 +393,7 @@ And so we get
 $$
 \tag{4.2.8}
 \begin{aligned}
-&\tau_{j,1}^2 = \frac{1}{\left(\frac{\sum_i x_{ji}^2}{2\sigma^2} +\frac{1}{2\tau_{j,0}^2}\right)} \\
+&\tau_{j,1}^2 = \frac{1}{\left(\frac{\sum_i x_{ji}^2}{\sigma^2} +\frac{1}{\tau_{j,0}^2}\right)} \\
 &\mu_{j,1} = \frac{\left(\frac{x_{ji} \sum_i (y_i - \beta_0 - \left[\sum_{k=1}^{j-1} \beta_kx_{ki}\right])}{\sigma^2} + \frac{u_{j,0}}{\tau_{j,0}^2}\right)} {\left(\frac{Nx_{ji}^2}{\sigma^2} + \frac{1}{\tau_{0,0}^2}\right)}
 \end{aligned}
 $$
@@ -420,7 +420,7 @@ f(\sigma^2 | \dots)
 \end{aligned}
 $$
 
-Recall that $k_i = \beta_0 + \beta_1X_{1i} + \beta_2X_{2i}$. It is helpful to redefine the part in orange in the equation above such that
+Recall that $k_i = \beta_0 + \beta_1X_{1i} + \beta_2X_{2i} + \dots + \beta_jX_{ji}$. It is helpful to redefine the part in orange in the equation above such that
 
 $$
 \tag{4.3.2}
@@ -438,15 +438,10 @@ $$
 \end{aligned}
 $$
 
-$$
-\tag{4.3.4}
-k_i = \beta_0 + \beta_1 x_{1i} + \dots + \beta_jx_{ji}
-$$
-
 Now, collecting the like terms yields
 
 $$
-\tag{4.3.5}
+\tag{4.3.4}
 \begin{aligned}
 f(\sigma^2 | \dots) 
 &\propto \left[(\sigma^2)^{-\frac{N}{2}}(\sigma^2)^{-\alpha_{0}-1} \right] \times \left[e^{-\left[\frac{S/2}{\sigma^2}\right]}e^{-\frac{\beta_0}{x}}\right] \\
@@ -457,7 +452,7 @@ $$
 Which you should recognize as an inverse gamma distribution with $A = -\frac{N}{2}-\alpha_0 - 1$ and $B = -(S/2+\beta_0)$. We can retrieve the posterior shape $\alpha_1$ and scale $\beta_1$ by using 
 
 $$
-\tag{4.3.6}
+\tag{4.3.5}
 \begin{aligned}
 &\alpha_1 = -A - 1 = - (-\frac{N}{2}-\alpha_0 - 1) - 1 = \frac{N}{2} + \alpha_0 \\
 &\beta_1 = -B = -(-(S/2+\beta_0)) = \frac{S}{2}+\beta_0
@@ -466,7 +461,7 @@ $$
 
 # Posterior distributions in vector notation
 
-The notation we used for the posteriors can become a little unwieldy when we implement it in $\mathbb{R}$. This has to do with the summations in the calculations for the posterior means of the coefficients and intercepts. If we would implement it as is, we would have to create a for loop in which we loop over the $j$ parameters.
+The notation we used for the posteriors can become a little unwieldy when we implement it in $\mathbb{R}$. This has to do with the summations in the calculations for the posterior means of the slopes and intercept. If we would implement it as is, we would have to create a for loop in which we loop over the $j$ parameters.
 
 Alternatively, we can use some linear algebra to simplify the equations. Recall that $k_i = \beta_0 + \beta_1x_{1i} + \dots + \beta_jx_{ji}$. This is a system of linear equations for $n$ examples. Accordingly, we can rewrite $k_i$ as 
 
@@ -522,7 +517,7 @@ We will use $x_j$ to denote the $j^{th}$ column vector from the design matrix $\
 
 ## Intercept and slope posteriors using linear algebra notation
 
-When we examine the posterior means for the intercept and slope coefficients, we should recognize that we can rewrite both equations as one using vector notation.
+When we examine the posterior means for the intercept and slope coefficients, we should recognize that we can rewrite both equations as one using vector notation. (The $\circ$ operator signifies element-wise multiplication).
 
 $$
 \tag{5.1.1}
@@ -533,14 +528,14 @@ $$
 Where:
 
 - $\vec{x}_j^T \vec{x}_j$ is the sum of the squared elements of $\vec{x}_j$
-- $X^{-j}$ is the design matrix without the $j^th$ column corresponding to $\beta_j$
-- $w_{-j}$ is the weight matrix without the $j_th$ coefficient
+- $X^{-j}$ is the design matrix without the $j^{th}$ column corresponding to $\beta_j$
+- $w_{-j}$ is the weight matrix without the $j^{th}$ coefficient
 
 For the variance, we get
 
 $$
 \tag{5.1.2}
 \tau_{j, 1}^2 = 
-\frac{1}{\left(\frac{\vec{x}_{j}^T \cdot \vec{x}_j}{2\sigma^2} +\frac{1}{2\tau_{j,0}^2}\right)}
+\frac{1}{\left(\frac{\vec{x}_{j}^T \cdot \vec{x}_j}{\sigma^2} +\frac{1}{\tau_{j,0}^2}\right)}
 $$
 

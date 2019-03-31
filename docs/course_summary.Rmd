@@ -1,7 +1,7 @@
 ---
-title: 'Appendix: deriving the conditional posteriors for linear regression'
+title: 'Course summary: Introduction to Bayesian Statistics'
 author: "Jasper Ginn"
-date: "February 18, 2019"
+date: "March 2019"
 output:
   pdf_document: 
     number_sections: true
@@ -15,532 +15,274 @@ header-includes:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.pos="H", fig.width = 3, fig.height = 3, echo = FALSE, 
+                      fig.align="center", warning = FALSE, message = FALSE)
 ```
 
-# Preliminaries
+# Introduction (week 1)
 
-## Recognizing a normal distribution
+A Bayesian statistical analysis consists of several steps.
 
-A random variable $x$ is normally distributed when $X \sim N(\mu, \sigma^2)$, or:
+1. **Research question & data preview**. This is the most important step. We think about *what* it is we want to know and *how* we could represent this using data.
+2. **Density of the data**. Here, we construct the likelihood of the data given our problem statement.
+3. **Prior distribution for the parameters of the density of the data**. Any likelihood function has parameters. The prior distributions allow us to represent our knowledge of these parameters.
+4. **Data collection**.
+5. **Posterior distribution**. We construct the posterior distribution using Bayes' rule and sample it repeatedly.
+6. **Inference for transformation of the parameters**. Using the samples we drew from the posterior, we can transform the parameters in a lot of ways to obtain new and interesting statistics.
+7. **The posterior predictive distribution of the data**. We can use the posterior distribution to repeatedly create predictions, which gives us detailed information about our problem.
 
-$$
-\tag{1.1.1}
-f(x) = \frac{1}{\sqrt{2\pi\sigma^2}} e^{-\left[\frac{(x - \mu)^2}{2\sigma^2} \right]}
-$$
+## Bayes' rule
 
-Many terms in the equation have the function of a normalizing constant. That is, they make the distribution a proper distribution (adhering to the laws of probability). But in the Bayesian framework, we are not necessarily concerned with these normalizing constants. 
-
-In the case of the normal, we will drop any terms that do not contain the random variable $x$
-
-$$
-\tag{1.1.2}
-\begin{aligned}
-f(x) &\propto e^{-\left[\frac{(x - \mu)^2}{2\sigma^2} \right]} \\
-&\propto e^{-\left[\frac{(x^2 - 2x\mu + \mu^2)}{2\sigma^2} \right]} \\
-&\propto e^{-\left[\frac{x^2}{2\sigma^2} - \frac{x\mu)}{\sigma^2} \right]} \\
-\end{aligned}
-$$
-
-Notice that we can drop $\mu^2$ terms because, with respect to $x$, this term is just a constant. Put another way, by the exponent properties we know that $f(x) = e^{x + Q} = e^x e^Q \propto e^x$. This result leads us to a general form of a normal distribution
+Bayesian statistics heavily rely on **Bayes' rule**, which is given by:
 
 $$
-\tag{1.1.3}
-e^{\left[-Ax^2 + Bx\right]}
+\tag{1.1}
+f(\theta|x) = \frac{f(x|\theta) f(\theta)}{f(x)}
 $$
 
-where
+Where:
 
-- $A=\frac{1}{2\sigma^2}$
-- $B=\frac{\mu}{\sigma^2}$
+- $f(\theta|x)$ is the posterior density.
+- $f(x|\theta)$ is the likelihood of the data.
+- $f(\theta)$ is the prior distribution of the parameter $\theta$.
+- $f(x)$ is a normalizing constant to ensure that the posterior distribution is a 'proper' probability distribution.
 
-Hence, if we see $f(x) \sim e^{\left[-Ax^2 + Bx\right]}$ with $A >0$ then we should **recognize a normal distribution**. To derive its parameters $\mu$ and $\sigma^2$ in this form, we need to manipulate the distribution such that we get $(\mu, \sigma^2)$ from $(A,B)$.
+## Constructing the density of the data (likelihood)
 
-$$
-\tag{1.1.4}
-\begin{aligned}
-&A = \frac{1}{2\sigma^2} \longrightarrow \begingroup\color{blue}\sigma^2\endgroup = \frac{1}{2A} \\
-&B = \frac{\mu}{\sigma^2} \longrightarrow \mu = B \begingroup\color{blue}\sigma^2\endgroup = \frac{B}{2A}
-\end{aligned}
-$$
-
-## Recognizing an inverse gamma distribution
-
-The *inverse gamma* distribution is given by
+The density of the data, or *likelihood* of the data, is the **probability/likelihood** of the data *given* the parameter $\theta$. The likelihood of the data depends on the problem under consideration. The likelihood of the data is defined for *every data point*. That is, for one data point, we have
 
 $$
-\tag{1.2.1}
-IG(x; \alpha, \beta) = \frac{\beta^\alpha}{\Gamma(\alpha)}x^{-\alpha-1}e^{-\frac{\beta}{x}}
+f(x_i | \theta)
 $$
 
-Dropping all terms that do not contain $x$, we get
+By virtue of independence, we can take the product of the individual likelihoods. So, for $n$ data points, we have
 
 $$
-\tag{1.2.2}
-IG(x; \alpha, \beta) \propto x^{-\alpha-1}e^{-\frac{\beta}{x}}
+f(\vec{x}|\theta) = \prod_{i=1}^n f(x_i | \theta)
 $$
 
-We say a random variable $x$ has an inverse gamma distribution if $f(x) \sim x^A e^{\left[\frac{B}{x}\right]}$ with $B < 0, A < 0$. In this case, we can retrieve the shape parameter $\alpha$ and the scale parameter $\beta$ by calculating
+## Prior distributions
 
-$$
-\tag{1.2.3}
-\begin{aligned}
-&\alpha = - A - 1 \\
-&\beta = -B
-\end{aligned}
-$$
+The parameter $\theta$ is not treated as a fixed but unknown parameter as we would do in frequentist statistics. Rather, we approach it as a random variable. The 'knowledge' that we have about our parameter is summarized in the *prior* $f(\theta)$. In equation $1.1$, we observe that the prior is 'combined' with the likelihood of the data to form the posterior. Hence, we can see that the posterior is a mix between the evidence from observed data and the knowledge we add to the model by means of a prior.
 
-## Linear regression equation
+Because of this 'mixing', it would be reasonable to expect that, if we knew a lot about the problem at hand and we could specify this in the prior, the posterior would be heavily affected by this knowledge. Conversely, if we knew nothing about the distribution of our parameters, the posterior would be affected primarily by the evidence we collected in the form of the data.
 
-The basic linear regression model with $j$ predictors is given by 
+A prior can be:
+
+1. **Uninformative**. This means that we do not know much about the form of $\theta$, which is reflected in the prior distribution. Suppose that the prior distribution for $\theta$ is a beta distribution $\theta \sim B(\alpha, \beta)$. Then, we could represent our lack of knowledge by using $B(1,1)$, which evaluates to $1$ for every value of $x \in (0,1)$
+
+```{r}
+library(ggplot2)
+x <- seq(0,1, 0.01)
+df <- data.frame(x=x, y=dbeta(x, 1, 1))
+ggplot(df, aes(x=x, y=y)) + geom_line(size=2, color="blue") + scale_y_continuous(limits=c(0,2))
+```
+
+2. **Informative**. This means that we have some idea about the distribution of $\theta$ prior to the analysis. We can reflect the strength of our *belief* in our knowledge in the way we construct the prior distribution. That is, in our beta distribution above, we can choose different parameters for $\alpha$ and $\beta$ that will change the way the beta distribution looks.
+
+```{r}
+library(magrittr)
+data.frame(x=x, B27=dbeta(x,2,7), B55=dbeta(x,5,5)) %>%
+  tidyr::gather(var, val, -x) %>%
+  ggplot(., aes(x=x, y=val, group=var, color=var)) +
+    geom_line()
+```
+
+In general, high dispersion (variance) indicates more uncertainty about the prior distribution whereas low dispersion indicates more certainty about our prior distribution.
+
+A prior distribution is called *conjugate* if it has the same mathematical form as the density of the data. For example, if we have a binomial likelihood and a beta prior, then we get:
 
 $$
 \tag{1.3.1}
 \begin{aligned}
-&\hat{y_i} = \beta_0 + \beta_1X_{1i} + \beta_2 X_{2i} + \dots + \beta_j X_{ji} + e_i
+f(\theta|x) 
+&\propto f(x|\theta)f(\theta) \\
+&\propto \left[ \prod_{i=1}^n {n \choose x} \theta^x (1-\theta)^{n-x} \right] \theta^{\alpha-1} (1-\theta)^{\beta-1} \\
+&\propto \theta^{\sum x} (1-\theta)^{\sum n-x} \theta^{\alpha-1} (1-\theta)^{\beta-1} \\
+&\propto \theta^{(\sum x_i) + \alpha-1} (1-\theta)^{(\sum n-x_i) + \beta-1}
 \end{aligned}
 $$
 
-Where:
+The resulting posterior is mathematically similar to the prior.
 
-- $\hat{y_i}$ is the predicted value for the outcome variable for the $i^{th}$ individual
-- $\beta_0$ is the intercept of the linear model
-- $\beta_1, \beta_2, \dots, \beta_j$ are the slope coefficients for the linear model
-- $X_{1i}, X_{2i}, \dots, X_{ji}$ are the independent variables values for the $i^{th}$ individual
-- $e_i$ is the residual error associated with the $i^{th}$ individual. We assume $e \sim N(0, \sigma^2)$
+## Constructing the posterior distribution
 
-The parameters of this model are the intercept $\beta_0$, the slope coefficients $\beta_1, \beta_2, \dots, \beta_j$ and the residual variance $\sigma^2$.
-
-As in any bayesian model, we are looking for the posterior 
+After we define the likleihood of the data and the priors, and we have collected our data for analysis, we can construct the posterior probability density $f(\theta|x)$, which is given by
 
 $$
-\tag{1.3.2}
-f(\text{parameters}|\text{data}) \propto f(\text{data} | \text{parameters}) f(\text{parameters})
+\tag{1.4.1}
+f(\theta|x) = f(x|\theta)f(\theta)
 $$
 
-where:
+Using a sampling procedure, we can then repeatedly sample the posterior distribution. This (hopefully) gives us a good approximation of the posterior.
 
-- $f(\text{parameters}|\text{data})$ is the *joint posterior distribution* of the parameters
-- $f(\text{data} | \text{parameters})$ is the *likelihood of the data* given the parameters
-- $f(\text{parameters})$ is the *joint prior distribution* of the parameters
+## Evaluation of the results
 
-For the linear regression case, this yields
+To evaluate the results, we compute the *Maximum a Posteriori* (MAP), which is usually the mean of the posterior distribution, but can also be the median or the mode. Furthermore, we calculate the posterior standard deviation of the sampled values and the $95\%$ credible interval. This is analogous to the confidence interval in classical statistics with a much simpler interpretation: the $95\%$ credible interval (CI) has a $95\%$ probability of containing the true value of interest.
+
+## Why Bayesian statistics is called 'subjective'
+
+The use of a prior in Bayesian statistics raises the question *which* prior should be considered best. Ultimately, this is a subjective choice, and a function of
+
+1. (Subjective) prior knowledge.
+2. Attitude with respect to the use of prior knowledge on historical data.
+3. Evaluation of the 'fit' between study subjects and application in a previous study and current study.
+4. Attitude with respect to the use of prior distributions to represent this prior knowledge.
+
+Ultimately, we should reasoned and transparent thinking to select priors of interest.
+
+If we care more about historical results, we could choose to weight historical results more heavily, which results in *power priors*. We weight the likelihood of the historical data by some value $\alpha_0$ to indicate that it should be more or less important than our believe of the distribution of the parameters. **This practice requires domain expertise**.
+
+## Transformation of posterior densities & posterior predictive distributions
+
+Besides retrieving point estimates, we can also transform posterior distribution as we see fit after we have repeatedly sampled it to compute ratios, differences and other statistics. Such variables are treated as any other, meaning that we similarly calculate metrics like the EAP etc.
+
+Unlike classical statistics, which focuses mainly on the computation of point estimates, bayesian statistics allows us more interesting analysis of posterior predictive results. For example, suppose that we run a linear regression on a dataset which predicts an attitude score from agreeableness and extraversion. Then a posterior predictive distribution of a person with an agreaableness score of $0.5$ and an extraversion score of $2.5$ would be predicted to have an attitude score that lies between $0.8$ and $1.6$ with the mean at an attitude score of $1.16$.
+
+```{r}
+library(blm)
+blm_setup()
+## Exercise 2 data
+d <- haven::read_sav("../testing/Exercise 2 - Data.sav")
+df <- as.data.frame(d)
+# RUn
+bfit <- blm("attitude ~ extraversion + agreeableness",
+            data=df, center = TRUE) %>%
+  # Update sampling settings
+  sampling_options(., chains = 2, iterations = 10000, burn = 1000,
+                   thinning=2) %>%
+  # Sample posterior
+  sample_posterior()
+# Predict using 200 posterior samples
+# Calculate predicted y for these values
+agree <- 0.5
+extra <- 2.5
+X <- matrix(cbind(c(1, extra, agree)), nrow=1)
+# w
+w <- do.call(rbind.data.frame, bfit$posterior)
+w <- w[sample(nrow(w), 200),1:3]
+row.names(w) <- 1:nrow(w)
+# Compute predicted y
+predicted_attitude <- t(X %*% t(w))
+hist(predicted_attitude)
+```
+
+Hence, posterior predictive distributions help us understand future predictions.
+
+## Practical using R and JAGS
+
+We first need to specify the data in R. This we can do by copying it from the table
+
+```{r, echo=TRUE}
+dat <- list(y.PE=58, n.PE=141, y.PC=40, n.PC=143)
+```
+
+Next, we specify a JAGS model. Given that we want to test the effectiveness of the treatment $PE$ against $PC$, we will model the success probability $\theta$, which indicates the probability of being cured.
+
+Notice that JAGS doesn't require a specific order of the variables in the model file. This means that you can reference items before assignment.
+
+We also specify an additional variable that we want to collect at each iteration called $RR$ or the relative risk of remaining sick in the PC condition versus the PE condition:
 
 $$
-\tag{1.3.3}
+RR = \frac{\theta_{PC}}{\theta_{PE}}
+$$
+
+```{r, echo=TRUE, message=FALSE}
+# Specify model
+mod1 <- 'model{
+  
+  # Priors (uninformative)
+  theta.PE ~ dbeta(1,1)
+  theta.PC ~ dbeta(1,1)
+  
+  # Likelihood of the data
+  y.PE ~ dbin(theta.PE, n.PE)
+  y.PC ~ dbin(theta.PC, n.PC)
+  
+  # Contrast (RR)
+  RR <- theta.PC / theta.PE
+  
+}'
+
+# Load rjags
+library(rjags)
+con <- textConnection(mod1)
+# Create a jags model
+jmod <- jags.model(file="jags_models/ex_jmod1.txt", data=dat, n.chains=2)
+close(con)
+```
+
+At this point, we have initialized the model with uninformative beta priors. Next, we specify the burn-in period and burn $1.000$ samples.
+
+```{r, echo=TRUE}
+update(jmod, n.iter = 1000)
+```
+
+Finally, we specify the parameters of interest and run the sampler to obtain a sample of the posterior distribution.
+
+```{r, echo=TRUE}
+params <- c("theta.PE", "theta.PC", "RR")
+res <- coda.samples(jmod, variable.names = params, n.iter=10000)
+```
+
+Normally, we would first inspect convergence before viewing the results, but since we have not yet done this we will skip this step. We use the `summary()` function to inspect the results.
+
+```{r, echo=TRUE}
+summary(res)
+```
+
+We observe the following:
+
+- The probability of recovering under treatment PC is roughly $28\%$, whereas the probability of recovering under treatment PE is roughly $41\%$. 
+- The relative risk of $\theta_{PC}/\theta_{PE}$ is $0.68$, $95\%$ CCI = $[0.49, 0.94]$%, meaning that the risk of remaining ill under the treatment PC is $1/0.68 \approx 1.47$ higher than the treatment PE. Since the ratio is below $1$, we can say that we are $95\%$ certain that PE treatment gives a higher chance of recovery than PC treatment.
+
+Notice that, for this model, it is also possible to derive the solution analytically. The mean for the posterior distribution is given by
+
+$$
+\hat{\theta_i} = \frac{(\alpha_i + y_i)}{(\alpha_i + y_i) + (\beta_i + n_i - y_i)}
+$$
+
+Which gives us
+
+$$
 \begin{aligned}
-&f(\beta_0, \beta_1, \beta_2, \dots, \beta_j, \sigma^2 | y, X) \propto f(y | X, \beta_0, \beta_1, \beta_2, \dots, \beta_j, \sigma^2) f(\beta_0, \beta_1, \beta_2, \dots, \beta_j, \sigma^2)
+&\theta_{PC} = \frac{1 + 40}{1 + 40 + 1 + 143 - 40} \approx 0.2828 \\
+&\theta_{PE} = \frac{1 + 58}{1 + 58 + 1 + 141 - 58} \approx 0.4126
 \end{aligned}
 $$
 
-We assume that the priors are independent, and as such, we can state that 
-
-$$
-\tag{1.3.4}
-f(\beta_0, \beta_1, \beta_2, \dots, \beta_j, \sigma^2) = f(\beta_0) f(\beta_1) f(\beta_2) f(\dots) f(\beta_j) f(\sigma^2)
-$$
-
-# Defining the likelihood of the data
-
-Let $k_i = \beta_0 + \beta_1X_{1i} + \beta_2X_{2i} + \beta_jX_{ji}$. We assume that the outcome variable $y$ is normally distributed, or $y_i \sim N(k_i, \sigma^2)$. Hence, for the $i^{th}$ example in the data, we can represent the likelihood for this example as
-
-$$
-\tag{2.1.1}
-\begin{aligned}
-&f(y_i | x_{1i}, x_{2i}, \beta_0, \beta_1, \beta_2, \dots, \beta_j, \sigma^2) = \frac{1}{\sqrt{2\pi\sigma^2}} e^{-\left[\frac{(y_i - k_i)^2}{2\sigma^2} \right]}
-\end{aligned}
-$$
-
-By virtue of independence, we construct the likelihood of all $N$ examples in the data as
-
-$$
-\tag{2.1.2}
-\begin{aligned}
-&f(\text{data}|\text{parameters}) = f(y | x_1, x_2, \beta_0, \beta_1, \beta_2, \dots, \beta_j, \sigma^2) = \prod_{i=1}^N \frac{1}{\sqrt{2\pi\sigma^2}} e^{-\left[\frac{(y_i - k_i)^2}{2\sigma^2} \right]}
-\end{aligned}
-$$
-
-# Specifying the prior distribution
-
-For each of the parameters $\beta_0, \beta_1, \beta_2$, we assume a normal prior distribution. For example, the slope coefficient is assumed to be distributed as $f(\beta_0) \sim N(\mu_{0,0}, \tau_{0,0}^2)$, or:
-
-$$
-\tag{3.1.1}
-f(\beta_0) = \frac{1}{\sqrt{2\pi\tau_{0,0}^2}} e^{-\left[\frac{(\beta_0 - \mu_{0,0})^2}{2\tau_{0,0}^2} \right]}
-$$
-
-Where the hyperparameters $\tau_{0,0}^2, \mu_{0,0}$ are defined as:
-
-- $\tau_{0,0}^2$ is the prior variance for the intercept
-- $\mu_{0,0}$ is the prior mean for the intercept.
-
-For the parameter $\sigma^2$, we assume an inverse gamma prior distribution.
-
-$$
-\tag{3.1.2}
-IG(x; \alpha_0, \beta_0) = \frac{\beta_{0}^{\alpha_0}}{\Gamma(\alpha_{0})}x^{-\alpha_{0}-1}e^{-\frac{\beta_0}{x}}
-$$
-
-Where the hyperparameters $\alpha_0$ and $\beta_0$ are defined as:
-
-- $\alpha_0$ is the prior shape of the distribution.
-- $\beta_0$ is the prior scale of the distribution.
-
-# Deriving the conditional posteriors for each parameter
-
-We can obtain posterior distributions for each of the parameters by constructing their *conditional posterior distributions*. Hence, we want to find
-
-$$
-\tag{4.1}
-\begin{aligned}
-&f(\beta_0 | y, X, \beta_1, \dots, \beta_j, \sigma^2) \propto f(y | X, \beta_0, \beta_1, \dots, \beta_j, \sigma^2) \times f(\beta_0) \\
-&f(\beta_1 | y, X, \beta_0, \dots, \beta_j, \sigma^2) \propto f(y | X, \beta_0, \beta_1, \dots, \beta_j, \sigma^2) \times f(\beta_1) \\
-&\dots \\
-&f(\beta_j | y, X, \beta_0, \beta_1, \dots, \beta_{j-1}, \sigma^2) \propto f(y | X, \beta_0, \beta_1, \dots, \beta_j, \sigma^2) \times f(\beta_j) \\
-&f(\sigma^2 | y, X, \beta_0, \beta_1, \dots, \beta_j) \propto f(y | X, \beta_0, \beta_1, \dots, \beta_j, \sigma^2) \times f(\sigma^2)
-\end{aligned}
-$$
-
-## The conditional distribution for the intercept $\beta_0$
-
-Here, we are making the posterior conditional on all parameters other than $\beta_0$, and hence we are effectively turning the joint prior distribution into a single prior distribution.
-
-Plugging in the likelihood and prior distribution into $(6)$, we get
-
-$$
-\tag{4.1.1}
-\begin{aligned}
-&f(\beta_0 | \dots) \propto \left[\prod_{i=1}^N \frac{1}{\sqrt{2\pi\sigma^2}} e^{-\left[\frac{(y_i - k_i)^2}{2\sigma^2} \right]} \right] \times \frac{1}{\sqrt{2\pi\tau_{0,0}^2}} e^{-\left[\frac{(\beta_0 - \mu_{0,0})^2}{2\tau_{0,0}^2} \right]}
-\end{aligned}
-$$
-
-To arrive at the conditional posterior for $\beta_0$, we simply drop all elements that do not contain $\beta_0$. We can do this because, in the conditional posterior distribution, such terms are nothing but normalization constants.
-
-First, we drop the leading coefficients from $(7)$
-
-$$
-\tag{4.1.2}
-\begin{aligned}
-&f(\beta_0 | \dots) \propto \left[\prod_{i=1}^N e^{-\left[\frac{(y_i - k_i)^2}{2\sigma^2} \right]}\right] \times e^{-\left[\frac{(\beta_0 - \mu_{0,0})^2}{2\tau_{0,0}^2} \right]}
-\end{aligned}
-$$
-
-Next, we examine each of the exponents separately and expand the factored quadratic in the numerator. If we forget about the product for a moment and focus on a single example of the likelihood, we see
-
-$$
-\tag{4.1.3}
-\begin{aligned}
-&e^{-\left[\begingroup\color{red}\frac{(y_i - k_i)^2}{2\sigma^2} \endgroup \right]} \longrightarrow  \\ 
-&\begingroup\color{red}\frac{(y_i - k_i)^2}{2\sigma^2} \endgroup = \\
-&\frac{1}{2\sigma^2} \left[y_i^2 - 2y_i k_i + k_i^2 \right] = \\
-&\frac{1}{2\sigma^2} \left[y_i^2 - 2y_i[\beta_0 + \beta_1X_{1i} + \beta_2X_{2i}] + (\beta_0 + \beta_1X_{1i} + \beta_2X_{2i})^2\right]
-\end{aligned}
-$$
-
-Expanding the terms and dropping all terms without $\beta_0$ yields
-
-$$
-\tag{4.1.4}
-\begin{aligned}
-&f(y | \dots) \propto \prod_{i=1}^N e^{\left[-\frac{\beta_0^2}{2\sigma^2} + \beta_0\frac{y_i - \beta_1x_{1i} - \beta_2x_{2i}}{\sigma^2} \right]}
-\end{aligned}
-$$
-
-If we repeat the above procedure for the prior distribution $f(\beta_0)$, we get
-
-$$
-\tag{4.1.5}
-\begin{aligned}
-f(\beta_0) \propto e^{\left[-\frac{\beta_0^2}{2\tau_{0,0}^2} + \frac{\beta_0 \mu_{0,0}}{\tau_{0,0}^2}\right]}
-\end{aligned}
-$$
-
-Recall the following exponent rules
-
-- $e^a e^b = e^{\left[a + b\right]}$
-- $\prod_{i=1}^N e^{\left[i+j\right]} = e^{\left[\left(\sum_{i=1}^N i\right) + \left(\sum_{i=1}^N j\right)\right]}= e^{\left[\left(\sum_{i=1}^N i\right) + Nj\right]}$
-
-Applying these rules to $(9)$ and $(10)$ and factoring the exponent yields
-
-$$
-\tag{4.1.6}
-\begin{aligned}
-f(\beta_0 | \dots) 
-&\propto e^{\left[-\frac{\beta_0^2N}{2\sigma^2} + \beta_0\frac{\sum_{i=1}^N y_i - \beta_1x_{1i} - \beta_2x_{2i}}{\sigma^2} \right]} 
-  \times e^{\left[-\frac{\beta_0^2}{2\tau_{0,0}^2} + \frac{\beta_0 \mu_{0,0}}{\tau_{0,0}^2}\right]} \\
-&\propto e^{\left[-\frac{\beta_0^2N}{2\sigma^2} + \beta_0\frac{\sum_{i=1}^N y_i - \beta_1x_{1i} - \beta_2x_{2i}}{\sigma^2} -\frac{\beta_0^2}{2\tau_{0,0}^2} + \frac{\beta_0 \mu_{0,0}}{\tau_{0,0}^2} \right] } \\
-&\propto e^{\left[-\beta_0^2\left(\frac{N}{2\sigma^2} + \frac{1}{2\tau_{0,0}^2}\right) + \beta_0\left(\frac{\sum_{i=1}^N y_i - \beta_1x_{1i} - \beta_2x_{2i}}{\sigma^2} + \frac{\mu_{0,0}}{\tau_{0,0}^2}\right)\right]} 
-\end{aligned}
-$$
-
-This we should recognize as the form 
-
-$$
-\tag{4.1.7}
-e^{\left[-Ax^2 + Bx\right]}
-$$
-
-Recall that:
-
-$$
-\tag{4.1.8}
-\begin{aligned}
-&A = \frac{1}{2\sigma^2} \longrightarrow \begingroup\color{blue}\sigma^2\endgroup = \frac{1}{2A} \\
-&B = \frac{\mu}{\sigma^2} \longrightarrow \mu = B \begingroup\color{blue}\sigma^2\endgroup = \frac{B}{2A}
-\end{aligned}
-$$
-
-And so we get
-
-$$
-\tag{4.1.9}
-\begin{aligned}
-&\tau_{0,1}^2\frac{1}{\left(\frac{N}{2\sigma^2} + \frac{1}{2\tau_{0,0}^2}\right)} \\
-&\mu_{0,1}\frac{\left(\frac{\sum_{i=1}^N y_i - \beta_1x_{1i} - \beta_2x_{2i}}{\sigma^2} + \frac{\mu_{0,0}}{\tau_{0,0}^2}\right)}{\left(\frac{N}{\sigma^2} + \frac{1}{\tau_{0,0}^2}\right)}
-\end{aligned}
-$$
-
-From $(12)$ we can see the effect of the prior distribution. If the prior variance $\tau_{0,0}^2$ is large relative to the prior mean $\mu_{0,0}$, then the posterior distribution for $\mu_{0,1}$ will depend mainly on the likelihood of the data. In the case of the posterior $\tau_{0,1}^2$, we see that it reduces to 
-
-$$
-\tag{4.1.10}
-\tau_{0,1}^2 = \frac{1}{\frac{N}{2\sigma^2}} = \frac{2\sigma^2}{N} = \sqrt{2} \frac{\sigma}{\sqrt{N}}
-$$
-
-which is simply the variance scaled by the number of examples in the data and similar to the standard error obtained by the central limit theorem.
-
-## The conditional distribution for the slope coefficients
-
-The slope coefficients $\beta_1, \dots, \beta_j$ are derived similarly to the intercept coefficient $\beta_0$. For the moment, assume that $\beta_j$ is the *last slope coefficient*. That is, assume that $j = \text{max}(j)$
-
-First, we define the posterior for $\beta_j$ as the product of the likelihood of the data and the prior distribution for $\beta_j$ and drop all terms in the prior distribution that do not contain this parameter
-
-$$
-\tag{4.2.1}
-\begin{aligned}
-f(\beta_j | \beta_0, \beta_1, \dots, \beta_j, \sigma^2) 
-&\propto \left[\prod_{i=1}^N \frac{1}{\sqrt{2\pi\sigma^2}} e^{-\left[\frac{(y_i - k_i)^2}{2\sigma^2} \right]} \right] \times \frac{1}{\sqrt{2\pi\tau_{j,0}^2}} e^{-\left[\frac{(\beta_j - \mu_{j,0})^2}{2\tau_{j,0}^2} \right]} \\
-\end{aligned}
-$$
-
-Next, we drop all terms that do not contain $\beta_j$ from the prior distribution
-
-$$
-\tag{4.2.2}
-\begin{aligned}
-f(\beta_j | \dots) 
-&\propto \left[\prod_{i=1}^N e^{-\left[\frac{\begingroup \color{green}(y_i - k_i)^2 \endgroup}{2\sigma^2} \right]}\right] \times e^{-\left[\frac{(\beta_j - \mu_{j,0})^2}{2\tau_{j,0}^2}
-\right]} 
-\end{aligned}
-$$
-
-Just like in equation $(4.1.3)$ we expand the part in green and keep all elements that contain $\beta_j$
-
-$$
-\tag{4.2.3}
-\begin{aligned}
-(y_i - k_i)^2 
-&= y_i^2 - 2y_ik_i + k_i^2 \\
-&= y_i^2 - 2y_i[\beta_0 + \beta_1 x_{1i} + \dots + \beta_jx_{ji}] + (\beta_0 + \beta_1 x_{1i} + \dots + \beta_jx_{ji})^2 \\
-&\propto -2y_i\beta_jx_{ji} + \left[(\beta_0^2 + \beta_0\beta_1x_{1i} + \dots + \beta_0\beta_jx_{ji}) + \dots + ([\beta_jx_{ji}]^2 + \beta_0\beta_jx_{ji} + \dots + \beta_{j-1}x_{(j-1)i}\beta_jx_{ji})\right] \\
-&\propto -2y_i\beta_jx_{ji} + (\beta_jx_{ji})^2 + 2\beta_0\beta_jx_{ji} + 2\beta_1x_{1i}\beta_jx_{2i} + \dots + 2\beta_{j-1}x_{(j-1)i}\beta_jx_{ji} \\
-&\propto (\beta_jx_{ji})^2 - 2\beta_jx_{ji} (y_i - \beta_0 - \beta_1x_{1i} - \dots - \beta_{j-1}x_{(j-1)i})
-\end{aligned}
-$$
-
-Plugging this back into equation XX and expanding the exponential containing the priors yields
-
-$$
-\tag{4.2.4}
-\begin{aligned}
-f(\beta_j | \dots) 
-&\propto \left[\prod_{i=1}^N e^{-\left[\frac{(\beta_jx_{ji})^2 - 2\beta_jx_{ji} (y_i - \beta_0 - \beta_1x_{1i} - \dots - \beta_{j-1}x_{(j-1)i})}{2\sigma^2} \right]}\right] \times e^{\left[-\frac{\beta_j^2}{2\tau_{j,0}^2} + \frac{\beta_j \mu_{j,0}}{\tau_{j,0}^2}\right]} \\
-&\propto \left[\prod_{i=1}^N e^{\left[-\frac{(\beta_jx_{ji})^2}{2\sigma^2} + \beta_jx_{ji}\frac{y_i - \beta_0 - \beta_1x_{1i} - \dots - \beta_{j-1}x_{(j-1)i}}{\sigma^2} \right]}\right] \times e^{\left[-\frac{\beta_j^2}{2\tau_{j,0}^2} + \frac{\beta_j \mu_{j,0}}{\tau_{j,0}^2}\right]} \\
-\end{aligned}
-$$
-
-Applying exponent properties to YY and combining the terms yields
-
-$$
-\tag{4.2.5}
-\begin{aligned}
-f(\beta_j | \dots) 
-&\propto e^{\left[-\frac{\sum_i(\beta_jx_{ji})^2}{2\sigma^2} + \beta_jx_{ji}\frac{\sum_i (y_i - \beta_0 - \left[\sum_{k=1}^{j-1} \beta_kx_{ki}\right])}{\sigma^2} \right]} \times e^{\left[-\frac{\beta_j^2}{2\tau_{j,0}^2} + \frac{\beta_j \mu_{j,0}}{\tau_{j,0}^2}\right]} \\
-&\propto e^{\left[\left\{-\frac{\sum_i(\beta_j)^2(x_{ji})^2}{2\sigma^2} -\frac{\beta_j^2}{2\tau_{j,0}^2} \right\} + \left\{\beta_jx_{ji}\frac{\sum_i (y_i - \beta_0 - \left[\sum_{k=1}^{j-1} \beta_kx_{ki}\right])}{\sigma^2} + \frac{\beta_j \mu_{j,0}}{\tau_{j,0}^2} \right\} \right]} \\
-&\propto e^{\left[-\beta_j^2 \left\{\frac{\sum_i x_{ji}^2}{2\sigma^2} +\frac{1}{2\tau_{j,0}^2} \right\} + \beta_j \left\{ \frac{x_{ij} \sum_i (y_i - \beta_0 - \left[\sum_{k=1}^{j-1} \beta_kx_{ki}\right])}{\sigma^2} + \frac{u_{j,0}}{\tau_{j,0}^2} \right\} \right]}
-\end{aligned}
-$$
-
-Again, we should recognize this as the form
-
-$$
-\tag{4.2.6}
-e^{\left[-Ax^2 + Bx\right]}
-$$
-
-Recall that:
-
-$$
-\tag{4.2.7}
-\begin{aligned}
-&A = \frac{1}{2\sigma^2} \longrightarrow \begingroup\color{blue}\sigma^2\endgroup = \frac{1}{2A} \\
-&B = \frac{\mu}{\sigma^2} \longrightarrow \mu = B \begingroup\color{blue}\sigma^2\endgroup = \frac{B}{2A}
-\end{aligned}
-$$
-
-And so we get
-
-$$
-\tag{4.2.8}
-\begin{aligned}
-&\tau_{j,1}^2 = \frac{1}{\left(\frac{\sum_i x_{ji}^2}{2\sigma^2} +\frac{1}{2\tau_{j,0}^2}\right)} \\
-&\mu_{j,1} = \frac{\left(\frac{x_{ji} \sum_i (y_i - \beta_0 - \left[\sum_{k=1}^{j-1} \beta_kx_{ki}\right])}{\sigma^2} + \frac{u_{j,0}}{\tau_{j,0}^2}\right)} {\left(\frac{Nx_{ji}^2}{\sigma^2} + \frac{1}{\tau_{0,0}^2}\right)}
-\end{aligned}
-$$
-
-Finally, we need to generalize this result to cases where $j \neq \text{max}(j)$. Assume that we have $j = 8$ parameters, then the above equation works fine if $j = 8$. For $j < 8$ it does not work. For example, if we have $j=4$, then the posterior mean $\mu_{4,1}$ does not depend on all coefficients except $\beta_4$ (which is what we desire). Rather, it depends on $\beta_1, \beta_2, \beta_3$ only. The simplest way to get around this problem is to rewrite $B$ such that we exclude the $j^{th}$ coefficient in the summation
-
-$$
-\tag{4.2.9}
-\begin{aligned}
-&\mu_{j,1}\frac{\left(\frac{\sum_i x_{ji} (y_i - \beta_0 - \left[\sum_{k \neq j} \beta_kx_{ki}\right])}{\sigma^2} + \frac{u_{j,0}}{\tau_{j,0}^2}\right)} {\left(\frac{Nx_{ji}^2}{\sigma^2} + \frac{1}{\tau_{j,0}^2}\right)}
-\end{aligned}
-$$
-
-## The conditional distribution for $sigma^2$
-
-The process to find the posterior for $\sigma^2$ is the same as for the previous parameters, with the difference being the prior $f(\sigma^2)$, which is inverse-gamma distributed. Again, we drop all terms that do not contain the parameter $\sigma^2$, which yields
-
-$$
-\tag{4.3.1}
-\begin{aligned}
-f(\sigma^2 | \dots) 
-&\propto \left[\prod_{i=1}^N \frac{1}{\sqrt{2\pi\sigma^2}} e^{-\left[\frac{(y_i - k_i)^2}{2\sigma^2} \right]} \right] \times \frac{\beta_{0}^{\alpha_0}}{\Gamma(\alpha_{0})}x^{-\alpha_{0}-1}e^{-\frac{\beta_0}{\sigma^2}} \\
-&\propto \frac{N}{\sqrt{\sigma^2}} e^{-\left[\frac{\begingroup\color{orange}\sum_i (y_i - k_i)^2 \endgroup}{2\sigma^2}\right]} \times x^{-\alpha_{0}-1}e^{-\frac{\beta_0}{\sigma^2}}
-\end{aligned}
-$$
-
-Recall that $k_i = \beta_0 + \beta_1X_{1i} + \beta_2X_{2i}$. It is helpful to redefine the part in orange in the equation above such that
-
-$$
-\tag{4.3.2}
-\begin{aligned}
-&S = \sum_{i=1}^N (y_i - k_i)^2
-\end{aligned}
-$$
-
-Furthermore, we take the $1/2$ from the denominator in the exponent and divide $S$ by this constant. (look at the preliminary section on the inverse gamma distribution to see why). Hence, we get
-
-$$
-\tag{4.3.3}
-\begin{aligned}
-&f(\sigma^2 | \dots) \propto \frac{N}{\sqrt{\sigma^2}} e^{-\left[\frac{S/2}{\sigma^2}\right]} \times (\sigma^2)^{-\alpha_{0}-1}e^{-\frac{\beta_0}{\sigma^2}}
-\end{aligned}
-$$
-
-$$
-\tag{4.3.4}
-k_i = \beta_0 + \beta_1 x_{1i} + \dots + \beta_jx_{ji}
-$$
-
-Now, collecting the like terms yields
-
-$$
-\tag{4.3.5}
-\begin{aligned}
-f(\sigma^2 | \dots) 
-&\propto \left[(\sigma^2)^{-\frac{N}{2}}(\sigma^2)^{-\alpha_{0}-1} \right] \times \left[e^{-\left[\frac{S/2}{\sigma^2}\right]}e^{-\frac{\beta_0}{x}}\right] \\
-&\propto (\sigma^2)^{[-\frac{N}{2}-\alpha_0 - 1]} e^{\left[-\frac{(S/2+\beta_0)}{\sigma^2}\right]}
-\end{aligned}
-$$
-
-Which you should recognize as an inverse gamma distribution with $A = -\frac{N}{2}-\alpha_0 - 1$ and $B = -(S/2+\beta_0)$. We can retrieve the posterior shape $\alpha_1$ and scale $\beta_1$ by using 
-
-$$
-\tag{4.3.6}
-\begin{aligned}
-&\alpha_1 = -A - 1 = - (-\frac{N}{2}-\alpha_0 - 1) - 1 = \frac{N}{2} + \alpha_0 \\
-&\beta_1 = -B = -(-(S/2+\beta_0)) = \frac{S}{2}+\beta_0
-\end{aligned}
-$$
-
-# Posterior distributions in vector notation
-
-The notation we used for the posteriors can become a little unwieldy when we implement it in $\mathbb{R}$. This has to do with the summations in the calculations for the posterior means of the coefficients and intercepts. If we would implement it as is, we would have to create a for loop in which we loop over the $j$ parameters.
-
-Alternatively, we can use some linear algebra to simplify the equations. Recall that $k_i = \beta_0 + \beta_1x_{1i} + \dots + \beta_jx_{ji}$. This is a system of linear equations for $n$ examples. Accordingly, we can rewrite $k_i$ as 
-
-$$
-\tag{5.1}
-\vec{k} = \mathbf{X}\vec{w} 
-$$
-
-Where 
-
-- $\vec{k}$ is a column vector of length $n$ 
-- $\mathbf{X}$ is a matrix with $n$ rows and $m$ columns
-- $\vec{w}$ is a column vector of length $m$
-
-$$
-\tag{5.2}
-\begin{bmatrix}
-k_1 \\
-k_2 \\
-\vdots \\
-k_n
-\end{bmatrix} =
-\begin{bmatrix}
-1 & x_{11} & x_{12} & \dots & x_{1m} \\
-1 & x_{21} & x_{22} & \dots & x_{2m} \\
-\vdots & \vdots & \vdots & \ddots & \vdots \\
-1 & x_{n1} & x_{n2} & \dots & x_{nm}
-\end{bmatrix} \cdot
-\begin{bmatrix}
-\beta_0 \\
-\beta_1 \\
-\vdots \\
-\beta_j
-\end{bmatrix} = 
-\begin{bmatrix}
-\beta_0 + \beta_1x_{11} + \beta_2x_{12} + \dots + \beta_jx_{1m} \\
-\beta_0 + \beta_1x_{21} + \beta_2x_{22} + \dots + \beta_jx_{2m} \\
-\dots \\
-\beta_0 + \beta_1x_{n1} + \beta_2x_{n2} + \dots + \beta_jx_{nm}
-\end{bmatrix}
-$$
-
-Note that the subscripts in $x$ have switched to accomodate the $\text{rows} \times \text{columns}$ notation that is usual in linear algebra. Instead of $x_{\text{coefficient} \times \text{observation}} = x_{ji}$ we now have $x_{\text{observation} \times \text{coefficient}} = x_{ij} = x_{nm}$.
-
-We will use the following notation to denote that the $j^{th}$ *column* of the design matrix $\mathbf{X}$ and the $j^{th}$ row of the coefficient matrix $\vec{w}$ have been removed
-
-$$
-\tag{5.3}
-\vec{k}_{*j} = \mathbf{X}^{-j}\vec{w}_{-j}
-$$
-
-We will use $x_j$ to denote the $j^{th}$ column vector from the design matrix $\mathbf{X}$
-
-## Intercept and slope posteriors using linear algebra notation
-
-When we examine the posterior means for the intercept and slope coefficients, we should recognize that we can rewrite both equations as one using vector notation.
-
-$$
-\tag{5.1.1}
-\mu_{j,1} = 
-\frac{1}{\frac{\vec{x}_j^T \cdot \vec{x}_j}{\sigma^2} + \frac{1}{\tau_{j,0}^2}} \times \left( \frac{\sum \vec{x}_j \circ [\vec{y} - \vec{k}_{*j}]}{\sigma^2} + \frac{u_{j,0}}{\tau_{j,0}^2} \right)
-$$
-
-Where:
-
-- $\vec{x}_j^T \vec{x}_j$ is the sum of the squared elements of $\vec{x}_j$
-- $X^{-j}$ is the design matrix without the $j^th$ column corresponding to $\beta_j$
-- $w_{-j}$ is the weight matrix without the $j_th$ coefficient
-
-For the variance, we get
-
-$$
-\tag{5.1.2}
-\tau_{j, 1}^2 = 
-\frac{1}{\left(\frac{\vec{x}_{j}^T \cdot \vec{x}_j}{2\sigma^2} +\frac{1}{2\tau_{j,0}^2}\right)}
-$$
-
+The RR then becomes $0.2828/0.4126 \approx 0.6854$. These results are the same as the results we obtained using sampling.
+
+With respect to using informative hypotheses using historical data, I would argue that both datasets fit reasonably well with our current research goal. Under the assumption that the treatments PC and PE are relatively static (don't change much), and that PTSD is a stable condition (which is likely given that the impact of war is horrible in almost any situation), we could use the results from the previous studies by pooling the data together and using these to construct the prior distributions.
+
+In the model file below, we specify the informative distributions.
+
+```{r, echo=TRUE}
+mod2 <- 'model{
+  
+  # Priors (informative)
+  theta.PE ~ dbeta(161,191)
+  theta.PC ~ dbeta(126,281)
+  
+  # Likelihood of the data
+  y.PE ~ dbin(theta.PE, n.PE)
+  y.PC ~ dbin(theta.PC, n.PC)
+  
+  # Contrast (RR)
+  RR <- theta.PC / theta.PE
+  
+}'
+
+# Load rjags
+con <- textConnection(mod2)
+# Create a jags model
+jmod <- jags.model(file=con, data=dat, n.chains=2)
+close(con)
+# Run the model
+update(jmod, n.iter = 1000)
+params <- c("theta.PE", "theta.PC", "RR")
+res <- coda.samples(jmod, variable.names = params, n.iter=10000)
+summary(res)
+```
+
+The posterior mean for RR is $0.68$ with $95\%$ CCI = $[0.58, 0.8]$. The CCIs are smaller and still do not include $1$. Hence, the result of including prior knowledge has quite a big effect.
