@@ -20,15 +20,20 @@ function gibbs_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     #=
     Run the Gibbs sampler to obtain the conditional posterior coefficients / sigma values
 
-    :param X:
-    :param y:
-    :param w:
-    :param sigma:
-    :param iterations:
-    :param priors:
+    :param X: Design matrix containing j+1 coefficients (first coefficient must equal intercept variable). The design matrix is created in R using model.matrix()
+    :param y: Numeric array with outcome variables. Length(y) == nrow(X)
+    :param w: Coefficient matrix containing initial values. nrow(w) == ncol(X)
+    :param sigma: Single initial value for the variance.
+    :param iterations: Number of sampling iteratios in each chain
+    :param thinning: thinning parameter. The value for thinning determines the observation that will be used as a draw from the posterior.
+                        That is, if thinning = 3, then the first two draws will be discarded and only the third draw will be returned as a draw
+                        from the posterior distribution.
+    :param priors: Dict containing information on the priors of each coefficient and sigma
 
-    :return:
+    :return: Tensor of shape N * J (iterations * parameters).
     :seealso:
+        - Lynch, S. M. (2007). Introduction to applied Bayesian statistics and estimation for social scientists. Springer Science & Business Media.
+        - Gelman, A., Stern, H. S., Carlin, J. B., Dunson, D. B., Vehtari, A., & Rubin, D. B. (2013). Bayesian data analysis. Chapman and Hall/CRC.
     =#
 
     # Open up a results matrix
@@ -68,17 +73,18 @@ function gibbs_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     #=
     Run a single iteration of the gibbs sampler
 
-    :param X:
-    :param y:
-    :param w:
-    :param sigma:
-    :param priors:
+    :param X: Design matrix containing j+1 coefficients (first coefficient must equal intercept variable). The design matrix is created in R using model.matrix()
+    :param y: Numeric array with outcome variables. Length(y) == nrow(X)
+    :param w: Coefficient matrix containing initial values. nrow(w) == ncol(X)
+    :param sigma: Single initial value for the variance.
+    :param priors: Dict containing information on the priors of each coefficient and sigma
 
-    :return:
-    :seealso:
+    :return: Dict containing draws for each conditional posterior distribution.
+    :seealso: The file 'conditionalposterior.pdf' in the 'docs' folder for an elaboration on the derivation of the
+                conditional posterior values for each parameter.
     =#
 
-    # For each, do
+    # For each prior / parameter, do
     for j in 1:length(priors)
 
         # If j == nparam, then sigma
@@ -88,6 +94,7 @@ function gibbs_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
                                       posterior_scale(X, w, y, priors[j][:beta])))
 
         # Else, coefficient
+        # See the Appendix in 'docs' folder (section 5) for an elaboration on the calculation of posterior values
         else
 
             w[j] = rand(Normal(posterior_mu(X[:,1:end .!= j], X[:,j], y, w[1:end .!= j], sigma,
@@ -114,6 +121,22 @@ function gibbs_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 function posterior_mu(X::Array{Float64}, xj::Array{Float64}, y::Array{Float64},
                       w::Array{Float64}, sigma::Float64, mu0::Float64, tau0::Float64)
 
+    #=
+    Calculate the posterior mean for an intercept / slope coefficient
+
+    :param X: The design matrix containing the data, where the jth column is removed
+    :param xj: Column vector containing the data corresponding to the jth coefficient
+    :param y: Data for the outcome variable
+    :param w: Column vector containing the coefficients, where the jth row is removed
+    :param sigma: Variance parameter. Updated iteratively.
+    :param mu0: Prior mean
+    :param tau0: Prior variance
+
+    :return: posterior mean for jth coefficient
+    :seealso: The file 'conditionalposterior.pdf' in the 'docs' folder for an elaboration on the derivation of the
+                conditional posterior values for each parameter.
+    =#
+
     # Numerator
     return(((sum(xj .* (y - X * w)) / sigma) + (mu0/tau0)) / ((transpose(xj) * xj / sigma) + (1 / tau0)))
 
@@ -121,17 +144,53 @@ function posterior_mu(X::Array{Float64}, xj::Array{Float64}, y::Array{Float64},
 
 function posterior_tau(xj::Array{Float64}, sigma::Float64, tau0::Float64)
 
+    #=
+    Calculate the posterior variance for an intercept / slope coefficient
+
+    :param xj: Column vector containing the data corresponding to the jth coefficient
+    :param sigma: Variance parameter. Updated iteratively.
+    :param tau0: Prior variance
+
+    :return: posterior variance for jth coefficient
+    :seealso: The file 'conditionalposterior.pdf' in the 'docs' folder for an elaboration on the derivation of the
+                conditional posterior values for each parameter.
+    =#
+
     return( 1 / ( (transpose(xj) * (xj ./ sigma)) + (1/tau0)) )
 
     end;
 
 function posterior_rate(n::Int, a0::Float64)
 
+    #=
+    Calculate the posterior rate for the sigma value
+
+    :param n: number of examples in the data
+    :param a0: prior rate value
+
+    :return: posterior rate
+    :seealso: The file 'conditionalposterior.pdf' in the 'docs' folder for an elaboration on the derivation of the
+                conditional posterior values for each parameter.
+    =#
+
     return( (n/2) + a0 )
 
     end;
 
 function posterior_scale(X::Array{Float64}, w::Array{Float64}, y::Array{Float64}, b0::Float64)
+
+    #=
+    Calculate the posterior scale for the sigma value
+
+    :param X: The design matrix containing the data, where the jth column is removed
+    :param y: Data for the outcome variable
+    :param w: Column vector containing the coefficients, where the jth row is removed
+    :param b0: prior scale value
+
+    :return: posterior scale
+    :seealso: The file 'conditionalposterior.pdf' in the 'docs' folder for an elaboration on the derivation of the
+                conditional posterior values for each parameter.
+    =#
 
     return( ( sum( ( y - (X * w) ).^2 ) / 2 ) + b0 )
 
@@ -145,10 +204,24 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
                        sigma::Float64, iterations::Int, thinning::Int, burn::Int, priors)
 
     #=
+    Perform posterior predictive checking.
+
     This function is used to draw data from the posterior using the gibbs sampler and to simulate values of the
-    outcome variable y to compute posterior predictive checks.
+    outcome variable y to compute posterior predictive checks. The function only simulates / computes the data. The
+    statistic is calculated in R. The checks that are computed are:
+
+        1. Normality of errors (using skewness).
+        2. Homogeneity of variances (using adj. R^2 of a linear regression on squared residuals).
+        3. Independence of errors (using correlation of lagged residuals).
 
     :param effective_iterations: number of iterations minus burn-in period
+
+    :return: Dictionary containing:
+        1. sim_y              [==>] 2D Tensor ([iterations - burn] * 1) of simulated y values
+        2. residuals          [==>] 3D Tensor ([iterations - burn] * n. examples * 2) cotaining residuals for simulated and observed data
+        3. heteroskedasticity [==>] 2D Tensor ([iterations - burn] * 2) containing test values (simulatd and observed data) on the test for heteroskedasticity
+        4. skewness           [==>] 2D Tensor ([iterations - burn] * 2) containing test values on the test for normality of errors
+        5. independence       [==>] 2D Tensor ([iterations - burn] * 2) containing test values on the test for independence of errors
     =#
 
     # 1. Call the gibbs sampler
