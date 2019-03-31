@@ -56,28 +56,11 @@ set_priors.blm <- function(blm, ...) {
 # Initial weight correction ==> divide coefficient weights by sqrt(sample size) to avoid them getting too large
 # when using uninformative priors
 #' @export
-sampling_options.blm <- function(blm, chains = 1, iterations = 10000, thinning = 1,
-                                 burn = 1000) {
+sampling_options.blm <- function(blm, chains = 1, iterations = 10000,
+                                 thinning = 1, burn = 1000) {
 
-  ##### Checks ######
-
-  if (chains < 1) {
-    stop("'chains' cannot be less than 1")
-  }
-
-  if (iterations < burn) {
-    stop("blm cannot sample fewer iterations than burn-in period")
-  }
-
-  if (ceiling(iterations / burn) < 2) {
-    warning("The number of iterations is very low. This will likely yield unstable results.")
-  }
-
-  if (burn < 1000) {
-    warning("You have specified the burn-in samples to be less than 1.000. This will likely yield unstable results.")
-  }
-
-  ##### End checks #####
+  # Checks
+  check_sampling_inputs(iterations, chains, thinning, burn)
 
   # Update settings
   if(!missing(chains)) {
@@ -546,7 +529,7 @@ resid.blm <- function(blm, type = c("mean", "mode", "median")) {
 }
 
 # posterior predictive checks
-# This returns a SEPARATE object ==> all them simulations are heavy on the memory.
+# This returns a SEPARATE object ==> all the simulations are heavy on the memory.
 #' @export
 posterior_predictive_checks.blm <- function(blm,
                                             iterations = 2000, burn = 1000) {
@@ -561,10 +544,15 @@ posterior_predictive_checks.blm <- function(blm,
 
   # Get priors etc.
   priors <- blm$priors
+  thinning <- blm$sampling_settings$thinning
+  chains <- 1
   X <- blm$input$X
   y <- blm$input$y
 
-  # Draw values
+  # Check values
+  check_sampling_inputs(iterations, chains, thinning, burn)
+
+  # Draw initial values
   iv <- initialize_chain_values(priors)
 
   # Call the gibbs sampler, simulate y values and compute residuals

@@ -1,227 +1,6 @@
 # Helper functions
 
-# Ensure that the user passed a valid formula
-#
-# @param column names of the design matrix X
-# @param formula formula as passed to linear_model()
-#
-# @return list containing the dependent variable (DV) and independent variable(s) (IV)
-check_formula <- function(varnames, formula) {
-
-  ## Coerce to character
-  formula <- as.character(formula)
-
-  ## Retrieve DV
-  DV <- formula[2]
-
-  ## Make sure DV is in variables
-  if( !(DV %in% varnames) ) {
-
-    stop("Dependent variable not found in dataset")
-
-  }
-
-  ## Retrieve IVs
-  IV <- formula[3]
-
-  ## If IV == ., move on
-  if( IV == '.' ) {
-
-    ## Store results in list
-    res <- list(
-      "DV" = DV,
-      "IV" = varnames[which(varnames != DV)]
-    )
-
-  } else if( grepl("\\+", IV) ) {
-
-    ## If '+' in IVs, then multiple IVs
-
-    # Split the IVs
-    IVs <- strsplit(IV,"(\\s)?\\+(\\s)?")[[1]]
-
-    # Check for each if in dataset
-    if( !all(IVs[which(!grepl("\\*", IVs))] %in% varnames) ) {
-
-      stop("Not all independent variables found in dataset")
-
-    }
-
-    # Store results in a list
-    res <- list(
-      "DV" = DV,
-      "IV" = IVs
-    )
-
-  } else {
-
-    # Split the IVs
-    IVs <- strsplit(IV,"(\\s)?\\+(\\s)?")[[1]]
-
-    ## We have the situation that there is only one IV
-
-    if( !(IV[which(!grepl("\\*", IVs))] %in% varnames) ) {
-
-      if( (IV[which(!grepl("\\*", IVs))] != "1") ) {
-        stop("Independent variable not found in dataset.")
-      }
-
-    }
-
-    ## Store results in list
-    res <- list(
-      "DV" = DV,
-      "IV" = IV
-    )
-
-  }
-
-  ## Return the DV / IV list
-  return(res)
-
-}
-
-# Perform checks for the model
-#
-# @param formula formula as passed to linear_model()
-# @param data data as passed by the user
-#
-# @return a list containing variable names, the formula, the design matrix X (as a model.matrix()), the outcome variable y, the number of observations n and the number of predictors m
-perform_checks <- function(formula, data, center) {
-
-  ## Check if formula is formula or if it can be coerced to one
-  if( !(is(formula)[1] == "formula") ) formula <- as.formula(formula)
-
-  ## Check if data is data frame or matrix
-  if( !(is.data.frame(data)) ) {
-
-    stop("'data' must be a data frame")
-
-  }
-
-  ## Retrieve variable names from data
-  varnames <- colnames(data)
-
-  ## Check if formula correct and all variable names present
-  vars <- check_formula(varnames, formula)
-
-  ## Retrieve X & y matrix / vectors
-  y <- data[,vars$DV]
-
-  ## Assert that the outcome variable is a numeric vector
-  if( !is.numeric(y) ) {
-
-    stop("outcome vector y must be numeric")
-
-  }
-
-  # Center
-  if(center) {
-    # Index for IV
-    iv_index <- setdiff(names(data), vars$DV)
-    # Retrieve numeric
-    numeric_vars <- iv_index[sapply(data[, iv_index], is.numeric)]
-    # Center variables
-    data[,numeric_vars] <- apply(data[,numeric_vars], 2, function(x) x - mean(x))
-  }
-
-  ## Create design matrix
-  ## (-1 ignores the intercept)
-  X <- model.matrix(as.formula(paste0(vars$DV, " ~ ",
-                                      paste0(vars$IV, collapse = "+"))),
-                    data)
-
-  ## Subset y by rows (may be deleted)
-  y <- y[as.numeric(row.names(X))]
-
-  ## Number of observations
-  n <- nrow(X)
-  ## Number of columns
-  m <- ncol(X)
-
-  ## Put in list & return
-  res <- list(
-    "inputs" = list(
-      "formula" = formula,
-      "variables" = vars,
-      "y" = y,
-      "X" = X,
-      "n" = n,
-      "m" = m,
-      "center" = center
-    )
-  )
-
-  return(res)
-
-}
-
-# Check density parameters
-# See function prior() in blm.R
-check_density_params <- function(density, params, req_params, range) {
-
-  # Parameter names
-  nparam <- names(params)
-
-  # Check if required params met
-  if (!all(nparam %in% req_params)) {
-
-    # Start building error message
-    msg <- paste0("Density '", density, "' requires parameters '",
-                  paste(req_params, collapse=", "),
-                  "' but user passed '",
-                  paste(nparam, collapse=", "), "'")
-
-    # Error
-    stop(msg)
-
-  }
-
-  # Check if required params have legal values
-  for (param in nparam) {
-
-    # Supplied value
-    param_supplied <- params[[param]]
-
-    # Allowed value
-    param_allowed <- range[[param]]
-
-    # In range?
-    if (param_supplied < param_allowed[1] | param_supplied > param_allowed[2]) {
-
-      msg <- paste0("Illegal value supplied for parameter '", param, "'. Parameter must be in range (",
-                    paste(param_allowed, collapse=", "), ")")
-
-      # Raise error
-      stop(msg)
-
-    }
-
-  }
-
-}
-
-# Helper function for autocorrelation
-autocor <- function(x, n=10) {
-
-  # Results
-  res <- rep(0, n)
-
-  # Lag for each n and calculate correlation
-  for(i in 1:n) {
-    res[i] <- cor(x, c(rep(NA, i), x[1:(length(x)-i)]),
-                  use="complete.obs")
-  }
-
-  # Return
-  return(
-    data.frame(
-      "lag" = 1:n,
-      "correlation" = res
-    )
-  )
-
-}
+# Helper functions for sampling ----
 
 # Initiate initial values for a Gibbs chain
 initialize_chain_values <- function(priors) {
@@ -256,7 +35,7 @@ gibbs_sampler <- function(X, y, initial_values, iterations, thinning, priors, bu
   sigma <- initial_values$sigma
 
   # TODO: ensure that user passes valid iterations / priors (integers)
-  r <- .blm$julia$eval("gibbs_sampler")(X, y, w, sigma, as.integer(iterations),
+  r <- .blm$julia$eval("gibbs_sampler")(X, as.numeric(y), w, sigma, as.integer(iterations),
                                         as.integer(thinning), unname(priors))
 
   # Burn
@@ -264,18 +43,118 @@ gibbs_sampler <- function(X, y, initial_values, iterations, thinning, priors, bu
 
 }
 
+# Helper functions for evaluation -----
+
+# Helper function for autocorrelation
+autocor <- function(x, n=10) {
+
+  # Results
+  res <- rep(0, n)
+
+  # Lag for each n and calculate correlation
+  for(i in 1:n) {
+    res[i] <- cor(x, c(rep(NA, i), x[1:(length(x)-i)]),
+                  use="complete.obs")
+  }
+
+  # Return
+  return(
+    data.frame(
+      "lag" = 1:n,
+      "correlation" = res
+    )
+  )
+
+}
+
 # Posterior predictive checks in julia
-ppc_julia <- function(X, y, initial_values, iterations, priors, burn) {
+ppc_julia <- function(X, y, initial_values, iterations, priors, thinning, burn) {
 
   # Unroll initial values
   w <- initial_values$w
   sigma <- initial_values$sigma
   #browser()
   return(
-    .blm$julia$eval("ppc_draws")(X, y, w, sigma, as.integer(iterations), as.integer(burn), unname(priors))
+    .blm$julia$eval("ppc_draws")(X, as.numeric(y), w, sigma,
+                                 as.integer(iterations), as.integer(thinning),
+                                 as.integer(burn), unname(priors))
   )
 
 }
+
+# Helper functions for special cat() ----
+
+# Special cat function for burn-in statistic
+cat.burnin <- function(x) {
+
+  # Dims
+  j <- dim(x)[2]
+  n <- dim(x)[1]
+
+  # Fill setting for cat()
+  f <- (nchar(crayon::green("0.00")) + 1) * j + (j-1) + nchar("chain 1 ")
+
+  # Round
+  x <- round(abs(x), digits=2)
+
+  # Determine colors
+  is_zero <- x == 0
+  less_than_05 <- abs(x) < 0.05
+
+  # Turn x into a character vector
+  x_v <- as.character(round(unname(unlist(x)), digits=2))
+
+  # For those elements of length 1, add decimals
+  x_v_l1 <- nchar(x_v) == 1
+  x_v_l3 <- nchar(x_v) == 3
+
+  # Set
+  x_v[x_v_l1] <- paste0(x_v[x_v_l1], ".00")
+  x_v[x_v_l3] <- paste0(x_v[x_v_l3], "0")
+
+  # Paste
+  cat(paste0("        ", paste0("b", 0:(j-1), collapse="   "), "\n"))
+  cat(ifelse(is_zero, crayon::green(x_v),
+             ifelse(less_than_05, crayon::yellow(x_v),
+                    crayon::red(x_v))), fill=f, labels=paste0("Chain ", 1:2), sep = " ")
+}
+
+# Special cat function for Gelman-Rubin statistic
+cat.GR <- function(x) {
+
+  # Round
+  x <- round(x, digits=2)
+
+  # To vector
+  x <- unname(x[1,])
+
+  # Length
+  j <- length(x)
+
+  # Fill setting for cat()
+  f <- (nchar(crayon::green("0.00")) + 1) * j + (j-1) + nchar("chain 1 ")
+
+  # Determine colors
+  is_one <- x == 1
+
+  # Turn x into a character vector
+  x_v <- as.character(x)
+
+  # For those elements of length 1, add decimals
+  x_v_l1 <- nchar(x_v) == 1
+  x_v_l3 <- nchar(x_v) == 3
+
+  # Set
+  x_v[x_v_l1] <- paste0(x_v[x_v_l1], ".00")
+  x_v[x_v_l3] <- paste0(x_v[x_v_l3], "0")
+
+  # Paste
+  cat(paste0("        ", paste0("b", 0:(j-1), collapse="   "), "\n"))
+  cat(ifelse(is_one, crayon::green(x_v), crayon::red(x_v)), fill=f, labels="Value  ", sep = " ")
+
+}
+
+# Misc ----
 
 # Generate a dataset with normal variables and outcome for testing purposes
 #
@@ -311,7 +190,7 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
   if(!is.null(seed)) {
     set.seed(seed)
   }
-  binary_j <- order(runif(j))[1:binary]
+  binary_j <- order(runif(j))[0:binary]
 
   for(i in 1:j) {
     if(!i %in% binary_j) {
@@ -384,75 +263,5 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
       "seed" = ifelse(is.null(seed), NA, seed)
     )
   )
-
-}
-
-# Special cat function for burn-in statistic
-cat.burnin <- function(x) {
-
-  # Dims
-  j <- dim(x)[2]
-  n <- dim(x)[1]
-
-  # Fill setting for cat()
-  f <- (nchar(crayon::green("0.00")) + 1) * j + (j-1) + nchar("chain 1 ")
-
-  # Round
-  x <- round(x, digits=2)
-
-  # Determine colors
-  is_zero <- x == 0
-  less_than_05 <- abs(x) < 0.05
-
-  # Turn x into a character vector
-  x_v <- as.character(round(unname(unlist(x)), digits=2))
-
-  # For those elements of length 1, add decimals
-  x_v_l1 <- nchar(x_v) == 1
-  x_v_l3 <- nchar(x_v) == 3
-
-  # Set
-  x_v[x_v_l1] <- paste0(x_v[x_v_l1], ".00")
-  x_v[x_v_l3] <- paste0(x_v[x_v_l3], "0")
-
-  # Paste
-  cat(paste0("        ", paste0("b", 0:(j-1), collapse="   "), "\n"))
-  cat(ifelse(is_zero, crayon::green(x_v),
-             ifelse(less_than_05, crayon::yellow(x_v),
-                    crayon::red(x_v))), fill=f, labels=paste0("Chain ", 1:2), sep = " ")
-}
-
-# Special cat function for Gelman-Rubin statistic
-cat.GR <- function(x) {
-
-  # Round
-  x <- round(x, digits=2)
-
-  # To vector
-  x <- unname(x[1,])
-
-  # Length
-  j <- length(x)
-
-  # Fill setting for cat()
-  f <- (nchar(crayon::green("0.00")) + 1) * j + (j-1) + nchar("chain 1 ")
-
-  # Determine colors
-  is_one <- x == 1
-
-  # Turn x into a character vector
-  x_v <- as.character(x)
-
-  # For those elements of length 1, add decimals
-  x_v_l1 <- nchar(x_v) == 1
-  x_v_l3 <- nchar(x_v) == 3
-
-  # Set
-  x_v[x_v_l1] <- paste0(x_v[x_v_l1], ".00")
-  x_v[x_v_l3] <- paste0(x_v[x_v_l3], "0")
-
-  # Paste
-  cat(paste0("        ", paste0("b", 0:(j-1), collapse="   "), "\n"))
-  cat(ifelse(is_one, crayon::green(x_v), crayon::red(x_v)), fill=f, labels="Value  ", sep = " ")
 
 }

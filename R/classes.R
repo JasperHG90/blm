@@ -13,7 +13,7 @@
 blm <- function(formula, data, center = FALSE) {
 
   # Check formula against data
-  inputs <- perform_checks(formula, data, center)
+  inputs <- check_init_blm(formula, data, center)
 
   # Retrieve X
   X <- inputs$inputs$X
