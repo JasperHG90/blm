@@ -286,3 +286,378 @@ summary(res)
 ```
 
 The posterior mean for RR is $0.68$ with $95\%$ CCI = $[0.58, 0.8]$. The CCIs are smaller and still do not include $1$. Hence, the result of including prior knowledge has quite a big effect.
+
+# Sampling the posterior: Gibbs method (week 2)
+
+Until now, we have seen that:
+
+$$
+f(\theta|y) = \frac{f(y|\theta) f(\theta)}{f_\theta(y)}
+$$
+
+1. $f(y|\theta)$ is the density of the data (likelihood)
+2. $f(\theta)$ is the prior distribution of the parameter $\theta$
+3. $f_\theta(y) = \int f(y|\theta)f(\theta)d \theta$ is the marginal distribution
+4. $f(\theta|y)$ is the posterior distribution
+
+We also know that the marginal distribution serves the role as a normalizing constant. That is, its role is to ensure that $f(\theta|y)$ is a proper probability distribution. Accordingly, we can state that 
+
+$$
+f(\theta|y) \propto f(y|\theta) f(\theta)
+$$
+
+In practice, we have three options for sampling from the posterior distribution.
+
+1. If $\theta$ is a single parameter, we can derive the posterior distribution analytically.
+2. If $\theta$ is a vector containing multiple parameters, then we could derive conditional posterior distributions and sample the posterior using a Gibbs sampler.
+3. If the conditional posteriors derived under $2$ are of an unknown form, we cannot sample directly from them and so we use the Metropolis-Hastings algorithm.
+
+## Two parameter case
+
+Suppose that we have $f(y|\theta_1, \theta_2)$. Then the joint posterior distribution will be:
+
+$$
+p(\theta_1, \theta_2 | y) \propto f(y | \theta_1, \theta_2) f(\theta_1, \theta_2)
+$$
+
+However, it is more convenient to derive the conditional posterior distributions
+
+\begin{align}
+&f(\theta_1|\theta_2, y) \propto f(y | \theta_1, \theta_2) f(\theta_1 | \theta_2) \\
+&f(\theta_2|\theta_1, y) \propto f(y | \theta_1, \theta_2) f(\theta_2 | \theta_1)
+\end{align}
+
+Note that we often assume that the priors are independent. By definition, if we have independent events $f(\theta_1 | \theta_2)$ and $f(\theta_2 | \theta_1)$ then reduce to $f(\theta_1)$ and $f(\theta_2)$.^[See e.g. [this page](https://newonlinecourses.science.psu.edu/stat414/node/38/)] 
+
+To sample from the posterior distribution, we repeatedly and iteratively sample the conditional posteriors by using the following procedure:
+
+1. Set $h=0$ and $H$ to a large number.
+2. Choose the initial values for $\theta_1, \theta_2 \longrightarrow \theta_1^{(0)}, \theta_2^{(0)}$.
+3. Set $h=h+1$.
+4. Sample $\theta_1^{(h)}$ from the conditional posterior $f(\theta_1|\theta_2^{(h-1)}, y)$.
+5. Sample $\theta_2^{(h)}$ from the conditional posterior $f(\theta_2|\theta_1^{(h-1)}, y)$.
+6. Repeats steps $3-5$ many times until $h=H$.
+
+This procedure is called the *Gibbs sampler*.
+
+## Evaluating convergence
+
+There are several ways to check convergence of the model. Keep in mind that:
+
+- **We should always use a combination of these methods**.
+- **We can never prove that a chain has converged**.
+
+1. **Autocorrelation plot**: Because the Gibbs sampler is an MC method, we by definition compute the current value on the basis of the previous one. High autocorrelation means that we are 'stepping through' the posterior space very slowly. This is a problem because we may not observe the entire posterior space. Autocorrelation further occurs because of **(1) mixed distributions** (e.g. a mixed (multimodal) normal distribution) and **(2) high autocorrelation between variables**.
+
+```{r, echo=FALSE, fig.cap="Uncorrelated versus correlated variables. Taken from: James, Gareth et al. Introduction to statistical learning. p.100", out.width="400px"}
+knitr::include_graphics("img/ISLR1.png")
+```
+
+Autocorrelation disturbs the estimate of the posterior $SD$ and reduces the *effective* sample size (and therefore the information) that we have collected from the posterior. The effective sample size would be the point where the autocorrelation is close to $0$; around about every $40^{th}$ iteration in the plot below.
+
+```{r, echo=FALSE}
+x=seq(1,50,1)
+cor2=seq(0,1,length.out = length(x))[50:1] + abs(rnorm(50, 0, 0.03))
+d <- data.frame(x, cor2)
+library(ggplot2)
+ggplot(d, aes(x=x, y=cor2)) +
+  geom_point()
+```
+
+
+In general, the lower the autocorrelation, the more information we have about the posterior. This is referred to as *mixing*.
+
+2. **Trace/history plots**: We check the values of the parameters against the index over multiple chains to see whether the estimate of the parameter stabilizes over time and to check whether the chains overlap. The value to which the chains coverge is called the **stationary distribution**. It is important that we 'burn' (remove) a set of $n$ (usually close to $1.000$) values from the start of the sequence to give the algorithm time to converge to a stable state.
+
+```{r, echo=FALSE, fig.show='hold', fig.cap="A converged model (left) and a model that has not converged (right) because the two chains do not overlap."}
+index <- 1001:10000
+converged <- data.frame(
+  index = index,
+  chain_1 = rnorm(index, 5, 1),
+  chain_2 = rnorm(index, 5, 1)
+)
+library(tidyr)
+library(ggplot2)
+ggplot(converged %>% gather(chain, value, -index), aes(x=index, y=value, color=chain)) +
+  geom_line(alpha=0.4) +
+  scale_y_continuous(limits=c(0, 10))
+
+nconverged <- data.frame(
+  index = index,
+  chain_1 = rnorm(index, 10, 1),
+  chain_2 = rnorm(index, 5, 1)
+)
+ggplot(nconverged %>% gather(chain, value, -index), aes(x=index, y=value, color=chain)) +
+  geom_line(alpha=0.4) +
+  scale_y_continuous(limits=c(0, 15))
+
+```
+
+3. **Gelman-Rubin Statistic**: The GR statistic assesses convergence of multiple chains. The statistic compares the variance *within* chains to variance *between* chains. Its value should be close to $1$.
+
+4. **MCError**: The MC error is computed as 
+
+$$
+\text{MCERR} = \frac{\text{SD}}{\sqrt{\text{iterations}}}
+$$
+
+Where the $SD$ value is the standard deviation of the $MAP$ estimates of a parameter. The MC error decreases as the number of iterations $\to \infty$, and should not be larger than $5\%$ of the sample standard deviation.
+
+## What to do if convergence failed?
+
+There are several things we can do if the model fails to converge.
+
+1. Use more iterations
+2. Re-parametrize the model, for example by centering the independent variables.
+3. Use different priors for correlated variables.
+4. Use different initial values.
+5. Increase the thinning parameter.
+
+## Practical II using R and JAGS
+
+The goal is to build a regression model that models people's attitude as a function of their agreeableness and extraversion:
+
+$$
+\text{attitude}_i = \beta_0 + \beta_1 \text{agreeableness}_i + \beta_2\text{extraversion}_i + e_i
+$$
+
+Where $e_i \sim N(0, \sigma^2)$.
+
+We assume the following priors:
+
+- For $\beta_0, \beta_1, \beta_2$ we assume a normal prior. This yields six hyperparameters; a prior mean and variance for each coefficient.
+- For $\sigma^2$ we assume an inverse-gamma prior. This yields two hyperparameters; a shape parameter and a scale parameter.
+
+We specify the model as follows. Note the following two things:
+
+1. We are using **uninformative priors**.
+2. Since we are using uninformative priors, we draw the coefficients from a normal with mean $\mu_{0,0}$ and variance $\tau^2_{0,0}$. This happens in the line `b[coef] ~ dnorm(0, 1/10000)` below. We **don't see** the part where the likelihood of the data and the prior are merged together into the posterior.
+3. In JAGS, we use *precision* instead of *variance*, hence the $1/10000$.
+
+```{r, results="hold"}
+# Load data
+d <- haven::read_spss("data/Exercise 2 - Data.sav")
+
+# Make model
+linm <- "model{
+  
+  #### Priors
+  
+  # Sigma^2
+  tau ~ dgamma(0.001, 0.001)
+
+  # Coefficients
+  for(coef in 1:3) {
+    b[coef] ~ dnorm(0, 1/10000)
+  }
+
+  #### Likelihood ==> for each example in the data SEPARATELY
+
+  for(i in 1:length(attitude)) {
+    # Calculate the mean value
+    mu[i] <- b[1] + b[2] * extraversion[i] + b[3] * agreeableness[i]
+
+    # Use dnorm to calculate the density at the mean value
+    attitude[i] ~ dnorm(mu[i], tau)
+  }
+
+  #### Variables of interest
+  sigma2 <- 1/tau
+  sigma <- sqrt(sigma2)
+
+}"
+
+# Specify initial values for the chains
+# (this is optional)
+init <- list(
+  init1 <- list(b = c(7, 0, -5), tau=1),
+  init2 <- list(b = c(-5, 0, 7), tau=2)
+)
+
+# Text connection
+con <- textConnection(linm)
+
+# Jags model
+library(rjags)
+jmod <- jags.model(file=con, data=d, n.chains=2, inits = init)
+close(con)
+# Run the model
+update(jmod, n.iter = 1000)
+
+# Specify parameter names
+params <- c("b", "sigma")
+# Run the chain
+res <- coda.samples(jmod, variable.names = params, n.iter=10000)
+```
+
+We first inspect convergence before we continue on and look at the results of the model.
+
+```{r, fig.show="hold"}
+traceplot(res)
+```
+
+The traceplot looks converged for each parameter. The values of the different chains largely overlap and are within reasonable bounds (e.g. the variance is small). The parameters seem to have converged to a stationary distribution.
+
+```{r, fig.show="hold"}
+densplot(res)
+```
+
+Similarly, the density plots show a nice, unimodal normal-like distribution.
+
+```{r}
+par(mar=c(1,1,1,1))
+autocorr.plot(res)
+```
+
+There appears to be some evidence of autocorrelation, especially for the residual error and for the coefficient of agreeableness. The autocorrelation dissappears around the $15^{th}$ lag. To remedy this, we perform grand-mean centering on the variables.
+
+```{r}
+par(mar=c(1,1,1,1))
+gelman.plot(res)
+```
+
+The gelman-rubin plot shows that the between and within variance of the chains are close to one, which is desired. This means that the chains have 'forgotten' their initial states and have converged to the same values.
+
+```{r}
+summary(res)
+```
+
+From the results, we observe the following:
+
+1. The coefficient for extraversion has a negative sign (and therefore impact) on the outcome attitude with $\beta_2 = -0.082, \ 95\% \text{ CI} = [-.19, .03]$. Because the credible interval contains $0$, we conclude that there is no evidence to support the claim that a person's extraversion score impacts their attitudes towards pets.
+2. The coefficient for agreeableness has a positive sign with mean $\beta_3 = 0.26, \ 95\% \text{ CI} = [.082, .444]$. Therefore, for each one-point increase in the agreeableness score, the attitude towards pets increases by a value of $0.26$. Given that the credible interval does not contain $0$, we may conclude that agreeableness positively impacts a person's attitude towards pets.
+
+Next, we run the model with an interaction effect.
+
+```{r}
+# Load data
+d <- haven::read_spss("data/Exercise 2 - Data.sav")
+
+# Make model
+linm <- "model{
+  
+  #### Priors
+  
+  # Sigma^2
+  tau ~ dgamma(0.001, 0.001)
+
+  # Coefficients
+  for(coef in 1:4) {
+    b[coef] ~ dnorm(0, 1/10000)
+  }
+
+  #### Likelihood ==> for each example in the data SEPARATELY
+  for(i in 1:length(attitude)) {
+    # Calculate the mean value
+    mu[i] <- b[1] + b[2] * (extraversion[i] - mean(extraversion)) + b[3] * (agreeableness[i] - mean(agreeableness)) + b[4] * (extraversion[i] - mean(extraversion)) * (agreeableness[i] - mean(agreeableness))
+
+    # Use dnorm to calculate the density at the mean value
+    attitude[i] ~ dnorm(mu[i], tau)
+  }
+
+  #### Variables of interest
+  sigma2 <- 1/tau
+  sigma <- sqrt(sigma2)
+
+}"
+
+# Specify initial values for the chains
+# (this is optional)
+init <- list(
+  init1 <- list(b = c(7, 0, -5, 12), tau=1),
+  init2 <- list(b = c(12, -5, 0, 7), tau=2)
+)
+
+# Text connection
+con <- textConnection(linm)
+
+# Jags model
+library(rjags)
+jmod <- jags.model(file=con, data=d, n.chains=2, inits = init)
+close(con)
+# Run the model
+update(jmod, n.iter = 1000)
+
+# Specify parameter names
+params <- c("b", "sigma")
+# Run the chain
+res <- coda.samples(jmod, variable.names = params, n.iter=10000)
+```
+
+We skip checking convergence for now and go straight to the results.
+
+```{r}
+summary(res)
+```
+
+From the results, we observe that the $95\%$ CI of the interaction effect contains $0$, and as such we do not have evidence that the effect of agreeableness on liking pets is moderated by extraversion.
+
+# Model selection using DIC (week 7)
+
+With any model, we like to be able to quantify the 'quality' of that model given the problem we are working on. There are many forms of 'information criteria' (IC) such as the AIC, BIC etc. that do this. All IC methods are based on the same principles:
+
+1. We like well-fitting models.
+2. We like parsimonious (specific) models that are not complex.
+
+Given that 'well fitting' refers to the fit of the model on the data, it would be reasonable to evaluate the *likelihood* of the data given the parameters, or $f(data|parameters)$. Parsimony is defined by using its antonym 'complexity'. Hence, we have two parts to any IC method:
+
+1. A measure of **fit**. Usually the log-likelihood of the data given the parameters.
+2. A measure of **complexity**. Usually a penalty measure involving the number of parameters.
+
+Which sum together as follows:
+
+$$
+\text{IC = model misfit + model complexity}
+$$
+
+We prefer the model with the smallest IC.
+
+Hence, IC methods give us the ability to compare models that are not nested^[meaning that the models are not of a form s.t. model A fully encompasses model B] and to compare more than two models at the same time. It is a standardized metric, and therefore comparable across models and methods.
+
+## Kullback-Leibler distance
+
+The K-L distance minimizes the distance between the **truth** $p(.)$ and the **model under consideration** $f(.|\theta)$:
+
+$$
+\tag{KL}
+\text{K-L} = E_{p(y)}\left[\log{p(y)} - \log{f(y|\theta)}\right]
+$$
+
+The 'truth' $p(y)$ is a constant and can be ignored when comparing models. Furthermore, since $\log{f(y|\theta)} \ge \log{p(y)}$ we maximize $E \left[\log{f(y|\theta)} \right]$^[In equation KL we are taking a difference. If we drop $\log{p(y)}$ then we are left with $-\log{f(y|\theta)}$. In this case we would *minimize* this value, but since we like to maximize things instead we multiply by $-1$.]. 
+
+To compute $f(y|\theta)$ for a measure like the AIC, we use $\hat{\theta}_y$. This gives us a biased estimate because we are using $y$ both to estimate the model **and** to evaluate the fit. Hence, we need a penalty term to correct for overfitting. 
+
+## Deviance information criterion (DIC)
+
+The DIC minizes the loss function / deviance of a model using the posterior mean:
+
+$$
+\text{DIC} = -2 \log{f(y|\bar{\theta_y})} + 2_{PD}
+$$
+
+Like all IC measures, the DIC consists of two parts:
+
+1. The **likelihood** of the data, computed as the log of the density of the data using the posterior mean.
+2. A measure of **model complexity**, which will be estimated as the effective number of parameters used in the model.
+
+In a complex model or when using informative priors, the number of parameters (dimensionality) is difficult to define. The DIC estimates this number as:
+
+$$
+\begin{aligned}
+\text{PD} &=  -2\left[E_{p(\theta|y)}\left\{\log{f(y|\theta)}\right\} - \log{f(y|\bar{\theta}_y)}  \right] \\
+&\approx -2 \left[\left\{\frac{1}{Q} \sum_{i=1}^Q \log{f(y|\theta^q)}\right\} - \log{f(y|\frac{1}{Q} \sum_{i=1}^Q \theta^q)} \right]
+\end{aligned}
+$$
+
+When computing the DIC, we prefer the model that has the lower value. Given two models, we then say that model A (lower DIC) provides a better description of the data than model B (higher DIC). 
+
+## Practical: model DIC using R and JAGS
+
+We will use JAGS to obtain the posterior for a logistic regression model. Further, we will make use of the DIC to select a best model.
+
+Our goal is to make a clinical prediction rule to detect clinical depression in primary care. We use low informative priors.
+
+```{r}
+# Read data
+d <- read.table("data/Exercise 4 - Data.txt")
+```

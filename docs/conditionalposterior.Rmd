@@ -147,7 +147,7 @@ Let $k_i = \beta_0 + \beta_1X_{1i} + \beta_2X_{2i} + \dots + \beta_jX_{ji}$. We 
 $$
 \tag{2.1.1}
 \begin{aligned}
-&f(y_i | x_{1i}, x_{2i}, \beta_0, \beta_1, \beta_2, \dots, \beta_j, \sigma^2) = \frac{1}{\sqrt{2\pi\sigma^2}} e^{-\left[\frac{(y_i - k_i)^2}{2\sigma^2} \right]}
+&f(y_i | x_{1i}, x_{2i}, \dots, x_{ji}, \beta_0, \beta_1, \beta_2, \dots, \beta_j, \sigma^2) = \frac{1}{\sqrt{2\pi\sigma^2}} e^{-\left[\frac{(y_i - k_i)^2}{2\sigma^2} \right]}
 \end{aligned}
 $$
 
@@ -156,7 +156,7 @@ By virtue of independence, we construct the likelihood of all $N$ examples in th
 $$
 \tag{2.1.2}
 \begin{aligned}
-&f(\text{data}|\text{parameters}) = f(y | x_1, x_2, \beta_0, \beta_1, \beta_2, \dots, \beta_j, \sigma^2) = \prod_{i=1}^N \frac{1}{\sqrt{2\pi\sigma^2}} e^{-\left[\frac{(y_i - k_i)^2}{2\sigma^2} \right]}
+&f(\text{data}|\text{parameters}) = f(y | x_1, x_2, \dots, x_j, \beta_0, \beta_1, \beta_2, \dots, \beta_j, \sigma^2) = \prod_{i=1}^N \frac{1}{\sqrt{2\pi\sigma^2}} e^{-\left[\frac{(y_i - k_i)^2}{2\sigma^2} \right]}
 \end{aligned}
 $$
 
@@ -193,11 +193,11 @@ We can obtain posterior distributions for each of the parameters by constructing
 $$
 \tag{4.1}
 \begin{aligned}
-&f(\beta_0 | y, X, \beta_1, \dots, \beta_j, \sigma^2) \propto f(y | X, \beta_0, \beta_1, \dots, \beta_j, \sigma^2) \times f(\beta_0) \\
-&f(\beta_1 | y, X, \beta_0, \dots, \beta_j, \sigma^2) \propto f(y | X, \beta_0, \beta_1, \dots, \beta_j, \sigma^2) \times f(\beta_1) \\
+&f(\beta_0 | y, x_1, x_2, \dots, x_j, \beta_1, \dots, \beta_j, \sigma^2) \propto f(y | x_1, x_2, \dots, x_j, \beta_0, \beta_1, \dots, \beta_j, \sigma^2) \times f(\beta_0) \\
+&f(\beta_1 | y, x_1, x_2, \dots, x_j, \beta_0, \dots, \beta_j, \sigma^2) \propto f(y | x_1, x_2, \dots, x_j, \beta_0, \beta_1, \dots, \beta_j, \sigma^2) \times f(\beta_1) \\
 &\dots \\
-&f(\beta_j | y, X, \beta_0, \beta_1, \dots, \beta_{j-1}, \sigma^2) \propto f(y | X, \beta_0, \beta_1, \dots, \beta_j, \sigma^2) \times f(\beta_j) \\
-&f(\sigma^2 | y, X, \beta_0, \beta_1, \dots, \beta_j) \propto f(y | X, \beta_0, \beta_1, \dots, \beta_j, \sigma^2) \times f(\sigma^2)
+&f(\beta_j | y, x_1, x_2, \dots, x_j, \beta_0, \beta_1, \dots, \beta_{j-1}, \sigma^2) \propto f(y | x_1, x_2, \dots, x_j, \beta_0, \beta_1, \dots, \beta_j, \sigma^2) \times f(\beta_j) \\
+&f(\sigma^2 | y, x_1, x_2, \dots, x_j, \beta_0, \beta_1, \dots, \beta_j) \propto f(y | x_1, x_2, \dots, x_j, \beta_0, \beta_1, \dots, \beta_j, \sigma^2) \times f(\sigma^2)
 \end{aligned}
 $$
 
@@ -295,7 +295,7 @@ And so we get
 $$
 \tag{4.1.9}
 \begin{aligned}
-&\tau_{0,1}=^2\frac{1}{\left(\frac{N}{\sigma^2} + \frac{1}{\tau_{0,0}^2}\right)} \\
+&\tau^2_{0,1}=\frac{1}{\left(\frac{N}{\sigma^2} + \frac{1}{\tau_{0,0}^2}\right)} \\
 &\mu_{0,1}=\frac{\left(\frac{\sum_{i=1}^N y_i - \beta_1x_{1i} - \beta_2x_{2i} - \dots - \beta_jx_{ji}}{\sigma^2} + \frac{\mu_{0,0}}{\tau_{0,0}^2}\right)}{\left(\frac{N}{\sigma^2} + \frac{1}{\tau_{0,0}^2}\right)}
 \end{aligned}
 $$
