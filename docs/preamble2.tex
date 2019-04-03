@@ -1,0 +1,25 @@
+\usepackage{float}
+\usepackage{setspace}
+\usepackage{xcolor}
+\definecolor{mypurple}{rgb}{146,76,239}
+\doublespacing
+\floatplacement{figure}{H}
+\usepackage{xcolor}
+\usepackage{mdframed}
+\usepackage{amsthm}
+\usepackage{thmtools}
+\colorlet{LightGreen}{green!10}
+\colorlet{LightPurple}{purple!10}
+\colorlet{LightOrange}{orange!15}
+\colorlet{Lightred}{red!15}
+\declaretheoremstyle[
+  name=Algorithm,
+  mdframed={
+skipabove=8pt,
+skipbelow=6pt,
+%hidealllines=true,
+backgroundcolor={LightPurple},
+innerleftmargin=8pt,
+innerrightmargin=8pt}
+]{algsty}
+\declaretheorem[style=algsty]{algorithm2}

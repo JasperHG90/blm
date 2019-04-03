@@ -5,18 +5,18 @@ date: "March 2019"
 output:
   pdf_document: 
     number_sections: true
-header-includes:
- \usepackage{float}
- \usepackage{setspace}
- \usepackage{xcolor}
- \definecolor{mypurple}{rgb}{146,76,239}
- \doublespacing
- \floatplacement{figure}{H}
+header-includes: 
+  \usepackage{float}
+  \usepackage{setspace}
+  \usepackage{xcolor}
+  \definecolor{mypurple}{rgb}{146,76,239}
+  \doublespacing
+  \floatplacement{figure}{H}
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(fig.pos="H", fig.width = 3, fig.height = 3, echo = FALSE, 
-                      fig.align="center", warning = FALSE, message = FALSE)
+                      fig.align="center", warning = FALSE, message = FALSE, eval=TRUE)
 ```
 
 # Introduction (week 1)
@@ -132,6 +132,8 @@ The use of a prior in Bayesian statistics raises the question *which* prior shou
 Ultimately, we should reasoned and transparent thinking to select priors of interest.
 
 If we care more about historical results, we could choose to weight historical results more heavily, which results in *power priors*. We weight the likelihood of the historical data by some value $\alpha_0$ to indicate that it should be more or less important than our believe of the distribution of the parameters. **This practice requires domain expertise**.
+
+<MORE ABOUT POWER PRIORS>
 
 ## Transformation of posterior densities & posterior predictive distributions
 
@@ -257,7 +259,7 @@ With respect to using informative hypotheses using historical data, I would argu
 
 In the model file below, we specify the informative distributions.
 
-```{r, echo=TRUE}
+```{r, echo=TRUE, results="hide"}
 mod2 <- 'model{
   
   # Priors (informative)
@@ -282,6 +284,9 @@ close(con)
 update(jmod, n.iter = 1000)
 params <- c("theta.PE", "theta.PC", "RR")
 res <- coda.samples(jmod, variable.names = params, n.iter=10000)
+```
+
+```{r, echo=TRUE}
 summary(res)
 ```
 
@@ -331,12 +336,14 @@ Note that we often assume that the priors are independent. By definition, if we 
 
 To sample from the posterior distribution, we repeatedly and iteratively sample the conditional posteriors by using the following procedure:
 
-1. Set $h=0$ and $H$ to a large number.
-2. Choose the initial values for $\theta_1, \theta_2 \longrightarrow \theta_1^{(0)}, \theta_2^{(0)}$.
-3. Set $h=h+1$.
-4. Sample $\theta_1^{(h)}$ from the conditional posterior $f(\theta_1|\theta_2^{(h-1)}, y)$.
-5. Sample $\theta_2^{(h)}$ from the conditional posterior $f(\theta_2|\theta_1^{(h-1)}, y)$.
-6. Repeats steps $3-5$ many times until $h=H$.
+> **Gibbs sampler**
+>
+>1. Set $h=0$ and $H$ to a large number.
+>2. Choose the initial values for $\theta_1, \theta_2 \longrightarrow \theta_1^{(0)}, \theta_2^{(0)}$.
+>3. Set $h=h+1$.
+>4. Sample $\theta_1^{(h)}$ from the conditional posterior $f(\theta_1|\theta_2^{(h-1)}, y)$.
+>5. Sample $\theta_2^{(h)}$ from the conditional posterior $f(\theta_2|\theta_1^{(h-1)}, y)$.
+>6. Repeat steps $3-5$ many times until $h=H$.
 
 This procedure is called the *Gibbs sampler*.
 
@@ -434,7 +441,7 @@ We specify the model as follows. Note the following two things:
 2. Since we are using uninformative priors, we draw the coefficients from a normal with mean $\mu_{0,0}$ and variance $\tau^2_{0,0}$. This happens in the line `b[coef] ~ dnorm(0, 1/10000)` below. We **don't see** the part where the likelihood of the data and the prior are merged together into the posterior.
 3. In JAGS, we use *precision* instead of *variance*, hence the $1/10000$.
 
-```{r, results="hold"}
+```{r, results="hide", echo=TRUE}
 # Load data
 d <- haven::read_spss("data/Exercise 2 - Data.sav")
 
@@ -529,7 +536,7 @@ From the results, we observe the following:
 
 Next, we run the model with an interaction effect.
 
-```{r}
+```{r, echo=TRUE, results="hide"}
 # Load data
 d <- haven::read_spss("data/Exercise 2 - Data.sav")
 
@@ -549,7 +556,10 @@ linm <- "model{
   #### Likelihood ==> for each example in the data SEPARATELY
   for(i in 1:length(attitude)) {
     # Calculate the mean value
-    mu[i] <- b[1] + b[2] * (extraversion[i] - mean(extraversion)) + b[3] * (agreeableness[i] - mean(agreeableness)) + b[4] * (extraversion[i] - mean(extraversion)) * (agreeableness[i] - mean(agreeableness))
+    mu[i] <- b[1] + b[2] * (extraversion[i] - mean(extraversion)) + 
+             b[3] * (agreeableness[i] - mean(agreeableness)) + 
+             b[4] * (extraversion[i] - mean(extraversion)) * 
+                    (agreeableness[i] - mean(agreeableness))
 
     # Use dnorm to calculate the density at the mean value
     attitude[i] ~ dnorm(mu[i], tau)
@@ -591,6 +601,294 @@ summary(res)
 ```
 
 From the results, we observe that the $95\%$ CI of the interaction effect contains $0$, and as such we do not have evidence that the effect of agreeableness on liking pets is moderated by extraversion.
+
+# Sampling the posterior: Metropolis-Hastings method (week 4)
+
+The Metropolis-Hastings algorithm is an MC method for sampling the posterior that allows us to sample from a generic probability distribution that we call the 'target distribution', even if we do not know the normalizing constant of the distribution we are looking for. This may occur because e.g. finding the marginal distribution is difficult or impossible because we cannot integrate the function.
+
+To do this, we construct - and sample from - a Markov Chain whose stationary distribution is the distribution that we are looking for. That is:
+
+$$
+f(\theta) \propto g(\theta)
+$$
+
+The MH algorithm then proceeds as follows:
+
+> **Metropolis-Hastings Algorithm**
+>
+>1. Select an initial value $\theta^{(0)}$.
+>2. For $i=1,\dots, m$, repeat:
+>
+>     a. draw a candidate value from a proposal distribution $q(\theta)$ s.t. $\theta^* \sim q(\theta^*|\theta^{(i-1)})$.
+>     b. Set $\alpha = \frac{g(\theta^*)/ q(\theta^*|\theta^{(i-1)})}{g(\theta^{(i-1)})/ q(\theta^*|\theta^{(i-1)})} = \frac{g(\theta^*) q(\theta^{(i-1)} | \theta^*)}{g(\theta^{(i-1)}) q(\theta^*|\theta^{(i-1)})}$
+>     c. If $\alpha \ge 1$: Accept $\theta^*$ and set $\theta^{(i)} \leftarrow \theta^*$
+>     d. If $\alpha < 1$: Accept $\theta^*$ and set $\theta^{(i)} \leftarrow \theta^*$ with probability $\alpha$
+  
+The basic idea of the algorithm is this: if moving is **advantageous** ($\alpha \ge 1$), which you can think of as e.g. being in the tails of the distribution and having a candidate at the peak of the distribution, then *we will always move*. If moving is **not advantageous** ($\alpha < 1$), then we may still move *but only with probability $\alpha$*.
+
+## Selecting a proposal density
+
+The proposal density may or may not depend on the previous value of theta. If it does, then the MH algorithm is called a **random-walk MH algorithm**. If it does not, then we must make sure that $q(\theta) \sim f(\theta)$.
+
+In a random walk MH, the proposal distribution is centered on the value of theta of the previous iteration ($\theta^{(i-1)}$). If we choose $q(\theta)$ to be a symmetric distribution (e.g. a normal), we have a neat additional feature; it means that in step $2b$, we only have to calculate the ratio $\alpha=\frac{g(\theta^*)}{g(\theta^{(i-1)})}$. This works because, for symmetric distributions, $q(\theta^{(i-1)} | \theta^*) = q(\theta^*|\theta^{(i-1)})$.  
+
+The MH algorithm has an **acceptance rate** which is basically the proportion of accepted candidates. High acceptance rates means that we are stepping through the posterior space too slow (slow mixing). Typically, we want an acceptance rate between $20\% \sim 50\%$. Similarly, we want low autocorrelation, but in practice the autocorrelation will be quite high because samples generated from an MH are not i.i.d. (in this case we can always use longer chains).
+
+The Gibbs sampler can be viewed as an MH sampler with a perfect proposal density. Hence, the acceptance rate is $1$ and $q(\theta) = f(\theta)$ exactly.
+
+# Prior/posterior predictive checking (weeks 5-6)
+
+Whenever we run a model, we are confronted with fundamental questions such as how plausible inferences from the model are with respect to the model characteristics of major substantive interest. That is, we are thinking about the following questions:
+
+1. What data would we expect when predicting from the model given the prior or the posterior using prior/posterior predictive distributions?
+2. How do these predictive distributions compare to the observed data?
+
+Prior/posterior predictive checking can be used as a flexible method to assess the discrepancy between the model and the data. Using PPC, we can compute posterior predictive p-values, which are interpreted as a measure deviance between the model and the data.
+
+## Test and discrepancy measures
+
+To evaluate the prior/posterior predictive distributions, we compare the observed data $y_{observed}$ to simulated data under the model $y_{simulated}$. The comparison is carried out by using either:
+
+1. **Test statistics**: denoted by $T(y)$, test statistics are a function of the data only. For example, we can compare the mean, variance, mode, minimum, sum etc. of simulated data to the test statistic of the observed data.
+2. **Discrepancy measures**: denoted by $D(y, \theta)$, discrepancy measures are a more general form of test statistic that are a function of **both** the data and the parameters. Examples are e.g. a likelihood ratio test.
+
+Whichever measure we use, it is important that the test measure should be chosen *on substantive terms*. Furthermore, we may wonder to what extent the posterior predictive check may vary as a function of plausible values for the priors, which is known as a sensitivity issue / analysis.
+
+## Types of p-values
+
+In the classical framework, we rely on goodness-of-fit tests $T(.)$ for some observed dataset $y_{observed}$
+
+$$
+P_C = P\left\{T(y) \ge T(y_{observed} | H_0)\right\}
+$$
+
+This is the probability that the test statistic is larger than the observed test statistic *given* the null hypothesis.
+
+Deriving a goodness-of-fit test is difficult for many models because:
+
+1. Some models are simply too complex.
+2. Standard goodness-of-fit measures have an https://en.wikipedia.org/wiki/Asymptotic_distribution[asymptotic distribution]() but it lacks accuracy.
+3. Sometimes, we would like to measure specific measures of fit rather than a general measure like the likelihood ratio. Deriving such measures is difficult.
+
+Given some prior distribution $f(\theta)$, the prior predictive p-value is given by:
+
+$$
+P_{prior} = P\left\{T(y_{simulated}) \ge T(y_{observed}) | f(\theta), H_0\right\}
+$$
+
+The posterior predictive p-value is then given by
+
+$$
+P_{posterior} = P\left\{T(y_{simulated}) \ge T(y_{observed}) | y_{observed}, H_0\right\}
+$$
+
+In both cases, it is the probability that the test statistic of the simulated data exceeds or is equal to the test statistic of the observed data under the model and given some null hypothesis (e.g. 'the model fits the data').
+
+The following is an algorithm for computing prior/posterior predictive p-values for test statistics.
+
+>**PPP for Test Statistics**
+>
+>1. Choose a test statistic $T(y)$
+>2. Calculate $T(y_{observed})$
+>3. Repeat for $i=1, \dots, m$:
+>
+>     a. Draw a vector $\vec{\theta}^{(i)}$ from the posterior distribution $f(\theta|y_{observed}) \propto f(y_{observed}|\theta) f(\theta)$.
+>     b. Simulate a dataset $y_{simulated}^{(i)}$ from the likelihood function $P(y|\theta^{(i)})$.
+>     c. Calculate $T(y_{simulated}^{(i)})$.
+>    
+>4. Count the porportion of replicated data sets for which $T(y_{simulated}^{(i)}) \ge T(y_{observed})$.
+
+The following is an algorithm for computing prior/posterior predictive p-values for discrepancy measures. Recall that here, the test function uses both the parameters and the data, and so we must calculate $D(y_{observed}|\theta^{(i)})$ in every iteration of the algorithm:
+
+>**PPP for Discrepancy Measures**
+>
+>1. Choose a discrepancy measure $D(y, \theta)$
+>2. Repeat for $i=1, \dots, m$:
+>
+>     a. Draw a vector $\vec{\theta}^{(i)}$ from the posterior distribution $f(\theta|y_{observed}) \propto f(y_{observed}|\theta) f(\theta)$.
+>     b. Calculate $D(y_{observed}|\theta^{(i)})$.
+>     c. Simulate a dataset $y_{simulated}^{(i)}$ from the likelihood function $P(y|\theta^{(i)})$.
+>     d. Calculate $D(y_{simulated}^{(i)}, \theta^{(i)})$.
+>    
+>3. Count the porportion of replicated data sets for which $D(y_{simulated}^{(i)}, \theta^{(i)}) \ge D(y_{observed},\theta^{(i)})$.
+
+## Interpreting the p-value
+
+For the prior predictive p-value, we conclude that the observed data is extreme given our expectations based on the prior model distributions. Hence, the observed data does not fit the prior. **Use if we have informative priors**.
+
+For the posterior predictive p-value, we conclude that the observed data is extreme given the posterior model results. Hence, the observed data does not fit the model and we should try to find another / better fitting model. **Use if we do not have informative priors**.
+
+A p-value is **uniform/ubiased** if, when you sample $y_{observed}$ under a true null model, we have equal odds of obtaining any p-value. 
+
+```{r, fig.cap="A uniform distribution"}
+hist(runif(10000, 0, 1))
+```
+
+Hence, we say that a significance level of $\alpha=.05$ corresponds to $5\%$ chance of rejecting the null hypothesis when it is true (Type I error). This is **not** the case for posterior predictive p-values, where the tails are smaller. Hence, we want the data to be closer to $0.5$ rather than $.05$.
+
+## Practical: PPC in R and JAGS
+
+The data is the same as we used in week $1$ (treatment PC and PE against post-traumatic stress in war veterans), with the difference being that we now have the entire dataset, not just the totals. We can read it into R as follows:
+
+```{r}
+rm(list=ls())
+source("data/Exercise 3 - Data.txt")
+```
+
+The aim of the current exercise is to check the assumptions of the model. A fundamental assumption we are making is that the success probability $\theta$ is the same across patients in a condition. That is, we assume that, on average, $\theta$ is the same for the last $50$ patients as it is for the first $50$ patients because they are interchangeable in terms of their chance of recovery. This assumption may not hold if there is an unobserved factor that obfuscates the results. For example, patients with intense PTSD may be more likely to sign up to the study, whereas light PTSD patients sign up later, or perhaps the researcher simply improved the therapy halfway through the study.
+
+First, we set up the model file. Instead of a binomial distribution, we now use a bernoulli.
+
+```{r, results="hide", echo=TRUE}
+bmod <- "model {
+  
+  ### Likelihood of the data
+  for(i in 1:n.PE) {
+    LD.PE[i] ~ dbern(theta.PE)
+  }
+
+  for(i in 1:n.PC) {
+    LD.PC[i] ~ dbern(theta.PC)
+  }
+
+  ### Priors
+
+  theta.PE ~ dbeta(1,1)
+  theta.PC ~ dbeta(1,1)
+
+  ### Relative risk
+
+  RR <- theta.PC / theta.PE
+
+}"
+
+# Text connection
+con <- textConnection(bmod)
+
+# Jags model
+jmod <- jags.model(file=con, data=dat, n.chains=2)
+close(con)
+# Run the model
+update(jmod, n.iter = 1000)
+
+# Specify parameter names
+params <- c("theta.PC", "theta.PE", "RR")
+# Run the chain
+res <- coda.samples(jmod, variable.names = params, n.iter=10000)
+```
+
+We check the results against those obtained in exercise $1$
+
+```{r}
+summary(res)
+```
+
+These results are roughly similar.
+
+We will set up the posterior predictive check as follows:
+
+1. Our null hypothesis $H_0$ is that the model fits the data well.
+
+2. We define a test statistic $T(y)$ as the difference between the proportion of patients cured in the first half of the data against the proportion of patients cured in the second half of the data. Since a proportion cannot really be negative, we take the absolute value.
+
+```{r, echo=TRUE}
+# Take the absolute value of the difference
+Ty <- function(d) {
+  # Split data in half
+  h1 <- median(1:length(d))
+  # Average proportion
+  return( (sum(d[1:h1]) / h1) - (sum(d[(h1+1):length(d)]) / (length(d) - h1)) )
+}
+# For PE
+PE_diff_theta <- abs(Ty(dat$LD.PE))
+# For PC
+PC_diff_theta <- abs(Ty(dat$LD.PC))
+```
+
+3. We will create replicated datasets using the theta values generated from the posterior distribution using the `sim()` function below.
+
+```{r, echo=TRUE}
+# Bind posterior values
+post_bind <- do.call(rbind.data.frame, res)
+# Save theta PE / PC separately
+theta_PE <- post_bind$theta.PE
+theta_PC <- post_bind$theta.PC
+
+# Convenience function for replications
+sim <- function(posterior_theta, N) {
+  
+  #' @param posterior_theta posterior distribution for a given parameter theta
+  #' @param N number of observations in the data
+  
+  # Open up a vector for results of simulations
+  sim_res <- matrix(0L, nrow = length(posterior_theta), ncol = N)
+  
+  # Simulate new data using the theta values
+  for( j in seq_along(1:length(posterior_theta)) ) {
+    
+    # Generate from a bernoulli a simulated outcome y and store that in the results
+    sim_res[j, ] <- LaplacesDemon::rbern(N, posterior_theta[j])
+    
+  }
+  
+  # Return
+  return(sim_res)
+  
+}
+```
+
+4. We can call the `ppc()` function to compute the posterior predictive check that we also computed on the observed $y$ values.
+
+```{r, echo=TRUE}
+# Convenience function for test statistic on simulated data
+Ty_sim <- function(posterior_theta, N) {
+  
+  # Simulate data
+  y_sim <- sim(posterior_theta, N)
+  
+  # Apply row-wise the following function
+    # row[i] (N binary values) [==>] Ty(row[i])
+    # Return: difference in proportion for first n examples and h-n examples
+  return(apply(y_sim, 1, Ty))
+  
+}
+
+# Simulate y values for PE and PC
+y_PE_diff <- abs(Ty_sim(theta_PE, dat$n.PE))
+y_PC_diff <- abs(Ty_sim(theta_PC, dat$n.PC))
+```
+
+5. The posterior predictive check we will execute is the following: we look at the difference in the test statistic between the simulated and observed data. If the difference is larger than or equal to $0$, we assign a value of $1$. If the difference is less than $0$, we assign a difference of $0$. This is a two-sided test, which means that extreme values are those that either occur close to $0$ **or** close to $1$. 
+
+This makes sense, because the model can misfit in both directions; that is, patients who came earlier may have a higher chance of recovery or patients who came later may have a higher chance of recovery.
+
+```{r, echo=TRUE}
+ppc <- function(sim, obs) {
+  
+  return(ifelse(sim - obs >= 0, 1, 0))
+  
+}
+
+# For PE
+PPC_PE <- ppc(y_PE_diff, PE_diff_theta)
+PPC_PC <- ppc(y_PC_diff, PC_diff_theta)
+```
+
+6. Finally, we calculate the proportion of cases where the difference in proportion of cured patients between the first half and the second half of the data in the simulated datasets exceeds that of the observed data, or:
+
+$$
+P(T(y_{simulated}) \ge T(y_{observed}), H_0) \approx \frac{1}{K} \sum_{i=1}^K T(y_{simulated}^{(i)}) \ge T(y_{observed})
+$$
+
+```{r, echo=TRUE}
+mean(PPC_PE)
+```
+
+```{r, echo=TRUE}
+mean(PPC_PC)
+```
+
+For the PC treatment, we observe an extreme result under the model. This indicates that we are violating the assumption outlined above. The group in the first half of the treatment has a different chance of recovery than the second half.
 
 # Model selection using DIC (week 7)
 
@@ -655,9 +953,230 @@ When computing the DIC, we prefer the model that has the lower value. Given two 
 
 We will use JAGS to obtain the posterior for a logistic regression model. Further, we will make use of the DIC to select a best model.
 
-Our goal is to make a clinical prediction rule to detect clinical depression in primary care. We use low informative priors.
+Recall that for any Generalized Linear Model (GLM) we have the following components:
+
+1. A probability function of the exponential family (Gaussian, Poisson, Binomial etc.). The chosen distribution determines the mean and variance, and whether (how) the variance is related to the mean.
+2. A linear predictor $\eta = \beta_0 + \beta_1X_1 + \dots + \beta_jX_j$.
+3. A link function that describes how the mean outcome $E(Y) = \mu$ is related to the linear predictor $g(\mu)=\eta$.
+
+Our goal is to make a clinical prediction rule to detect clinical depression in primary care. We use low informative priors. In this case, we therefore use logistic regression. For a binary outcome, the binomial distribution is therefore a logical choice. 
+
+$$
+P(Y_i = y_i) = {n_i \choose y_i} \theta^{y_i} (1-\theta)^{1-y_i}
+$$
+
+Recall that the mean $\mu$ for the binomial is simply the proportion $\theta$. As such, the link function is a logit, or:
+
+$$
+g(\mu) = g(\theta) = \log \left(\frac{\theta}{1-\theta}\right) = \log (\text{odds}) = \text{logit}(\text{odds})
+$$
+
+And since the log of the odds equals $g(\mu)$, it therefore follows that:
+
+$$
+g(\mu)=\eta \longrightarrow \text{logit}(\mu) = \beta_0 + \beta_1X_1 + \dots + \beta_jX_j
+$$
+
+Finally, this means that:
+
+1. The outcome of our model (the coefficients) are given in log-odds. Substantively, only their sign has meaning (i.e. whether the coefficient is positive or negative means that it has a positive or negative effect on the probability of the outcome).
+2. Exponentiating a coefficient or multiple coefficients gives us the **odds ratio**. $\text{odds} = \frac{\theta_i}{1-\theta_i} = e^{\beta_0 + \beta_1x_1 + \dots}$.
+3. We can also convert the logit to a probability:
+
+$$
+\theta_i = \frac{e^{\beta_0 + \beta_1x_1 + \dots}}{1 + e^{\beta_0 + \beta_1x_1 + \dots}}
+$$
+
+We first read in the data
 
 ```{r}
 # Read data
-d <- read.table("data/Exercise 4 - Data.txt")
+d <- source("data/Exercise 4 - Data.txt")$value
 ```
+
+Next, we specify the logistic regression model with only `gender` as a predictor
+
+```{r, echo=TRUE, results="hide"}
+# depGP is outcome variable
+jmodl <- "model {
+
+  ### Likelihood
+  for(i in 1:length(depr)) {
+
+    # Outcome variable distributed as bernoulli with theta == p
+    depr[i] ~ dbern(p[i])
+
+    # Calculate theta
+    # USE []
+    logit(p[i]) <- int + b[1]*(gender[i] - mean(gender[]))
+
+  }
+
+  ### Priors
+
+  # Intercept (normal)
+  int ~ dnorm(0, 1/1000)
+  # Coefficients
+  for(j in 1:1) {
+    b[j] ~ ddexp(0, sqrt(2)) # OR: b[j] ~ dnorm(0, 1/10000)
+  }
+
+  # Variables of interest
+  odds_gender <- exp(b[1])
+}"
+
+# Parameters
+params <- c("int", "b", "odds_gender", "prob_gender")
+# Initial values
+init <- list(list(int = 0, b=2),
+             list(int = 2, b=4))
+
+# Initiate JAGS model
+library(rjags)
+con <- textConnection(jmodl)
+mod_gender <- jags.model(con, data=d, n.chains=2, inits=init)
+close(con)
+
+# Burn-in
+update(mod_gender, n.iter = 1000)
+
+# Sample posterior
+samples <- coda.samples(mod_gender, variable.names=params, n.iter = 10000, thin=2)
+```
+
+In the model above, we also calculate the odds ratio for `gender` in the model. The advantage of this is that we do not have to do it outside of the model.
+
+First, we assess convergence
+
+```{r}
+traceplot(samples)
+```
+
+The trace plot indicates that the coefficients have converged to their stable distribution.
+
+```{r}
+gelman.diag(samples)
+```
+
+Similarly, we observe that from the gelman-rubin statistic that the two chains have converged as the GR statistic is close to $1$.
+
+```{r}
+par(mar=c(1,1,1,1))
+gelman.plot(samples)
+```
+
+Finally, we check the autocorrelation
+
+```{r}
+par(mar=c(1,1,1,1))
+autocorr.plot(samples)
+```
+
+Autocorrelation is quite an issue in this model. We can reduce it by increasing the thinning parameter and by centering the predictor (even though centering a binary variable is meaningless)
+
+```{r}
+summary(samples)
+```
+
+The coefficient for gender is positive, which indicates that females have a higher probability of depression than males $\beta_{gender} = 0.432, \  95\% \text{ CCI } = [0.068, 0.822]$. The odds ratio does not include 1, and so we may conclude that gender is a predictor of depression.
+
+Next, we define two other models using different predictors and compare the models using the DIC.
+
+```{r, include=FALSE}
+m1 <- "model {
+  ### Likelihood
+  for(i in 1:length(depr)) {
+
+    # Outcome variable distributed as bernoulli with theta == p
+    depr[i] ~ dbern(p[i])
+
+    # Calculate theta
+    logit(p[i]) <- int + b[1]*(age[i] - mean(age))
+
+  }
+
+  ### Priors
+
+  # Intercept (normal)
+  int ~ dnorm(0, 1/1000)
+  # Coefficients
+  for(j in 1:1) {
+    b[j] ~ ddexp(0, sqrt(2))
+  }
+
+  # Variables of interest
+  odds_age <- exp(b[1])
+}"
+# Parameters
+params <- c("int", "b", "odds_age")
+
+# Initiate JAGS model
+library(rjags)
+con <- textConnection(m1)
+mod_age <- jags.model(con, data=d, n.chains=2)
+close(con)
+
+# Burn-in
+update(mod_age, n.iter = 1000)
+
+# Sample posterior
+samples_agemod <- coda.samples(mod_age, variable.names=params, n.iter = 10000, thin=2)
+```
+
+```{r, results="hide"}
+m2 <- "model {
+  ### Likelihood
+  for(i in 1:length(depr)) {
+
+    # Outcome variable distributed as bernoulli with theta == p
+    depr[i] ~ dbern(p[i])
+
+    # Calculate theta
+    logit(p[i]) <- int + b[1]*(educ[i] - mean(educ))
+
+  }
+
+  ### Priors
+
+  # Intercept (normal)
+  int ~ dnorm(0, 1/1000)
+  # Coefficients
+  for(j in 1:1) {
+    b[j] ~ ddexp(0, sqrt(2))
+  }
+
+  # Variables of interest
+  odds_educ <- exp(b[1])
+}"
+# Parameters
+params <- c("int", "b", "odds_educ")
+
+# Initiate JAGS model
+library(rjags)
+con <- textConnection(m2)
+mod_educ <- jags.model(con, data=d, n.chains=2)
+close(con)
+
+# Burn-in
+update(mod_educ, n.iter = 1000)
+
+# Sample posterior
+samples_educmod <- coda.samples(mod_educ, variable.names=params, n.iter = 10000, thin=2)
+```
+
+```{r, echo=TRUE}
+dic_gender <- dic.samples(mod_gender, 1000, "pD")
+dic_gender
+```
+
+```{r, echo=TRUE}
+dic_age <- dic.samples(mod_age, 1000, "pD")
+dic_age
+```
+
+```{r, echo=TRUE}
+dic_educ <- dic.samples(mod_educ, 1000, "pD")
+dic_educ
+```
+
+Whether or not we use the parameter estimates and DIC depends heavily on our application area. If we were just looking for the best fitting model, we wouldn't necessarily care about insignificant predictors all that much. However, if our goal is inference, we would defnitely want to make more parsimonious models and leave out predictors that don't add much to the model.
