@@ -1,8 +1,27 @@
 # S3 generics
 
+#' Get a value from an S3 object
+#'
+#' @param x object with a get_value() method
+#' @param var string. name of the value to retrieve from the object.
+#'
+#' @export
+get_value <- function(x, var) {
+  UseMethod("get_value")
+}
+
+#' Set a value for an S3 object
+#'
+#' @param x object with a set_value() method
+#' @param var string. name of the value you want to change
+#' @param val new value for var
+set_value <- function(x, var, val) {
+  UseMethod("set_value")
+}
+
 #' Set priors for a blm object
 #'
-#' @param blm blm object
+#' @param x blm object
 #' @param ... optional arguments needed to specify a prior
 #'
 #' @return blm object with new priors
@@ -107,4 +126,14 @@ homoskedast_check <- function(x, ...) {
 #' @export
 independence_check <- function(x, ...) {
   UseMethod("independence_check")
+}
+
+#' Check a posterior sample for the assumption that errors are normally distributed with mean mu and sd sigma
+#'
+#' @param x ppc object
+#'
+#' @return posterior predictive check on normal distribution of errors assumption
+#' @export
+norm_of_errors_check <- function(x, ...) {
+  UseMethod("norm_of_errors_check")
 }

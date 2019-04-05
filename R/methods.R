@@ -1,5 +1,16 @@
 # S3 Methods
 
+# Update values (internal update function)
+update.priors <- function() {
+
+}
+
+update.sampler <- function() {
+
+}
+
+#update.blm
+
 # Class 'blm' methods -----
 
 # Class method to change priors for available parameters
@@ -155,50 +166,8 @@ sample_posterior.blm <- function(blm) {
 
 }
 
-# Print method
-#' @export
-print.blm <- function(blm) {
-
-  # Print information
-  msg <- paste0(
-    crayon::bold("Bayesian Linear Model (BLM) object:\n\n"),
-    "Data:\n",
-      "\tPredictors: ", blm$input$m - 1, "\n",
-      "\tOutcome: ", blm$input$variables$DV, "\n",
-      "\tCentered: ", blm$input$center, "\n\n",
-    "Sampler:\n",
-      "\tChains: ", blm$sampling_settings$chains , "\n",
-      "\tIterations: ", blm$sampling_settings$iterations , "\n",
-      "\tThinning: ", blm$sampling_settings$thinning, "\n",
-      "\tBurn: ", blm$sampling_settings$burn , "\n\n")
-
-  # Set up priors matrix
-  pr_coef <- matrix(0L, ncol=length(blm$priors)-1, nrow = 2,
-               dimnames=list(
-                 c("mu", "tau"),
-                 names(blm$priors)[-length(blm$priors)]
-               ))
-  pr_sigma <- matrix(0L, ncol=1, nrow=2,
-                     dimnames = list(
-                       c("rate", "scale"),
-                       c("sigma")
-                     ))
-
-  # Add values
-  for(i in seq_along(blm$priors)) {
-    if(names(blm$priors)[i] == "sigma") {
-      pr_sigma[1,1] <- blm$priors[[i]]$alpha
-      pr_sigma[2,1] <- blm$priors[[i]]$beta
-    } else {
-      pr_coef[1,i] <- blm$priors[[i]]$mu
-      pr_coef[2,i] <- blm$priors[[i]]$sd
-    }
-
-  }
-
-  cat(msg)
-  print.listof(list("Priors (Coefficients)" = pr_coef))
-  print.listof(list("Priors (Residuals)" = pr_sigma))
+# Update posterior samples
+update_posterior.blm <- function(blm) {
 
 }
 

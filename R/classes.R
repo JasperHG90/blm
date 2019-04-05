@@ -22,9 +22,35 @@ blm <- function(formula, data, center = FALSE) {
   # Variable names
   vn <- colnames(X)
 
-  # Retrieve summary statistics
-
   # Define priors
+  priors_init <- priors(j, vn)
+
+  # Set up sampler settings
+  # Note these are defaults
+  samplers_init <- sampler(chains = 1, iterations = 10000, burn = 1000,
+                           thinning = 1, vn, priors_init)
+
+  # Collect data, add class & return
+  final <- list(
+    "input" = inputs$inputs,
+    "sampling_settings" = samplers_init,
+    "priors" = priors_init
+  )
+
+  # Add structure
+  class(final) <- "blm"
+
+  # Return
+  return(final)
+
+}
+
+#' Priors class
+#'
+#' @param j number of parameters
+#' @param vn variable names of the j parameters
+priors <- function(j, vn) {
+
   priors <- list()
   # Add  + 1 (for sigma)
   for (param in 1:(j + 1)) {
@@ -56,32 +82,21 @@ blm <- function(formula, data, center = FALSE) {
 
   }
 
-  # Collect data, add class & return
-  final <- list(
-    "input" = inputs$inputs,
-    "sampling_settings" = list(
-      "chains" = 1,
-      "iterations" = 10000,
-      "burn" = 1000,
-      "thinning" = 1
-    ),
-    "priors" = priors
-  )
-
-  # Add class
-  class(final) <- "blm"
+  # Add structure
+  class(priors) <- "priors"
 
   # Return
-  return(final)
+  return(priors)
 
 }
 
-#' Sets up a prior object
+#' Sets up a prior class
+#'
+#' Every blm object contains an S3 class called 'priors'. This object is used to store information about priors and has its own methods (mainly used for internal purposes). The user can specify priors by means of the function 'set_priors()'
 #'
 #' @param density either Normal or Gamma density
 #'
 #' @return prior object
-#' @export
 prior <- function(density, ...) {
 
   # Get options
@@ -120,3 +135,53 @@ prior <- function(density, ...) {
 
 }
 
+#' Sets up a sampler class
+#'
+#' @return sampler object
+sampler <- function(chains, iterations, burn, thinning, vars, priors) {
+
+  # Initialize settings
+  chains_init <- vector("list", chains)
+
+  # Fill chain
+  for(i in seq_along(chains_init)) {
+    chains_init[[i]] <- chain(priors, iterations, burn, thinning, vars)
+  }
+
+  # Names
+  names(chains_init) <- paste0("chain_", 1:chains)
+
+  # Structure
+  class(chains_init) <- "sampler"
+
+  # Return
+  return(chains_init)
+
+}
+
+#' Set up a single chain
+chain <- function(priors, iterations, burn, thinning, vars, ...) {
+
+  # Set up the object
+  opts <- list(
+    "iterations" = iterations,
+    "burn" = burn,
+    "thinning" = thinning,
+    "params" = paste0("b", 0:length(vars)-1),
+    "varnames" = vars,
+    "samplers" = rep("Gibbs", length(vars)),
+    "initial_values" = initialize_chain_values(priors)
+  )
+
+  # Return
+  class(opts) <- c("chain")
+  return(opts)
+
+}
+
+#' Sets up posterior class
+#'
+#' @return list containing matrices of chain values (dims: iterations x coef + 1) of object posterior
+posterior <- function(samples) {
+
+}
