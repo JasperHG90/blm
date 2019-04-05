@@ -36,3 +36,11 @@ print.priors <- function(x) {
   print.listof(list("Priors (Residuals)" = pr_sigma))
 
 }
+
+# IF UPDATE PRIORS, DRAW NEW INITIAL VALUES !!!!
+update_priors.priors <- function(x) {
+
+
+
+}
+

@@ -1,14 +1,5 @@
 # S3 Methods
 
-# Update values (internal update function)
-update.priors <- function() {
-
-}
-
-update.sampler <- function() {
-
-}
-
 #update.blm
 
 # Class 'blm' methods -----
@@ -62,109 +53,9 @@ set_priors.blm <- function(blm, ...) {
 
 }
 
-# Do gibbs sampling on blm
-# This should be a class method
-# Initial weight correction ==> divide coefficient weights by sqrt(sample size) to avoid them getting too large
-# when using uninformative priors
-#' @export
-sampling_options.blm <- function(blm, chains = 1, iterations = 10000,
-                                 thinning = 1, burn = 1000) {
 
-  # Checks
-  check_sampling_inputs(iterations, chains, thinning, burn)
 
-  # Update settings
-  if(!missing(chains)) {
-    # Update # chains
-    blm$sampling_settings$chains <- chains
-  }
-  if (!missing(iterations)) {
-    blm$sampling_settings$iterations <- iterations
-  }
-  if (!missing(burn)) {
-    blm$sampling_settings$burn <- burn
-  }
-  if (!missing(thinning)) {
-    blm$sampling_settings$thinning <- thinning
-  }
 
-  # Return
-  return(blm)
-
-}
-
-# Execute a blm plan
-#' @export
-sample_posterior.blm <- function(blm) {
-
-  # number iterations & chains
-  chains <- blm$sampling_settings$chains
-  iterations <- blm$sampling_settings$iterations
-  priors <- blm$priors
-  burn <- blm$sampling_settings$burn
-  thinning <- blm$sampling_settings$thinning
-
-  # unroll data
-  X <- blm$input$X
-  y <- blm$input$y
-
-  # Draw initial values for each chain
-  initial_values <- lapply(1:chains, function(x) {
-
-    # Draw initial values
-    iv <- initialize_chain_values(priors)
-
-    # Return
-    return(iv)
-
-  })
-
-  # Add to sampling options
-  blm$sampling_settings$initial_values <- initial_values
-  # (names)
-  names(blm$sampling_settings$initial_values) <- paste0("chain", 1:blm$sampling_settings$chains)
-
-  # Run foreach (possibly parallel for each chain)
-  posterior <- vector("list", chains)
-
-  # For each list
-  for(i in seq_along(1:chains)) {
-
-    # Initial values for the current chain
-    initial_values_current <- initial_values[[i]]
-
-    # Call the gibbs sampler (helpers.R)
-    posterior[[i]] <- gibbs_sampler(X, y, initial_values_current, iterations, thinning, priors, burn)
-
-  }
-
-  # Name output list
-  names(posterior) <- paste0("chain_", 1:chains)
-
-  # Name output data columns
-  posterior <- lapply(posterior, function(x) {
-
-    # Retrieve varname if listed in prior
-    varnames <- unname(unlist(lapply(priors, function(x) x[["varname"]])))
-
-    # Construct names
-    cnames <- c("Intercept", varnames, "sigma")
-
-    # Set colnames
-    colnames(x) <- cnames
-
-    # Return
-    return(x)
-
-  })
-
-  # Append posterior
-  blm$posterior <- posterior
-
-  # Return results
-  return(blm)
-
-}
 
 # Update posterior samples
 update_posterior.blm <- function(blm) {

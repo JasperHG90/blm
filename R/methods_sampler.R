@@ -1,7 +1,5 @@
 ## Methods for sampler
 
-
-
 #' Print method for sampler class
 #'
 print.sampler <- function(x) {
@@ -23,3 +21,48 @@ print.sampler <- function(x) {
   cat(msg)
 
 }
+
+#' Sample the posterior distribution
+sample.sampler <- function(x, X, y, priors) {
+
+  # For each chain, sample posterior sequentially
+  posterior_samples <- lapply(x, function(z) {
+
+    # Unroll data
+    iterations <- z$iterations
+    thinning <- z$thinning
+    initial_values_current <- z$initial_values
+    samplers <- z$samplers
+
+    # Call mc sampler
+    r <- mc_sampler(X, y, initial_values_current, iterations, thinning, priors, samplers)
+
+    # Add names
+    colnames(r) <- z$varnames
+
+    # Return
+    return(z)
+
+  })
+
+  # Add structure
+  posterior_samples <- posterior(posterior_samples)
+
+  # Return
+  return(posterior_samples)
+
+}
+
+#' Setting samplers
+set_options.sampler <- function(x, chains = 1, iterations = 10000,
+                                burn = 1000, thinning = 1, priors) {
+
+  # Create chains
+  x <- sampler(chains = chains, iterations = iterations, burn = burn,
+               thinning = thinning, vn, priors)
+
+  # Return
+  return(x)
+
+}
+

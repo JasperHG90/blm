@@ -28,7 +28,7 @@ initialize_chain_values <- function(priors) {
 }
 
 # Helper function that calls the Julia Gibbs sampler
-gibbs_sampler <- function(X, y, initial_values, iterations, thinning, priors, burn) {
+mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, samplers) {
 
   # Unroll initial values
   w <- initial_values$w
@@ -39,7 +39,7 @@ gibbs_sampler <- function(X, y, initial_values, iterations, thinning, priors, bu
                                         as.integer(thinning), unname(priors))
 
   # Burn
-  return(r[-1:-burn,])
+  return(r)
 
 }
 
