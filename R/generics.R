@@ -30,6 +30,22 @@ set_priors <- function(x, ...) {
   UseMethod("set_priors")
 }
 
+set_prior <- function(x, ...) {
+  UseMethod("set_prior")
+}
+
+set_options <- function(x, ...) {
+  UseMethod("set_options")
+}
+
+set_sampler <- function(x, ...) {
+  UseMethod("set_sampler")
+}
+
+set_initial_values <- function(x, ...) {
+  UseMethod("set_initial_values")
+}
+
 #' Sample the posterior distribution
 #'
 #' @param blm blm object
@@ -40,8 +56,8 @@ set_priors <- function(x, ...) {
 #'
 #' @return updated blm object
 #' @export
-sampling_options <- function(x, ...) {
-  UseMethod("sampling_options", x)
+set_sampling_options <- function(x, ...) {
+  UseMethod("set_sampling_options", x)
 }
 
 #' Sample the posterior distribution
@@ -52,6 +68,14 @@ sampling_options <- function(x, ...) {
 #' @export
 sample_posterior <- function(x) {
   UseMethod("sample_posterior", x)
+}
+
+update_posterior <- function(x) {
+  UseMethod("update_posterior", x)
+}
+
+delete_posterior <- function(x) {
+  UseMethod("delete_posterior", x)
 }
 
 #' Set up posterior predictive checks

@@ -2,7 +2,7 @@
 % Please edit documentation in R/classes.R
 \name{prior}
 \alias{prior}
-\title{Sets up a prior object}
+\title{Sets up a prior class}
 \usage{
 prior(density, ...)
 }
@@ -13,5 +13,5 @@ prior(density, ...)
 prior object
 }
 \description{
-Sets up a prior object
+Every blm object contains an S3 class called 'priors'. This object is used to store information about priors and has its own methods (mainly used for internal purposes). The user can specify priors by means of the function 'set_priors()'
 }

@@ -58,7 +58,6 @@ priors <- function(j, vn) {
     if (param == max(j+1)) {
 
       priors[["sigma"]] <- prior("gamma", alpha=0.01, beta=0.01)
-      priors[["sigma"]]$informative <- FALSE
 
     } else {
 
@@ -68,15 +67,13 @@ priors <- function(j, vn) {
       # Set prior
       if ((param-1) > 0) {
 
-        priors[[coef_name]] <- prior("normal", mu=0, sd=1000, varname = vn[param])
+        priors[[coef_name]] <- prior("normal", mu=0, sd=10000, varname = vn[param])
 
       } else {
 
-        priors[[coef_name]] <- prior("normal", mu=0, sd=1000)
+        priors[[coef_name]] <- prior("normal", mu=0, sd=10000, varname = "Intercept")
 
       }
-
-      priors[[coef_name]]$informative <- FALSE
 
     }
 
@@ -118,6 +115,15 @@ prior <- function(density, ...) {
     opts$varname <- NULL
 
   }
+  # Is the prior informative?
+  if ("informative" %in% names(opts)) {
+
+    informative <- TRUE
+    opts$informative <- NULL
+
+  } else {
+    informative <- FALSE
+  }
 
   # For each density, check if required arguments supplied and allowed
   check_density_params(density, opts, dparams[[density]], dparam_values[[density]])
@@ -126,6 +132,9 @@ prior <- function(density, ...) {
   if ("varname" %in% ls()) {
     opts$varname <- varname
   }
+
+  # Add informative
+  opts$informative <- informative
 
   # Add class
   class(opts) <- c(density, "prior")
@@ -162,15 +171,25 @@ sampler <- function(chains, iterations, burn, thinning, vars, priors) {
 #' Set up a single chain
 chain <- function(priors, iterations, burn, thinning, vars, ...) {
 
+  pts <- list(...)
+
+  # Check if inits in function
+  if("inits" %in% names(pts)) {
+    inits_user_defined <- pts$inits
+  } else {
+    inits_user_defined <- FALSE
+  }
+
   # Set up the object
   opts <- list(
-    "iterations" = iterations,
-    "burn" = burn,
-    "thinning" = thinning,
-    "params" = paste0("b", 0:length(vars)-1),
+    "iterations" = as.integer(iterations),
+    "burn" = as.integer(burn),
+    "thinning" = as.integer(thinning),
+    "params" = paste0("b", 0:length(vars)),
     "varnames" = vars,
     "samplers" = rep("Gibbs", length(vars)),
-    "initial_values" = initialize_chain_values(priors)
+    "initial_values" = initialize_chain_values(priors),
+    "inits_user_defined" = inits_user_defined
   )
 
   # Return

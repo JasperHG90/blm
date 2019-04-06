@@ -53,7 +53,7 @@ sample.sampler <- function(x, X, y, priors) {
 
 }
 
-#' Setting samplers
+#' Updating sampling options
 set_options.sampler <- function(x, chains = 1, iterations = 10000,
                                 burn = 1000, thinning = 1, priors) {
 
@@ -66,3 +66,61 @@ set_options.sampler <- function(x, chains = 1, iterations = 10000,
 
 }
 
+#' Updating the type of sampler (e.g. gibbs or mh)
+#' @importFrom magrittr '%>%'
+set_sampler.sampler <- function(x, label, type = c("Gibbs", "MH")) {
+
+  # Match arg
+  type <- match.arg(type)
+
+  # Retrieve labels
+  labs <- get_value(x, "chain_1") %>%
+    get_value(., "params")
+
+  # Check if label in labs
+  if(!(label %in% labs)) {
+    stop(paste0("Label '", label, "' not found. (available labels: ", paste0(labs, collapse=", "), ")"))
+  }
+
+  # For each chain, change the value of the sampler belonging to label
+  for( i in seq_along(x) ) {
+
+    # Set new value
+    x[[i]][["samplers"]][which(labs == label)] <- type
+
+  }
+
+  # Return
+  return(x)
+
+}
+
+# Re-draw initial values for each chain (this is necessary when priors are set)
+set_initial_values.sampler <- function(x, vpriors) {
+
+  # For each chain, do ...
+  for( i in seq_along(x) ) {
+
+    if(!x[[i]][["inits_user_defined"]]) {
+
+      x[[i]] <- set_value(x[[i]], "initial_values", initialize_chain_values(vpriors))
+
+    }
+
+  }
+
+  # Return
+  return(x)
+
+}
+
+# Let user set specific initial values
+#user_specific_inits.sampler <- function(x, chain, values) {
+
+  # Update initial values
+  iv <- get_value(x[[chain]], "initial_values")
+
+  # Set initial values
+
+
+}

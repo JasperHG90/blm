@@ -7,9 +7,9 @@
 set_priors(x, ...)
 }
 \arguments{
-\item{...}{optional arguments needed to specify a prior}
+\item{x}{blm object}
 
-\item{blm}{blm object}
+\item{...}{optional arguments needed to specify a prior}
 }
 \value{
 blm object with new priors

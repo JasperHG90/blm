@@ -4,64 +4,6 @@
 
 # Class 'blm' methods -----
 
-# Class method to change priors for available parameters
-#' @export
-set_priors.blm <- function(blm, ...) {
-
-  # Get opts
-  priors_new <- list(...)
-
-  # Get current priors
-  priors <- blm$priors
-
-  # Empty vector to keep track of warnings
-  warning_vars <- c()
-
-  # Set new priors (based on names)
-  for(i in names(priors_new)) {
-
-    if(i %in% names(priors)) {
-
-      # If varname in priors, then add to priors_new
-      if("varname" %in% names(priors[[i]])) {
-        priors_new[[i]]$varname <- priors[[i]]$varname
-      }
-
-      # Update priors
-      priors[[i]] <- priors_new[[i]]
-
-      # Add marker
-      priors[[i]]$informative <- TRUE
-
-    } else {
-
-      # Keep track of warnings
-      warning_vars <- c(warning_vars, i)
-
-    }
-
-  }
-
-  # TODO: Emit warnings
-  #  ...
-
-  # Set new priors and return
-  blm$priors <- priors
-
-  # Return
-  return(blm)
-
-}
-
-
-
-
-
-# Update posterior samples
-update_posterior.blm <- function(blm) {
-
-}
-
 # Convergence diagnostics
 #' @export
 convergence_diagnostics.blm <- function(blm) {
