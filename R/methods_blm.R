@@ -33,8 +33,13 @@ set_sampling_options.blm <- function(x, chains = 1, iterations = 10000,
 
   # Update sampling options
   if("posterior" %in% names(x)) {
-    # TODO: refuse to update sampler values if posterior already sampled!
-    stop("Posterior already sampled. Cannot update sampling settings. Use update_posterior() to sample more values from the posterior distribution or use delete_posterior() to remove it from your results. After deletion, you can update the sampler settings.")
+    if(!missing(chains) | !missing(iterations) | !missing(thinning)) {
+      # TODO: refuse to update sampler values if posterior already sampled!
+      stop("Posterior already sampled. Cannot update sampling settings. Use update_posterior() to sample more values from the posterior distribution or use delete_posterior() to remove it from your results. After deletion, you can update the sampler settings.")
+    } else if(!missing(burn)) {
+      # Update the burn settings in the posterior
+      x$posterior$burn <- burn #set_value(x$posterior, "burn", burn)
+    }
   }
 
   # If missing, then take from current values
@@ -52,7 +57,7 @@ set_sampling_options.blm <- function(x, chains = 1, iterations = 10000,
   if (missing(burn)) {
     burn <- opts$chain_1$burn
   } else {
-    burn <- as.integer(iterations)
+    burn <- as.integer(burn)
   }
   if (missing(thinning)) {
     thinning <- opts$chain_1$thinning
@@ -69,7 +74,7 @@ set_sampling_options.blm <- function(x, chains = 1, iterations = 10000,
   # Call
   x <- get_value(x, "priors") %>%
     # Update options
-    set_options(opts, chains, iterations, burn, thinning, .) %>%
+    set_options(opts, chains, iterations, burn, thinning, vn, .) %>%
     # Set results as new sampling objects
     set_value(x, "sampling_settings", .)
 
@@ -111,6 +116,11 @@ set_initial_values.blm <- function(x, ...) {
   chain_names <- get_value(x, "sampling_settings") %>%
     names()
 
+  # Retrieve a single example from the blm object
+  ex <- get_value(x, "sampling_settings") %>%
+    get_value(., "chain_1") %>%
+    get_value(., "initial_values")
+
   # If names(opts) != names(chain_names)
   if(!all(names(opts) %in% chain_names)) {
     stop("Supplied chain names that are not yet created. Current chain names are '", paste0(chain_names, collapse = ", "), "'.")
@@ -136,11 +146,6 @@ set_initial_values.blm <- function(x, ...) {
     }
 
   }
-
-  # Retrieve a single example from the blm object
-  ex <- get_value(x, "sampling_settings") %>%
-    get_value(., "chain_1") %>%
-    get_value(., "initial_values")
 
   # For each chain, set initial values
   for(i in names(opts)) {
@@ -201,11 +206,13 @@ sample_posterior.blm <- function(x) {
   # unroll data
   X <- x$input$X
   y <- x$input$y
+  b <- get_value(x, "sampling_settings") %>%
+    get_value(., "chain_1") %>% get_value(., "burn")
 
   # sample the posterior
   x <- get_value(x, "sampling_settings") %>%
         # Sample method for class 'sampler'
-        sample(., X, y, get_value(x, "priors")) %>%
+        postsamp(., X, y, get_value(x, "priors"), b) %>%
         # Add posterior samples to blm object
         set_value(x, "posterior", .)
 
@@ -225,25 +232,36 @@ update_posterior.blm <- function(x, iterations = 1000) {
 
   # Posterior
   posterior_samples <- get_value(x, "posterior")
+  # Dims
+  n <- nrow(posterior_samples[["samples"]][[1]])
+  m <- ncol(posterior_samples[["samples"]][[1]])
 
   # Sampling settings and set each value for iterations (i.e. each chain) to the value of additional iterations
-  sampling_settings <- lapply(get_value(x, "sampling_settings"),
-                              function(y) y$iterations <- iterations)
-
-  # All sampling settings are now fixed except iterations. Draw new samples.
-  posterior_updated_samples <- get_value(x, "sampling_settings") %>%
-    # Sample method for class 'sampler'
-    sample(., X, y, get_value(x, "priors"))
-
-  # Combine the posterior samples
-  for(i in seq_along(1:length(posterior_samples))) {
-
-    posterior_samples[[i]] <- rbind(posterior_samples[[i]], posterior_updated_samples[[i]])
-
+  # Set starting values to the last obtained values in the chain
+  sampling_settings <- get_value(x, "sampling_settings")
+  for(i in seq_along(sampling_settings)) {
+    sampling_settings[[i]]["iterations"] <- iterations
+    sampling_settings[[i]][["initial_values"]][["w"]][,1] <- unname(posterior_samples[["samples"]][[i]][n,1:3])
+    sampling_settings[[i]][["initial_values"]][["sigma"]] <- unname(posterior_samples[["samples"]][[i]][n,4])
   }
 
-  # Add to blm object
-  x <- set_value(x, "posterior", posterior_samples)
+  # All sampling settings are now fixed except iterations. Draw new samples.
+  x <- sampling_settings %>%
+    # Sample method for class 'sampler'
+    postsamp(., X, y, get_value(x, "priors")) %>%
+    # Append samples to original
+    append_samples(posterior_samples, .) %>%
+    # Add to blm object
+    set_value(x, "posterior", .)
+
+  # Update number of iterations on the sample
+  x <- get_value(x, "sampling_settings") %>%
+    lapply(., function(z) set_value(z, "iterations",
+                                    z$iterations + iterations)) %>%
+    set_value(x, "sampling_settings", .)
+
+  # Class is removed by lapply()
+  class(x$sampling_settings) <- "sampler"
 
   # Return
   return(x)

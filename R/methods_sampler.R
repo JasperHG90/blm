@@ -23,30 +23,34 @@ print.sampler <- function(x) {
 }
 
 #' Sample the posterior distribution
-sample.sampler <- function(x, X, y, priors) {
+postsamp.sampler <- function(x, X, y, priors) {
+
+  # Set burn
+  b <- get_value(x, "chain_1") %>%
+    get_value(., "burn")
 
   # For each chain, sample posterior sequentially
   posterior_samples <- lapply(x, function(z) {
 
     # Unroll data
-    iterations <- z$iterations
-    thinning <- z$thinning
-    initial_values_current <- z$initial_values
-    samplers <- z$samplers
+    iterations <- get_value(z, "iterations")
+    thinning <- get_value(z, "thinning")
+    initial_values_current <- get_value(z, "initial_values")
+    samplers <- get_value(z, "samplers")
 
     # Call mc sampler
     r <- mc_sampler(X, y, initial_values_current, iterations, thinning, priors, samplers)
 
     # Add names
-    colnames(r) <- z$varnames
+    colnames(r) <- c(z$varnames, "sigma")
 
     # Return
-    return(z)
+    return(r)
 
   })
 
   # Add structure
-  posterior_samples <- posterior(posterior_samples)
+  posterior_samples <- posterior(posterior_samples, b)
 
   # Return
   return(posterior_samples)
@@ -55,11 +59,11 @@ sample.sampler <- function(x, X, y, priors) {
 
 #' Updating sampling options
 set_options.sampler <- function(x, chains = 1, iterations = 10000,
-                                burn = 1000, thinning = 1, priors) {
+                                burn = 1000, thinning = 1, varnames, priors) {
 
   # Create chains
   x <- sampler(chains = chains, iterations = iterations, burn = burn,
-               thinning = thinning, vn, priors)
+               thinning = thinning, varnames, priors)
 
   # Return
   return(x)
@@ -118,9 +122,9 @@ set_initial_values.sampler <- function(x, vpriors) {
 #user_specific_inits.sampler <- function(x, chain, values) {
 
   # Update initial values
-  iv <- get_value(x[[chain]], "initial_values")
+  #iv <- get_value(x[[chain]], "initial_values")
 
   # Set initial values
 
 
-}
+#}

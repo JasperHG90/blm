@@ -27,7 +27,7 @@ initialize_chain_values <- function(priors) {
 
 }
 
-# Helper function that calls the Julia Gibbs sampler
+# Helper function that calls the Julia MC sampler
 mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, samplers) {
 
   # Unroll initial values

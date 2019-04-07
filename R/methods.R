@@ -406,22 +406,7 @@ model_fit.blm <- function(blm) {
 
 # Class 'Prior' methods -----
 
-# Drawing from a normal distribution
-#' @export
-draw_value.normal <- function(prior) {
 
-  rnorm(1, prior$mu, prior$sd)
-
-}
-
-# Drawing from a gamma distribution
-# Add a small value to prevent sigma being 0 (bad stuff happens)
-#' @export
-draw_value.gamma <- function(prior) {
-
-  rgamma(1, prior$alpha, prior$beta) + runif(1, 1e-10, 1e-08)
-
-}
 
 # Class 'ppc' methods -----
 

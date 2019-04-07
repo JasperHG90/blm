@@ -201,12 +201,18 @@ chain <- function(priors, iterations, burn, thinning, vars, ...) {
 #' Sets up posterior class
 #'
 #' @return list containing matrices of chain values (dims: iterations x coef + 1) of object posterior
-posterior <- function(samples) {
+posterior <- function(samples, burn) {
+
+  # New object
+  post <- list(
+    "burn" = burn,
+    "samples" = samples
+  )
 
   # Add structure
-  class(samples) <- "posterior"
+  class(post) <- "posterior"
 
   # Return
-  return(samples)
+  return(post)
 
 }

@@ -46,6 +46,22 @@ set_initial_values <- function(x, ...) {
   UseMethod("set_initial_values")
 }
 
+postsamp <- function(x,...) {
+  UseMethod("postsamp")
+}
+
+append_samples <- function(x, ...) {
+  UseMethod("append_samples")
+}
+
+burn <- function(x, ...) {
+  UseMethod("burn")
+}
+
+bind <- function(x, ...) {
+  UseMethod("bind")
+}
+
 #' Sample the posterior distribution
 #'
 #' @param blm blm object
