@@ -330,75 +330,7 @@ resid.blm <- function(blm, type = c("mean", "mode", "median")) {
 
 }
 
-# posterior predictive checks
-# This returns a SEPARATE object ==> all the simulations are heavy on the memory.
-#' @export
-posterior_predictive_checks.blm <- function(blm,
-                                            iterations = 2000, burn = 1000) {
 
-  # Set up posterior predictive check by sampling from the posterior
-  inputs <- list(
-    settings = list(
-      iterations = iterations,
-      burn = burn
-    )
-  )
-
-  # Get priors etc.
-  priors <- blm$priors
-  thinning <- blm$sampling_settings$thinning
-  chains <- 1
-  X <- blm$input$X
-  y <- blm$input$y
-
-  # Check values
-  check_sampling_inputs(iterations, chains, thinning, burn)
-
-  # Draw initial values
-  iv <- initialize_chain_values(priors)
-
-  # Call the gibbs sampler, simulate y values and compute residuals
-  r <- ppc_julia(X, y, iv, iterations, priors, burn)
-
-  # Add results
-  inputs$data$initial_values <- iv
-  inputs$data$X <- X
-  inputs$data$sim_y <- r$sim_y
-  inputs$data$residuals <- r$residuals
-
-  # Add class to input
-  class(inputs) <- "ppc"
-
-  # Add the results to the data
-  inputs <- normality_check(inputs, r$skewness)
-  inputs <- homoskedast_check(inputs, r$heteroskedasticity)
-  inputs <- independence_check(inputs, r$independence)
-
-  # Return
-  return(inputs)
-
-}
-
-# Model fit
-#' @export
-model_fit.blm <- function(blm) {
-
-  # Model fit
-  mfit <- DIC(blm$input$X, blm$input$y, blm$posterior)
-
-  # Bind models
-  final <- round(mfit, digits=3)
-
-  # Row names
-  row.names(final) <- c("(Model)")
-
-  # Print
-  cat(crayon::bold("Model fit for blm object:\n\n"))
-  print.listof(
-    list("Model DIC"=final)
-  )
-
-}
 
 # Evaluate method
 #  (plots, statistics etc.)

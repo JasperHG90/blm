@@ -1,5 +1,11 @@
 # Helper functions
 
+# Calculate mode
+calc_mode <- function(x) {
+  uniqv <- unique(x)
+  uniqv[which.max(tabulate(match(x, uniqv)))]
+}
+
 # Helper functions for sampling ----
 
 # Initiate initial values for a Gibbs chain
@@ -78,6 +84,33 @@ ppc_julia <- function(X, y, initial_values, iterations, priors, thinning, burn) 
     .blm$julia$eval("ppc_draws")(X, as.numeric(y), w, sigma,
                                  as.integer(iterations), as.integer(thinning),
                                  as.integer(burn), unname(priors))
+  )
+
+}
+
+# Model DIC
+# See: http://kylehardman.com/BlogPosts/View/6
+DIC <- function(X, y, posterior) {
+
+  ## Join posterior
+  pb <- do.call(rbind, posterior)
+
+  ## MAP values
+  MAP <- apply(pb, 2, mean)
+
+  ## Coef separate from sigma
+  sigma <- unname(MAP["sigma"])
+  coefs <- matrix(MAP[-length(MAP)], ncol=1)
+
+  ## Two parts to DIC ==> (1) sum of log of likelihood P(y|theta_MAP)
+
+  # Call Julia implementation
+  r <- .blm$julia$eval("DIC")(X, y, coefs, sigma, pb)
+
+  ## Return model fit
+  return(
+    do.call(cbind.data.frame,
+            r)
   )
 
 }

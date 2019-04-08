@@ -86,12 +86,32 @@ sample_posterior <- function(x) {
   UseMethod("sample_posterior", x)
 }
 
-update_posterior <- function(x) {
+update_posterior <- function(x, ...) {
   UseMethod("update_posterior", x)
 }
 
 delete_posterior <- function(x) {
   UseMethod("delete_posterior", x)
+}
+
+get_posterior_samples <- function(x) {
+  UseMethod("get_posterior_samples", x)
+}
+
+MAP <- function(x) {
+  UseMethod("MAP", x)
+}
+
+CCI <- function(x) {
+  UseMethod("CCI", x)
+}
+
+GR <- function(x, ...) {
+  UseMethod("GR", x)
+}
+
+burnin_diagnostic <- function(x, ...) {
+  UseMethod("burnin_diagnostic", x)
 }
 
 #' Set up posterior predictive checks

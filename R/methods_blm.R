@@ -206,13 +206,11 @@ sample_posterior.blm <- function(x) {
   # unroll data
   X <- x$input$X
   y <- x$input$y
-  b <- get_value(x, "sampling_settings") %>%
-    get_value(., "chain_1") %>% get_value(., "burn")
 
   # sample the posterior
   x <- get_value(x, "sampling_settings") %>%
         # Sample method for class 'sampler'
-        postsamp(., X, y, get_value(x, "priors"), b) %>%
+        postsamp(., X, y, get_value(x, "priors")) %>%
         # Add posterior samples to blm object
         set_value(x, "posterior", .)
 
@@ -277,8 +275,87 @@ delete_posterior.blm <- function(x) {
 
 }
 
+# Retrieve posterior samples
+get_posterior_samples.blm <- function(x) {
 
+  # Bind method on posterior samples
+  get_value(x, "posterior") %>%
+    bind()
+
+}
 
 # CONVERGENCE -----
 
 # EVALUATION ----
+
+# posterior predictive checks
+# This returns a SEPARATE object ==> all the simulations are heavy on the memory.
+#' @export
+evaluate_ppc.blm <- function(x, iterations = 2000) {
+
+
+  ## GET BURN FROM BLM OBJECT AND TAG ON NUMBER OF ITERATIONS
+
+  # Set up posterior predictive check by sampling from the posterior
+  inputs <- list(
+    settings = list(
+      iterations = iterations,
+      burn = burn
+    )
+  )
+
+  # Get priors etc.
+  priors <- blm$priors
+  thinning <- blm$sampling_settings$thinning
+  chains <- 1
+  X <- blm$input$X
+  y <- blm$input$y
+
+  # Check values
+  check_sampling_inputs(iterations, chains, thinning, burn)
+
+  # Draw initial values (only if uninformative!!!)
+  iv <- initialize_chain_values(priors)
+
+  # Call the gibbs sampler, simulate y values and compute residuals
+  r <- ppc_julia(X, y, iv, iterations, priors, burn)
+
+  # Add results
+  inputs$data$initial_values <- iv
+  inputs$data$X <- X
+  inputs$data$sim_y <- r$sim_y
+  inputs$data$residuals <- r$residuals
+
+  # Add class to input
+  class(inputs) <- "ppc"
+
+  # Add the results to the data
+  inputs <- normality_check(inputs, r$skewness)
+  inputs <- homoskedast_check(inputs, r$heteroskedasticity)
+  inputs <- independence_check(inputs, r$independence)
+
+  # Return
+  return(inputs)
+
+}
+
+# Model fit
+#' @export
+evaluate_model_fit.blm <- function(blm) {
+
+  # Model fit
+  mfit <- DIC(blm$input$X, blm$input$y, blm$posterior)
+
+  # Bind models
+  final <- round(mfit, digits=3)
+
+  # Row names
+  row.names(final) <- c("(Model)")
+
+  # Print
+  cat(crayon::bold("Model fit for blm object:\n\n"))
+  print.listof(
+    list("Model DIC"=final)
+  )
+
+}
