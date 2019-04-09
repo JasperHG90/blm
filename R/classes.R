@@ -10,10 +10,10 @@
 #'
 #' @return blm object containing roadmap for bayesian linear modeling
 #' @export
-blm <- function(formula, data, center = FALSE) {
+blm <- function(formula, data) {
 
   # Check formula against data
-  inputs <- check_init_blm(formula, data, center)
+  inputs <- check_init_blm(formula, data)
 
   # Retrieve X
   X <- inputs$inputs$X

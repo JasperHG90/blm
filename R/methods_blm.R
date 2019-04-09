@@ -1,6 +1,6 @@
 ## Methods for blm class
 
-# GENERIC METHODS ------
+# Generic functions (print, summary etc.)
 
 # Print method
 #' @export
@@ -21,6 +21,8 @@ print.blm <- function(x) {
   print(get_value(x, "priors"))
 
 }
+
+# Functions that build up the blm object with settings etc. ------
 
 # Determine the sampling options
 #' @export
@@ -112,6 +114,9 @@ set_initial_values.blm <- function(x, ...) {
   # Opts
   opts <- list(...)
 
+  # m (number of coefs)
+  m <- x$input$m
+
   # Which chain?
   chain_names <- get_value(x, "sampling_settings") %>%
     names()
@@ -150,7 +155,7 @@ set_initial_values.blm <- function(x, ...) {
   # For each chain, set initial values
   for(i in names(opts)) {
     # Set coefficients
-    x[["sampling_settings"]][[i]][["initial_values"]][["w"]][1:3,1] <- opts[[i]]$b
+    x[["sampling_settings"]][[i]][["initial_values"]][["w"]][1:m,1] <- opts[[i]]$b
     # Set sigma
     x[["sampling_settings"]][[i]][["initial_values"]][["sigma"]] <- opts[[i]]$sigma
     # Set user defined starting postions
@@ -239,8 +244,8 @@ update_posterior.blm <- function(x, iterations = 1000) {
   sampling_settings <- get_value(x, "sampling_settings")
   for(i in seq_along(sampling_settings)) {
     sampling_settings[[i]]["iterations"] <- iterations
-    sampling_settings[[i]][["initial_values"]][["w"]][,1] <- unname(posterior_samples[["samples"]][[i]][n,1:3])
-    sampling_settings[[i]][["initial_values"]][["sigma"]] <- unname(posterior_samples[["samples"]][[i]][n,4])
+    sampling_settings[[i]][["initial_values"]][["w"]][,1] <- unname(posterior_samples[["samples"]][[i]][n,1:(m-1)])
+    sampling_settings[[i]][["initial_values"]][["sigma"]] <- unname(posterior_samples[["samples"]][[i]][n,m])
   }
 
   # All sampling settings are now fixed except iterations. Draw new samples.
@@ -292,7 +297,6 @@ get_posterior_samples.blm <- function(x) {
 # This returns a SEPARATE object ==> all the simulations are heavy on the memory.
 #' @export
 evaluate_ppc.blm <- function(x, iterations = 2000) {
-
 
   ## GET BURN FROM BLM OBJECT AND TAG ON NUMBER OF ITERATIONS
 

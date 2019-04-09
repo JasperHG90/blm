@@ -24,57 +24,12 @@ check_formula <- function(varnames, formula) {
   ## Retrieve IVs
   IV <- formula[3]
 
-  ## If IV == ., move on
-  if( IV == '.' ) {
-
-    ## Store results in list
-    res <- list(
-      "DV" = DV,
-      "IV" = varnames[which(varnames != DV)]
-    )
-
-  } else if( grepl("\\+", IV) ) {
-
-    ## If '+' in IVs, then multiple IVs
-
-    # Split the IVs
-    IVs <- strsplit(IV,"(\\s)?\\+(\\s)?")[[1]]
-
-    # Check for each if in dataset
-    if( !all(IVs[which(!grepl("\\*", IVs))] %in% varnames) ) {
-
-      stop("Not all independent variables found in dataset")
-
-    }
-
-    # Store results in a list
-    res <- list(
-      "DV" = DV,
-      "IV" = IVs
-    )
-
-  } else {
-
-    # Split the IVs
-    IVs <- strsplit(IV,"(\\s)?\\+(\\s)?")[[1]]
-
-    ## We have the situation that there is only one IV
-
-    if( !(IV[which(!grepl("\\*", IVs))] %in% varnames) ) {
-
-      if( (IV[which(!grepl("\\*", IVs))] != "1") ) {
-        stop("Independent variable not found in dataset.")
-      }
-
-    }
-
-    ## Store results in list
-    res <- list(
-      "DV" = DV,
-      "IV" = IV
-    )
-
-  }
+  ## Store results in list
+  res <- list(
+    "DV" = DV,
+    "IV" = strsplit(IV, "\\+")[[1]] %>% trimws(),
+    "IV_in_data" = varnames[which(DV != varnames)]
+  )
 
   ## Return the DV / IV list
   return(res)
@@ -87,7 +42,7 @@ check_formula <- function(varnames, formula) {
 # @param data data as passed by the user
 #
 # @return a list containing variable names, the formula, the design matrix X (as a model.matrix()), the outcome variable y, the number of observations n and the number of predictors m
-check_init_blm <- function(formula, data, center) {
+check_init_blm <- function(formula, data) {
 
   ## Check if formula is formula or if it can be coerced to one
   if( !(is(formula)[1] == "formula") ) formula <- as.formula(formula)
@@ -102,7 +57,7 @@ check_init_blm <- function(formula, data, center) {
   ## Retrieve variable names from data
   varnames <- colnames(data)
 
-  ## Check if formula correct and all variable names present
+  ## Retrieve DV / IV
   vars <- check_formula(varnames, formula)
 
   ## Retrieve X & y matrix / vectors
@@ -115,23 +70,15 @@ check_init_blm <- function(formula, data, center) {
 
   }
 
-  # Center
-  if(center) {
-    # Index for IV
-    iv_index <- setdiff(names(data), vars$DV)
-    # Retrieve numeric
-    numeric_vars <- iv_index[sapply(data[, iv_index], is.numeric)]
-    # Center variables
-    data[,numeric_vars] <- apply(data[,numeric_vars], 2, function(x) x - mean(x))
-  }
-
   ## Create design matrix
   ## (-1 ignores the intercept)
+  ## model.matrix automatically throws error if formula misspecified
   X <- model.matrix(as.formula(paste0(vars$DV, " ~ ",
                                       paste0(vars$IV, collapse = "+"))),
                     data)
 
   ## Subset y by rows (may be deleted)
+  ## Apply listwise deletion
   y <- y[as.numeric(row.names(X))]
 
   ## Number of observations
@@ -147,8 +94,7 @@ check_init_blm <- function(formula, data, center) {
       "y" = y,
       "X" = X,
       "n" = n,
-      "m" = m,
-      "center" = center
+      "m" = m
     )
   )
 
