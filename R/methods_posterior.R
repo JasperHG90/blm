@@ -84,6 +84,9 @@ CCI.posterior <- function(x) {
 # Compare the within / between variances
 GR.posterior <- function(x, iterations) {
 
+  ## Burn
+  x <- set_value(x, "samples", burn(x))
+
   ## For each chain, and each statistic, calculate the between and within
   ## variance
   M <- get_value(x, "samples") %>%
@@ -139,6 +142,9 @@ GR.posterior <- function(x, iterations) {
 # Burn-in period diagnostics
 # Run a linear regression on squared coefficient draws from posterior
 burnin_diagnostic.posterior <- function(x) {
+
+  # Burn
+  x <- set_value(x, "samples", burn(x))
 
   out_post <- lapply(seq_along(x), function(chain_it) {
 

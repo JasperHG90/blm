@@ -291,6 +291,177 @@ get_posterior_samples.blm <- function(x) {
 
 # CONVERGENCE -----
 
+# Convergence diagnostics
+#' @export
+convergence_diagnostics.blm <- function(x) {
+
+  var_names <- c(colnames(x$input$X), "sigma")
+
+  ### Formula
+  form <- as.character(x$input$formula)
+  formchar <- paste0(form[2], " ", form[1], " ", form[3])
+
+  ## Construct individual parts
+  general <- paste0(
+    "Formula: '", crayon::italic(formchar), "'"
+  )
+
+  ## User has already sampled or not
+  has_sampled <- paste0(
+    "Sampled: ", ifelse("posterior" %in% names(x),
+                        crayon::green('TRUE'),
+                        crayon::red('FALSE'))
+  )
+
+  ### If not sampled yet ...
+  if(!"posterior" %in% names(x)) {
+    cat(crayon::bold("Convergence diagnostics for blm object:"))
+    cat("\n\n")
+    cat(general)
+    cat("\n\n")
+    cat(has_sampled)
+    return(cat(""))
+  } else {
+
+    # Burn-in diagnostics
+    pd <- get_value(x, "posterior")
+    # Burn
+    pd <- set_value(pd, "samples", burn(pd))
+    # Burn-in
+    burning_diag <- pd %>% burnin_diagnostic()
+
+    # If multiple chains
+    if(length(x$sampling_settings) > 1) {
+      # Calculate Gelman-Rubin
+      GRS <- pd %>%
+        GR(., x$sampling_settings$chain_1$iterations)
+    }
+
+    # Cat
+    cat(crayon::bold("Convergence diagnostics for blm object:"))
+    cat("\n\n")
+    cat(general)
+    cat("\n\n")
+    cat(has_sampled)
+    cat("\n\n")
+    cat("Burn-in diagnostic:\n")
+    cat.burnin(burning_diag)
+    cat("\n")
+    cat("Gelman-Rubin statistic:\n")
+    cat.GR(GRS)
+  }
+
+}
+
+# Plot method
+#' @export
+plot.blm <- function(x, type=c("history",
+                                 "autocorrelation",
+                                 "density"),
+                     ...) {
+
+  # Retrieve posterior data
+  pd <- get_value(x, "posterior")
+  # Burn
+  pd <- set_value(pd, "samples", burn(pd))
+
+  ## If autocorrelation plot
+  if(type == "autocorrelation") {
+
+    # Get opts
+    opts <- list(...)
+
+    # If not chain specified and multiple chains, choose chain 1 but raise error
+    if(!"chain" %in% names(opts) & length(get_value(x, "sampling_settings")) > 1) {
+
+      warning("Choosing chain 1 for autocorrelation plot. You can choose a different chain by passing 'chain = <number>' to the plot() function.")
+
+      chain <- 1
+
+    } else {
+
+      chain <- opts$chain
+
+    }
+
+    # Get data from posterior
+    qd <- get_value(pd, "samples")[[paste0("chain_", chain)]]
+
+    # Lag data
+    qd <- qd %>%
+      as.data.frame() %>%
+      lapply(., function(x) autocor(x, n=40)) %>%
+      do.call(rbind.data.frame, .)
+
+    # Add variable name
+    qd$id <- stringr::str_replace_all(row.names(qd), "\\.[0-9]{1,2}", "")
+
+    # Plot
+    ggplot2::ggplot(qd, ggplot2::aes(x=lag, y=correlation, group=id)) +
+      ggplot2::geom_bar(stat="identity") +
+      ggplot2::scale_x_continuous(breaks= scales::pretty_breaks()) +
+      ggplot2::scale_y_continuous(limits = c(-1,1)) +
+      ggplot2::facet_wrap(id ~ .)
+
+  } else {
+
+    samples <- get_value(pd, "samples")
+    # Bind data
+    for(i in seq_along(samples)) {
+      df <- data.frame(samples[[i]])
+      df$chain <- i
+      df$iteration <- (x$sampling_settings$chain_1$burn + 1):x$sampling_settings$chain_1$iterations
+      samples[[i]] <- df
+    }
+
+    # To long format
+    samples <- samples %>%
+      do.call(rbind.data.frame, .) %>%
+      tidyr::gather(key = parameter, value = value,
+                    -chain, -iteration)
+
+    #### Plot
+
+    # Make into factor
+    pd$chain <- as.factor(pd$chain)
+
+    ## History plot
+
+    if(type == "history") {
+
+      ggplot2::ggplot(samples, ggplot2::aes(x = iteration,
+                                       y=value,
+                                       color=as.factor(chain),
+                                       group = parameter)) +
+        ggplot2::geom_line(alpha=0.4) +
+        ggplot2::theme_bw() +
+        ggplot2::theme(legend.position = "None") +
+        #geom_smooth(method="lm") +
+        ggplot2::facet_wrap("parameter ~ .", scales = "free_y",
+                            ncol=1)
+
+      ## Density plot
+
+    } else if(type == "density") {
+
+      ggplot2::ggplot(samples, ggplot2::aes(x=value,
+                                       fill = chain)) +
+        ggplot2::geom_density(alpha=0.4) +
+        ggplot2::theme_bw() +
+        ggplot2::theme(legend.position = "None") +
+        ggplot2::facet_wrap("parameter ~ .", scales = "free")
+
+    } else { ## Unknown! Raise error
+
+      ## Raise error
+      stop(paste0("Type '", type, "' not a allowed."))
+
+    }
+
+  }
+
+}
+
 # EVALUATION ----
 
 # posterior predictive checks
