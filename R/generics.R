@@ -120,8 +120,8 @@ burnin_diagnostic <- function(x, ...) {
 #'
 #' @return prints summary of the ppc to the R console
 #' @export
-posterior_predictive_checks <- function(x, ...) {
-  UseMethod("posterior_predictive_checks")
+evaluate_ppc <- function(x, ...) {
+  UseMethod("evaluate_ppc")
 }
 
 #' Assess blm model fit
@@ -130,8 +130,8 @@ posterior_predictive_checks <- function(x, ...) {
 #'
 #' @return prints summary of model fit (DIC) to the R console
 #' @export
-model_fit <- function(x) {
-  UseMethod("model_fit")
+evaluate_model_fit <- function(x) {
+  UseMethod("evaluate_model_fit")
 }
 
 #' Print diagnostics

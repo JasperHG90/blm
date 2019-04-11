@@ -11,14 +11,15 @@ Course: Introduction to Bayesian Statistics
 =#
 
 #=
-PART I: Gibbs sampler in Julia
+PART I: MCMC sampler in in Julia
 =#
 
-function gibbs_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
-                       sigma::Float64, iterations::Int, thinning::Int, priors)
+function MCMC_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
+                       sigma::Float64, iterations::Int, thinning::Int, priors
+                       samplers)
 
     #=
-    Run the Gibbs sampler to obtain the conditional posterior coefficients / sigma values
+    Run the MCMC sampler to obtain the conditional posterior coefficients / sigma values
 
     :param X: Design matrix containing j+1 coefficients (first coefficient must equal intercept variable). The design matrix is created in R using model.matrix()
     :param y: Numeric array with outcome variables. Length(y) == nrow(X)
@@ -29,6 +30,7 @@ function gibbs_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
                         That is, if thinning = 3, then the first two draws will be discarded and only the third draw will be returned as a draw
                         from the posterior distribution.
     :param priors: Dict containing information on the priors of each coefficient and sigma
+    :param samplers: Dict containing information on which sampling strategy to follow for each coefficient (gibbs or MH)
 
     :return: Tensor of shape N * J (iterations * parameters).
     :seealso:
@@ -44,8 +46,8 @@ function gibbs_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
         for j in 1:thinning
 
-          # One step of the gibbs sampler
-          r = gibbs_one_step(X, y, w, sigma, priors)
+          # One step of the MCMC sampler
+          r = MCMC_one_step(X, y, w, sigma, priors, samplers)
 
           # Set new values for weights and sigma
           w = r["w"]
@@ -67,8 +69,8 @@ function gibbs_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
     end;
 
-function gibbs_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
-                        sigma::Float64, priors)
+function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
+                        sigma::Float64, priors, samplers)
 
     #=
     Run a single iteration of the gibbs sampler
@@ -78,6 +80,7 @@ function gibbs_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     :param w: Coefficient matrix containing initial values. nrow(w) == ncol(X)
     :param sigma: Single initial value for the variance.
     :param priors: Dict containing information on the priors of each coefficient and sigma
+    :param samplers: Dict containing information on which sampling strategy to follow for each coefficient (gibbs or MH)
 
     :return: Dict containing draws for each conditional posterior distribution.
     :seealso: The file 'conditionalposterior.pdf' in the 'docs' folder for an elaboration on the derivation of the
@@ -97,9 +100,23 @@ function gibbs_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
         # See the Appendix in 'docs' folder (section 5) for an elaboration on the calculation of posterior values
         else
 
-            w[j] = rand(Normal(posterior_mu(X[:,1:end .!= j], X[:,j], y, w[1:end .!= j], sigma,
-                                            priors[j][:mu], priors[j][:sd]),
-                               sqrt(posterior_tau(X[:,j], sigma, priors[j][:sd]))))
+            ## Check sampler
+
+            ## Use Gibbs sampling? ==> sample conditional posteriors
+            if samplers[j] == "gibbs"
+
+                w[j] = rand(Normal(posterior_mu(X[:,1:end .!= j], X[:,j], y, w[1:end .!= j], sigma,
+                                                priors[j][:mu], priors[j][:sd]),
+                                   sqrt(posterior_tau(X[:,j], sigma, priors[j][:sd]))))
+
+            ## Use MH sampling? ==> sample conditional posteriors that are proportional up to a constant
+            else if samplers[j] == "MH"
+
+            else
+
+                # Unknown sampler. ERROR OUT
+
+                end;
 
             end;
 

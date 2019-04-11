@@ -36,6 +36,8 @@ initialize_chain_values <- function(priors) {
 # Helper function that calls the Julia MC sampler
 mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, samplers) {
 
+  #browser()
+
   # Unroll initial values
   w <- initial_values$w
   sigma <- initial_values$sigma
@@ -74,12 +76,11 @@ autocor <- function(x, n=10) {
 }
 
 # Posterior predictive checks in julia
-ppc_julia <- function(X, y, initial_values, iterations, priors, thinning, burn) {
+ppc_julia <- function(X, y, initial_values, samplers, iterations, priors, thinning, burn) {
 
   # Unroll initial values
   w <- initial_values$w
   sigma <- initial_values$sigma
-  #browser()
   return(
     .blm$julia$eval("ppc_draws")(X, as.numeric(y), w, sigma,
                                  as.integer(iterations), as.integer(thinning),
@@ -90,22 +91,25 @@ ppc_julia <- function(X, y, initial_values, iterations, priors, thinning, burn) 
 
 # Model DIC
 # See: http://kylehardman.com/BlogPosts/View/6
-DIC <- function(X, y, posterior) {
+DIC <- function(X, y, posterior_samples) {
 
-  ## Join posterior
-  pb <- do.call(rbind, posterior)
+  ## Map values
+  map <- MAP(posterior_samples)$MAP
 
-  ## MAP values
-  MAP <- apply(pb, 2, mean)
+  ## Bind data
+  pb <- bind(posterior_samples)
+  ## To matrix (expected by julia)
+  pb <- as.matrix(pb)
 
   ## Coef separate from sigma
-  sigma <- unname(MAP["sigma"])
-  coefs <- matrix(MAP[-length(MAP)], ncol=1)
+  sigma <- unname(map["sigma"])
+  coefs <- matrix(map[-length(map)], ncol=1)
 
   ## Two parts to DIC ==> (1) sum of log of likelihood P(y|theta_MAP)
 
   # Call Julia implementation
-  r <- .blm$julia$eval("DIC")(X, y, coefs, sigma, pb)
+  r <- .blm$julia$eval("DIC")(X, as.numeric(y),
+                              coefs, sigma, pb)
 
   ## Return model fit
   return(

@@ -22,6 +22,88 @@ print.blm <- function(x) {
 
 }
 
+# Summary method
+#' @export
+#' @importFrom crayon bold
+#' @importFrom crayon green
+#' @importFrom crayon red
+summary.blm <- function(x) {
+
+  var_names <- c(colnames(x$input$X), "sigma")
+
+  ### Formula
+  form <- as.character(x$input$formula)
+  formchar <- paste0(form[2], " ", form[1], " ", form[3])
+
+  ## Construct individual parts
+  general <- paste0(
+    "Formula: '", crayon::italic(formchar), "'"
+  )
+
+  ## User has already sampled or not
+  has_sampled <- paste0(
+    "Sampled: ", ifelse("posterior" %in% names(x),
+                        crayon::green('TRUE'),
+                        crayon::red('FALSE'))
+  )
+
+  ## num. observations + predictors
+  obs <- list(
+    "Sampling settings" = matrix(c(x$input$n,x$input$m - 1,length(x$sampling_settings),
+                                   x$sampling_settings$chain_1$iterations,
+                                   x$sampling_settings$chain_1$thinning,
+                                   x$sampling_settings$chain_1$burn),
+                                 nrow = 1,
+                                 dimnames = list(
+                                   c(""),
+                                   c("Obs.",
+                                     "Predictors",
+                                     "Chains",
+                                     "Iterations",
+                                     "Thinning",
+                                     "Burn")
+                                 )))
+
+  ### If not sampled yet ...
+  if(!"posterior" %in% names(x)) {
+    cat(crayon::bold("Model results for blm object:"))
+    cat("\n\n")
+    cat(general)
+    cat("\n\n")
+    cat(has_sampled)
+    cat("\n\n")
+    print.listof(obs)
+    return(cat(""))
+  }
+
+  ### Statistics
+
+  # Calculate MAP for each chain & combine
+  MAPV <- t(do.call(rbind, MAP(get_value(x, "posterior"))))
+  # Add MC error
+  MAPV <- cbind(MAPV, MAPV[,2] / sqrt(x$sampling_settings$chain_1$iterations))
+  # Round
+  MAPV <- round(MAPV, digits = 3)
+
+  # Amend names
+  colnames(MAPV) <- c("Est. (mean)", "SD", "MCERR.")
+
+  # Calculate CI
+  CIV <- t(round(CCI(get_value(x, "posterior")), digits = 3))
+
+  # Print MAP & SE
+  cat(crayon::bold("Model results for blm object:"))
+  cat("\n\n")
+  cat(general)
+  cat("\n\n")
+  cat(has_sampled)
+  cat("\n\n")
+  print.listof(obs)
+  print.listof(list("Maximum a posteriori (MAP) estimates" = MAPV))
+  print.listof(list("95% credible interval" = CIV))
+
+}
+
 # Functions that build up the blm object with settings etc. ------
 
 # Determine the sampling options
@@ -469,7 +551,16 @@ plot.blm <- function(x, type=c("history",
 #' @export
 evaluate_ppc.blm <- function(x, iterations = 2000) {
 
-  ## GET BURN FROM BLM OBJECT AND TAG ON NUMBER OF ITERATIONS
+
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
+  # Get burn value
+  burn <- x$sampling_settings$chain_1$burn
+  # Update iterations
+  iterations <- burn + iterations
 
   # Set up posterior predictive check by sampling from the posterior
   inputs <- list(
@@ -480,20 +571,20 @@ evaluate_ppc.blm <- function(x, iterations = 2000) {
   )
 
   # Get priors etc.
-  priors <- blm$priors
-  thinning <- blm$sampling_settings$thinning
+  priors <- x$priors
+  thinning <- x$sampling_settings$chain_1$thinning
+  samplers <- x$sampling_settings$chain_1$samplers
+  iv <- x$sampling_settings$chain_1$initial_values
   chains <- 1
-  X <- blm$input$X
-  y <- blm$input$y
+  X <- x$input$X
+  y <- x$input$y
 
   # Check values
-  check_sampling_inputs(iterations, chains, thinning, burn)
-
-  # Draw initial values (only if uninformative!!!)
-  iv <- initialize_chain_values(priors)
+  check_sampling_inputs(as.integer(iterations), as.integer(chains), as.integer(thinning),
+                        as.integer(burn))
 
   # Call the gibbs sampler, simulate y values and compute residuals
-  r <- ppc_julia(X, y, iv, iterations, priors, burn)
+  r <- ppc_julia(X, y, iv, samplers, iterations, priors, thinning, burn)
 
   # Add results
   inputs$data$initial_values <- iv
@@ -516,10 +607,11 @@ evaluate_ppc.blm <- function(x, iterations = 2000) {
 
 # Model fit
 #' @export
-evaluate_model_fit.blm <- function(blm) {
+evaluate_model_fit.blm <- function(x) {
 
   # Model fit
-  mfit <- DIC(blm$input$X, blm$input$y, blm$posterior)
+  mfit <- DIC(x$input$X, x$input$y,
+              get_value(x, "posterior"))
 
   # Bind models
   final <- round(mfit, digits=3)

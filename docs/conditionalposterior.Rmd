@@ -1,5 +1,5 @@
 ---
-title: 'Appendix: deriving the conditional posteriors for linear regression'
+title: 'Deriving the conditional posteriors for linear regression'
 author: "Jasper Ginn"
 date: "February 18, 2019"
 output:
@@ -394,7 +394,7 @@ $$
 \tag{4.2.8}
 \begin{aligned}
 &\tau_{j,1}^2 = \frac{1}{\left(\frac{\sum_i x_{ji}^2}{\sigma^2} +\frac{1}{\tau_{j,0}^2}\right)} \\
-&\mu_{j,1} = \frac{\left(\frac{x_{ji} \sum_i (y_i - \beta_0 - \left[\sum_{k=1}^{j-1} \beta_kx_{ki}\right])}{\sigma^2} + \frac{u_{j,0}}{\tau_{j,0}^2}\right)} {\left(\frac{Nx_{ji}^2}{\sigma^2} + \frac{1}{\tau_{0,0}^2}\right)}
+&\mu_{j,1} = \frac{\left(\frac{x_{ji} \sum_i (y_i - \beta_0 - \left[\sum_{k=1}^{j-1} \beta_kx_{ki}\right])}{\sigma^2} + \frac{u_{j,0}}{\tau_{j,0}^2}\right)} {\left(\frac{x_{ji}^2}{\sigma^2} + \frac{1}{\tau_{0,0}^2}\right)}
 \end{aligned}
 $$
 
@@ -403,7 +403,7 @@ Finally, we need to generalize this result to cases where $j \neq \text{max}(j)$
 $$
 \tag{4.2.9}
 \begin{aligned}
-&\mu_{j,1}\frac{\left(\frac{\sum_i x_{ji} (y_i - \beta_0 - \left[\sum_{k \neq j} \beta_kx_{ki}\right])}{\sigma^2} + \frac{u_{j,0}}{\tau_{j,0}^2}\right)} {\left(\frac{Nx_{ji}^2}{\sigma^2} + \frac{1}{\tau_{j,0}^2}\right)}
+&\mu_{j,1}\frac{\left(\frac{\sum_i x_{ji} (y_i - \beta_0 - \left[\sum_{k \neq j} \beta_kx_{ki}\right])}{\sigma^2} + \frac{u_{j,0}}{\tau_{j,0}^2}\right)} {\left(\frac{x_{ji}^2}{\sigma^2} + \frac{1}{\tau_{j,0}^2}\right)}
 \end{aligned}
 $$
 
@@ -515,7 +515,7 @@ $$
 
 We will use $x_j$ to denote the $j^{th}$ column vector from the design matrix $\mathbf{X}$
 
-## Intercept and slope posteriors using linear algebra notation
+## Intercept and slope posteriors using vector notation
 
 When we examine the posterior means for the intercept and slope coefficients, we should recognize that we can rewrite both equations as one using vector notation. (The $\circ$ operator signifies element-wise multiplication).
 
