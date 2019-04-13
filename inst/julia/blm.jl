@@ -16,7 +16,7 @@ PART I: MCMC sampler in in Julia
 
 function MCMC_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
                        sigma::Float64, iterations::Int, thinning::Int, priors
-                       samplers)
+                       samplers; zeta=0)
 
     #=
     Run the MCMC sampler to obtain the conditional posterior coefficients / sigma values
@@ -47,7 +47,7 @@ function MCMC_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
         for j in 1:thinning
 
           # One step of the MCMC sampler
-          r = MCMC_one_step(X, y, w, sigma, priors, samplers)
+          r = MCMC_one_step(X, y, w, sigma, priors, samplers, zeta)
 
           # Set new values for weights and sigma
           w = r["w"]
@@ -70,7 +70,7 @@ function MCMC_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     end;
 
 function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
-                        sigma::Float64, priors, samplers)
+                        sigma::Float64, priors, samplers; zeta=0)
 
     #=
     Run a single iteration of the gibbs sampler
@@ -93,24 +93,24 @@ function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
         # If j == nparam, then sigma
         if j == length(priors)
 
-            sigma = rand(InverseGamma(posterior_rate(size(X)[1], priors[j][:alpha]),
-                                      posterior_scale(X, w, y, priors[j][:beta])))
+            sigma = gibbs_one_step_resvar(X, w, y, priors[j][:alpha]), priors[j][:beta])
 
         # Else, coefficient
         # See the Appendix in 'docs' folder (section 5) for an elaboration on the calculation of posterior values
         else
 
             ## Check sampler
-
             ## Use Gibbs sampling? ==> sample conditional posteriors
             if samplers[j] == "gibbs"
 
-                w[j] = rand(Normal(posterior_mu(X[:,1:end .!= j], X[:,j], y, w[1:end .!= j], sigma,
-                                                priors[j][:mu], priors[j][:sd]),
-                                   sqrt(posterior_tau(X[:,j], sigma, priors[j][:sd]))))
+                w[j] = gibbs_one_step_coef(X, y, w, sigma, priors[j][:mu], priors[j][:sd])
 
             ## Use MH sampling? ==> sample conditional posteriors that are proportional up to a constant
             else if samplers[j] == "MH"
+
+                w[j] = MH_one_step_coef(w[j], X[:, j], X[:, 1:end .!= j], y,
+                                        w[1:end .!= j], sigma, priors[j][:mu],
+                                        priors[j][:sd], zeta)
 
             else
 
@@ -128,6 +128,59 @@ function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
             "w" => w,
             "sigma" => sigma
         )
+    )
+
+    end;
+
+function MH_one_step_coef(b_previous::Float64, xj::Array{Float64}, X::Arrat{Float64}, y::Array{Float64},
+                     w::Array{Float64}, sigma::Float64, prior_mu::Float64, prior_tau::Float64,
+                     zeta::Float64)
+
+    #=
+    Perform one draw (iteration) of the Metropolis-Hastings sampler
+    =#
+
+    # Draw proposal
+    b_proposed = rand(Normal(b_previous, zeta))
+
+    # Draw from the posterior (current coef and previous coef) & ompare difference to logged random uniform variate
+    if (posterior_coef(b_proposed, xj, X, y, w, sigma, prior_mu, prior_tau) - posterior_coef(b_previous, xj, X, y, w, sigma, prior_mu, prior_tau)) < log(rand(Uniform(0, 1)))
+
+        return(
+            Dict(
+                "samp" => b_previous,
+                "accepted" => 0
+            )
+        )
+
+    else
+
+        return(
+            Dict(
+                "samp" => b_proposed,
+                "accepted" => 1
+            )
+        )
+
+        end;
+
+    end;
+
+function gibbs_one_step_coef(X, y, w, sigma, prior_mu, prior_sd)
+
+    return(
+        rand(Normal(posterior_mu(X[:,1:end .!= j], X[:,j], y, w[1:end .!= j], sigma,
+                                        prior_mu, prior_sd),
+                    sqrt(posterior_tau(X[:,j], sigma, prior_sd))))
+    )
+
+    end;
+
+function gibbs_one_step_resvar(X, w, y, prior_alpha, prior_beta)
+
+    return(
+        rand(InverseGamma(posterior_rate(size(X)[1], prior_alpha),
+                          posterior_scale(X, w, y, prior_beta)))
     )
 
     end;
@@ -210,6 +263,22 @@ function posterior_scale(X::Array{Float64}, w::Array{Float64}, y::Array{Float64}
     =#
 
     return( ( sum( ( y - (X * w) ).^2 ) / 2 ) + b0 )
+
+    end;
+
+function posterior_coef(bj::Float64, xj::Array{Float64}, X::Arrat{Float64}, y::Array{Float64},
+                        w::Array{Float64}, sigma::Float64, prior_mu::Float64, prior_tau::Float64)
+
+    #=
+    Sample the logged non-normalized posterior for a coefficient
+
+    @seealso: implementation notes on GitHub
+    =#
+
+    return(
+        -(bj)^2 * ( (( transpose(xj) * xj )/(2*sigma)) + (1 / (2*prior_tau)) ) +
+        bj * ( ( sum(xj .* (y .- X * w))) / sigma ) + (prior_mu / prior_tau)
+    )
 
     end;
 

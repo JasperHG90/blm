@@ -1,5 +1,76 @@
 ## Methods for posterior predictive checks
 
+# Exported -----
+
+# Summary
+#' @export
+summary.ppc <- function(ppc) {
+
+  msg <- paste0(
+    crayon::bold("Posterior Predictive Checks (PPC) for blm object:"),
+    "\n\n"
+  )
+
+  # Bind results
+  bpr <- round(do.call(cbind.data.frame, ppc$results), digits=3)
+  colnames(bpr) <- c("Normality", "Heteroskedasticity", "Independence")
+  row.names(bpr) <- c("p")
+
+  res <- list(
+    "Bayesian p-value" = bpr
+  )
+
+  # Cat
+  cat(msg)
+  print.listof(res)
+
+}
+
+# Print method == summary method for ppc
+#' @export
+print.ppc <- function(ppc) {
+  summary(ppc)
+}
+
+# Plot method
+#' @importFrom magrittr '%>%'
+#' @importFrom ggplot2 ggplot
+#' @importFrom ggplot2 geom_density
+#' @importFrom ggplot2 aes
+#' @importFrom ggplot2 theme_bw
+#' @importFrom ggplot2 ggtitle
+#' @export
+plot.ppc <- function(ppc, type=c("normality", "heteroskedasticity", "independence")) {
+
+  type <- match.arg(type)
+
+  # Get data
+  data <- switch(
+    type,
+    "normality" = ppc$data$skewness,
+    "heteroskedasticity" = ppc$data$homosked,
+    "independence" = ppc$data$independence
+  )
+
+  # Plot data
+  data <- data %>%
+    as.data.frame() %>%
+    tidyr::gather(dataset, value)
+
+  # Update labels
+  data$dataset <- ifelse(data$dataset == "V1", "Simulated", "Observed")
+
+  # Plot
+  data %>%
+    ggplot2::ggplot(., ggplot2::aes(x=value, fill=dataset)) +
+    ggplot2::geom_density(alpha=0.6) +
+    ggplot2::theme_bw() +
+    ggplot2::ggtitle(paste0("Observed and simulated results for test '", type, "'"))
+
+}
+
+# Not exported -----
+
 # Check normality of errors assumption
 normality_check.ppc <- function(ppc, skewed) {
 
@@ -69,65 +140,4 @@ independence_check.ppc <- function(ppc, independence) {
 
   # Return
   return(ppc)
-}
-
-# Summary
-#' @export
-summary.ppc <- function(ppc) {
-
-  msg <- paste0(
-    crayon::bold("Posterior Predictive Checks (PPC) for blm object:"),
-    "\n\n"
-  )
-
-  # Bind results
-  bpr <- round(do.call(cbind.data.frame, ppc$results), digits=3)
-  colnames(bpr) <- c("Normality", "Heteroskedasticity", "Independence")
-  row.names(bpr) <- c("p")
-
-  res <- list(
-    "Bayesian p-value" = bpr
-  )
-
-  # Cat
-  cat(msg)
-  print.listof(res)
-
-}
-
-# Print method == summary method for ppc
-#' @export
-print.ppc <- function(ppc) {
-  summary(ppc)
-}
-
-# Plot method
-#' @export
-plot.ppc <- function(ppc, type=c("normality", "heteroskedasticity", "independence")) {
-
-  type <- match.arg(type)
-
-  # Get data
-  data <- switch(
-    type,
-    "normality" = ppc$data$skewness,
-    "heteroskedasticity" = ppc$data$homosked,
-    "independence" = ppc$data$independence
-  )
-
-  # Plot data
-  data <- data %>%
-    as.data.frame() %>%
-    tidyr::gather(dataset, value)
-
-  # Update labels
-  data$dataset <- ifelse(data$dataset == "V1", "Simulated", "Observed")
-
-  # Plot
-  data %>%
-    ggplot2::ggplot(., ggplot2::aes(x=value, fill=dataset)) +
-    ggplot2::geom_density(alpha=0.6) +
-    ggplot2::theme_bw() +
-    ggplot2::ggtitle(paste0("Observed and simulated results for test '", type, "'"))
-
 }

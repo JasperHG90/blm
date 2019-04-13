@@ -5,7 +5,7 @@
 \title{Updating sampling options}
 \usage{
 \method{set_options}{sampler}(x, chains = 1, iterations = 10000,
-  burn = 1000, thinning = 1, priors)
+  burn = 1000, thinning = 1, varnames, priors)
 }
 \description{
 Updating sampling options

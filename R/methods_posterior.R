@@ -1,7 +1,6 @@
 ## Methods for the posterior class
 
-#' Burn samples from a posterior sample dataset
-#'
+# Burn samples from a posterior sample dataset
 burn.posterior <- function(x) {
 
   # Return posterior without burn-in samples
@@ -15,7 +14,7 @@ burn.posterior <- function(x) {
 
 }
 
-#' Collapse all chains into one big sample
+# Collapse all chains into one big sample
 bind.posterior <- function(x) {
 
   # Burn
@@ -25,7 +24,7 @@ bind.posterior <- function(x) {
 
 }
 
-#' Append samples to a posterior distribution
+# Append samples to a posterior distribution
 append_samples.posterior <- function(x, updates) {
 
   samples <- get_value(x, "samples")
@@ -44,7 +43,7 @@ append_samples.posterior <- function(x, updates) {
 
 }
 
-#' MAP estimates for posterior distribution
+# MAP estimates for posterior distribution
 MAP.posterior <- function(x) {
 
   # Join the data row-wise
@@ -64,7 +63,7 @@ MAP.posterior <- function(x) {
 
 }
 
-#' 95% CCI
+# Calculate the 95% CCI
 CCI.posterior <- function(x) {
 
   # Bind data row-wise

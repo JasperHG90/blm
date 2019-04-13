@@ -4,7 +4,7 @@
 \alias{posterior}
 \title{Sets up posterior class}
 \usage{
-posterior(samples)
+posterior(samples, burn)
 }
 \value{
 list containing matrices of chain values (dims: iterations x coef + 1) of object posterior

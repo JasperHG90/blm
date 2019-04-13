@@ -4,7 +4,7 @@
 \alias{blm}
 \title{Create a blm object}
 \usage{
-blm(formula, data, center = FALSE)
+blm(formula, data)
 }
 \arguments{
 \item{formula}{linear regression formula}

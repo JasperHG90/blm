@@ -189,7 +189,8 @@ chain <- function(priors, iterations, burn, thinning, vars, ...) {
     "varnames" = vars,
     "samplers" = rep("Gibbs", length(vars)),
     "initial_values" = initialize_chain_values(priors),
-    "inits_user_defined" = inits_user_defined
+    "inits_user_defined" = inits_user_defined,
+    "zeta" = 0.25
   )
 
   # Return

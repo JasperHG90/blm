@@ -1,7 +1,6 @@
 ## Methods for sampler
 
-#' Print method for sampler class
-#'
+# Print method for sampler class
 print.sampler <- function(x) {
 
   # Paste message
@@ -22,7 +21,8 @@ print.sampler <- function(x) {
 
 }
 
-#' Sample the posterior distribution
+# Sample the posterior distribution
+#' @importFrom maggritr '%>%'
 postsamp.sampler <- function(x, X, y, priors) {
 
   # Set burn
@@ -37,9 +37,10 @@ postsamp.sampler <- function(x, X, y, priors) {
     thinning <- get_value(z, "thinning")
     initial_values_current <- get_value(z, "initial_values")
     samplers <- get_value(z, "samplers")
+    zeta <- get_value(z, "zeta")
 
     # Call mc sampler
-    r <- mc_sampler(X, y, initial_values_current, iterations, thinning, priors, samplers)
+    r <- mc_sampler(X, y, initial_values_current, iterations, thinning, priors, samplers, zeta)
 
     # Add names
     colnames(r) <- c(z$varnames, "sigma")
@@ -57,7 +58,7 @@ postsamp.sampler <- function(x, X, y, priors) {
 
 }
 
-#' Updating sampling options
+# Updating sampling options
 set_options.sampler <- function(x, chains = 1, iterations = 10000,
                                 burn = 1000, thinning = 1, varnames, priors) {
 
@@ -70,12 +71,17 @@ set_options.sampler <- function(x, chains = 1, iterations = 10000,
 
 }
 
-#' Updating the type of sampler (e.g. gibbs or mh)
+# Updating the type of sampler (e.g. gibbs or mh)
 #' @importFrom magrittr '%>%'
-set_sampler.sampler <- function(x, label, type = c("Gibbs", "MH")) {
+set_sampler.sampler <- function(x, label, type = c("Gibbs", "MH"), zeta=0.25) {
 
   # Match arg
   type <- match.arg(type)
+
+  # Check zeta
+  if(zeta < 0) {
+    stop("'zeta' cannot be negative.")
+  }
 
   # Retrieve labels
   labs <- get_value(x, "chain_1") %>%
@@ -91,6 +97,9 @@ set_sampler.sampler <- function(x, label, type = c("Gibbs", "MH")) {
 
     # Set new value
     x[[i]][["samplers"]][which(labs == label)] <- type
+
+    # Add zeta
+    x[[i]][["samplers"]]
 
   }
 
@@ -118,13 +127,3 @@ set_initial_values.sampler <- function(x, vpriors) {
 
 }
 
-# Let user set specific initial values
-#user_specific_inits.sampler <- function(x, chain, values) {
-
-  # Update initial values
-  #iv <- get_value(x[[chain]], "initial_values")
-
-  # Set initial values
-
-
-#}

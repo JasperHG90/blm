@@ -1,6 +1,6 @@
 ## Shared methods
 
-#' @export
+# Get a value from a blm or related object
 get_value.sampler <-
   get_value.priors <-
   get_value.prior <-
@@ -13,7 +13,7 @@ get_value.sampler <-
 
   }
 
-#' @export
+# Set a value to a new value
 set_value.sampler <-
   set_value.priors <-
   set_value.prior <-

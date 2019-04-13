@@ -1,6 +1,6 @@
-## Methods for prior class
+## Methods for prior and priors class
 
-#' @export
+# Print a priors object
 print.priors <- function(x) {
 
   # Set up priors matrix
@@ -97,7 +97,6 @@ set_prior_gamma <- function(x, alpha, beta) {
 }
 
 # Drawing from a normal distribution
-#' @export
 draw_value.normal <- function(prior) {
 
   rnorm(1, prior$mu, prior$sd)
@@ -106,7 +105,6 @@ draw_value.normal <- function(prior) {
 
 # Drawing from a gamma distribution
 # Add a small value to prevent sigma being 0 (bad stuff happens)
-#' @export
 draw_value.gamma <- function(prior) {
 
   rgamma(1, prior$alpha, prior$beta) + runif(1, 1e-10, 1e-08)

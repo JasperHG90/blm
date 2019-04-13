@@ -4,7 +4,8 @@
 \alias{set_sampler.sampler}
 \title{Updating the type of sampler (e.g. gibbs or mh)}
 \usage{
-\method{set_sampler}{sampler}(x, label, type = c("Gibbs", "MH"))
+\method{set_sampler}{sampler}(x, label, type = c("Gibbs", "MH"),
+  zeta = 0.25)
 }
 \description{
 Updating the type of sampler (e.g. gibbs or mh)

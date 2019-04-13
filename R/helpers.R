@@ -34,7 +34,7 @@ initialize_chain_values <- function(priors) {
 }
 
 # Helper function that calls the Julia MC sampler
-mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, samplers) {
+mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, samplers, zeta) {
 
   #browser()
 
@@ -43,8 +43,8 @@ mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, sampl
   sigma <- initial_values$sigma
 
   # TODO: ensure that user passes valid iterations / priors (integers)
-  r <- .blm$julia$eval("gibbs_sampler")(X, as.numeric(y), w, sigma, as.integer(iterations),
-                                        as.integer(thinning), unname(priors))
+  r <- .blm$julia$eval("MCMC_sampler")(X, as.numeric(y), w, sigma, as.integer(iterations),
+                                       as.integer(thinning), unname(priors), samplers, zeta)
 
   # Burn
   return(r)
