@@ -34,7 +34,7 @@ initialize_chain_values <- function(priors) {
 }
 
 # Helper function that calls the Julia MC sampler
-mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, samplers, zeta) {
+mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, samplers) {
 
   #browser()
 
@@ -44,7 +44,7 @@ mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, sampl
 
   # TODO: ensure that user passes valid iterations / priors (integers)
   r <- .blm$julia$eval("MCMC_sampler")(X, as.numeric(y), w, sigma, as.integer(iterations),
-                                       as.integer(thinning), unname(priors), samplers, zeta)
+                                       as.integer(thinning), unname(priors), samplers)
 
   # Burn
   return(r)
@@ -76,15 +76,17 @@ autocor <- function(x, n=10) {
 }
 
 # Posterior predictive checks in julia
-ppc_julia <- function(X, y, initial_values, samplers, iterations, priors, thinning, burn) {
+ppc_julia <- function(X, y, initial_values, iterations, priors, thinning, burn, samplers) {
 
   # Unroll initial values
   w <- initial_values$w
   sigma <- initial_values$sigma
+
+  # Call Julia function for posterior predictive checks
   return(
     .blm$julia$eval("ppc_draws")(X, as.numeric(y), w, sigma,
                                  as.integer(iterations), as.integer(thinning),
-                                 as.integer(burn), unname(priors))
+                                 as.integer(burn), unname(priors), samplers)
   )
 
 }
@@ -301,4 +303,9 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
     )
   )
 
+}
+
+## Sample size helper
+sample_size <- function(n, pk) {
+  n / (1 + 2 * sum(pk))
 }

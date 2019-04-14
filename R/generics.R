@@ -23,7 +23,7 @@ set_sampling_options <- function(x, ...) {
 #' @return updated blm object
 #' @export
 set_sampler <- function(x, ...) {
-  UseMethod("set_sampler")
+  UseMethod("set_sampler", x)
 }
 
 #' Set initial values for a chain
@@ -34,7 +34,7 @@ set_sampler <- function(x, ...) {
 #' @return updated blm object
 #' @export
 set_initial_values <- function(x, ...) {
-  UseMethod("set_initial_values")
+  UseMethod("set_initial_values", x)
 }
 
 #' Set priors for a blm object
@@ -45,7 +45,7 @@ set_initial_values <- function(x, ...) {
 #' @return updated blm object with new priors
 #' @export
 set_prior <- function(x, ...) {
-  UseMethod("set_prior")
+  UseMethod("set_prior", x)
 }
 
 #' Sample the posterior distribution
@@ -97,7 +97,7 @@ get_posterior_samples <- function(x) {
 #' @return prints summary of the ppc to the R console
 #' @export
 evaluate_ppc <- function(x, ...) {
-  UseMethod("evaluate_ppc")
+  UseMethod("evaluate_ppc", x)
 }
 
 #' Assess blm model fit
@@ -107,7 +107,7 @@ evaluate_ppc <- function(x, ...) {
 #' @return prints summary of model fit (DIC) to the R console
 #' @export
 evaluate_model_fit <- function(x) {
-  UseMethod("evaluate_model_fit")
+  UseMethod("evaluate_model_fit", x)
 }
 
 #' Print diagnostics
@@ -117,7 +117,18 @@ evaluate_model_fit <- function(x) {
 #' @return prints summary of convergence diagnostics to R console
 #' @export
 convergence_diagnostics <- function(x) {
-  UseMethod("convergence_diagnostics")
+  UseMethod("convergence_diagnostics", x)
+}
+
+#' Calculate the effective sample size
+#'
+#' @param x a blm object
+#'
+#' @return prints effective sample size information to screen
+#'
+#' @export
+evaluate_effective_sample_size <- function(x) {
+  UseMethod("evaluate_effective_sample_size", x)
 }
 
 ## Internal use only, not exported -----
@@ -127,7 +138,7 @@ convergence_diagnostics <- function(x) {
 #' @param x object with a get_value() method
 #' @param var string. name of the value to retrieve from the object.
 get_value <- function(x, var) {
-  UseMethod("get_value")
+  UseMethod("get_value", x)
 }
 
 #' Set a value for an S3 object
@@ -136,37 +147,37 @@ get_value <- function(x, var) {
 #' @param var string. name of the value you want to change
 #' @param val new value for var
 set_value <- function(x, var, val) {
-  UseMethod("set_value")
+  UseMethod("set_value", x)
 }
 
 # Set priors on an S3 object (blm/priors)
 set_priors <- function(x, ...) {
-  UseMethod("set_priors")
+  UseMethod("set_priors", x)
 }
 
 # Set options (sampler object)
 set_options <- function(x, ...) {
-  UseMethod("set_options")
+  UseMethod("set_options", x)
 }
 
 # Given a sampling plan (sampler object), sample the posterior distribution (resulting in a posterior object)
 postsamp <- function(x,...) {
-  UseMethod("postsamp")
+  UseMethod("postsamp", x)
 }
 
 # Combine existing posterior samples with newly sampled posterior samples (posterior object)
 append_samples <- function(x, ...) {
-  UseMethod("append_samples")
+  UseMethod("append_samples", x)
 }
 
 # Burn n samples from a posterior distribution (posterior object)
 burn <- function(x, ...) {
-  UseMethod("burn")
+  UseMethod("burn", x)
 }
 
 # Bind all samples from all chains together (posterior object)
 bind <- function(x, ...) {
-  UseMethod("bind")
+  UseMethod("bind", x)
 }
 
 # Retrieve maximum a posteriori (MAP) estimates (posterior object)
@@ -189,6 +200,11 @@ burnin_diagnostic <- function(x, ...) {
   UseMethod("burnin_diagnostic", x)
 }
 
+# Calculate effective sample size (posterior object)
+effss <- function(x, ...) {
+  UseMethod("effss", x)
+}
+
 # ---------- Functions for priors ---------------
 
 #' Draw a value from a prior distribution
@@ -197,7 +213,7 @@ burnin_diagnostic <- function(x, ...) {
 #'
 #' @return random variate drawn from a Normal or Gamma distribution
 draw_value <- function(x) {
-  UseMethod("draw_value")
+  UseMethod("draw_value", x)
 }
 
 # ---------- Functions for posterior predictive checks ----------
@@ -208,7 +224,7 @@ draw_value <- function(x) {
 #'
 #' @return posterior predictive check for normality assumption
 normality_check <- function(x, ...) {
-  UseMethod("normality_check")
+  UseMethod("normality_check", x)
 }
 
 #' Check a posterior sample for homoskedasticity assumption
@@ -217,7 +233,7 @@ normality_check <- function(x, ...) {
 #'
 #' @return posterior predictive check for homoskedasticity assumption
 homoskedast_check <- function(x, ...) {
-  UseMethod("homoskedast_check")
+  UseMethod("homoskedast_check", x)
 }
 
 #' Check a posterior sample for independence of errors assumption
@@ -226,7 +242,7 @@ homoskedast_check <- function(x, ...) {
 #'
 #' @return posterior predictive check for independence of errors assumption
 independence_check <- function(x, ...) {
-  UseMethod("independence_check")
+  UseMethod("independence_check", x)
 }
 
 #' Check a posterior sample for the assumption that errors are normally distributed with mean mu and sd sigma
@@ -235,5 +251,5 @@ independence_check <- function(x, ...) {
 #'
 #' @return posterior predictive check on normal distribution of errors assumption
 norm_of_errors_check <- function(x, ...) {
-  UseMethod("norm_of_errors_check")
+  UseMethod("norm_of_errors_check", x)
 }

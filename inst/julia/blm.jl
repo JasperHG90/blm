@@ -15,8 +15,8 @@ PART I: MCMC sampler in in Julia
 =#
 
 function MCMC_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
-                       sigma::Float64, iterations::Int, thinning::Int, priors
-                       samplers; zeta=0)
+                       sigma::Float64, iterations::Int, thinning::Int, priors,
+                       samplers)
 
     #=
     Run the MCMC sampler to obtain the conditional posterior coefficients / sigma values
@@ -47,7 +47,7 @@ function MCMC_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
         for j in 1:thinning
 
           # One step of the MCMC sampler
-          r = MCMC_one_step(X, y, w, sigma, priors, samplers, zeta)
+          r = MCMC_one_step(X, y, w, sigma, priors, samplers)
 
           # Set new values for weights and sigma
           w = r["w"]
@@ -93,7 +93,7 @@ function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
         # If j == nparam, then sigma
         if j == length(priors)
 
-            sigma = gibbs_one_step_resvar(X, w, y, priors[j][:alpha]), priors[j][:beta])
+            sigma = gibbs_one_step_resvar(X, w, y, priors[j][:alpha], priors[j][:beta])
 
         # Else, coefficient
         # See the Appendix in 'docs' folder (section 5) for an elaboration on the calculation of posterior values
@@ -101,12 +101,12 @@ function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
             ## Check sampler
             ## Use Gibbs sampling? ==> sample conditional posteriors
-            if samplers[j] == "gibbs"
+            if samplers[j] == "Gibbs"
 
-                w[j] = gibbs_one_step_coef(X, y, w, sigma, priors[j][:mu], priors[j][:sd])
+                w[j] = gibbs_one_step_coef(X, y, w, sigma, priors[j][:mu], priors[j][:sd], j)
 
             ## Use MH sampling? ==> sample conditional posteriors that are proportional up to a constant
-            else if samplers[j] == "MH"
+            elseif samplers[j] == "MH"
 
                 w[j] = MH_one_step_coef(w[j], X[:, j], X[:, 1:end .!= j], y,
                                         w[1:end .!= j], sigma, priors[j][:mu],
@@ -132,7 +132,7 @@ function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
     end;
 
-function MH_one_step_coef(b_previous::Float64, xj::Array{Float64}, X::Arrat{Float64}, y::Array{Float64},
+function MH_one_step_coef(b_previous::Float64, xj::Array{Float64}, X::Array{Float64}, y::Array{Float64},
                      w::Array{Float64}, sigma::Float64, prior_mu::Float64, prior_tau::Float64,
                      zeta::Float64)
 
@@ -166,7 +166,7 @@ function MH_one_step_coef(b_previous::Float64, xj::Array{Float64}, X::Arrat{Floa
 
     end;
 
-function gibbs_one_step_coef(X, y, w, sigma, prior_mu, prior_sd)
+function gibbs_one_step_coef(X, y, w, sigma, prior_mu, prior_sd, j::Int)
 
     return(
         rand(Normal(posterior_mu(X[:,1:end .!= j], X[:,j], y, w[1:end .!= j], sigma,
@@ -266,7 +266,7 @@ function posterior_scale(X::Array{Float64}, w::Array{Float64}, y::Array{Float64}
 
     end;
 
-function posterior_coef(bj::Float64, xj::Array{Float64}, X::Arrat{Float64}, y::Array{Float64},
+function posterior_coef(bj::Float64, xj::Array{Float64}, X::Array{Float64}, y::Array{Float64},
                         w::Array{Float64}, sigma::Float64, prior_mu::Float64, prior_tau::Float64)
 
     #=
@@ -287,7 +287,8 @@ PART II: Posterior Predictive Checks
 =#
 
 function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
-                       sigma::Float64, iterations::Int, thinning::Int, burn::Int, priors)
+                   sigma::Float64, iterations::Int, thinning::Int, burn::Int,
+                   priors, samplers)
 
     #=
     Perform posterior predictive checking.
@@ -311,7 +312,7 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     =#
 
     # 1. Call the gibbs sampler
-    sampled = gibbs_sampler(X, y, w, sigma, iterations, thinning, priors)
+    sampled = MCMC_sampler(X, y, w, sigma, iterations, thinning, priors, samplers)
 
     # 2. Burn
     sampled = sampled[burn+1:end, :]

@@ -18,7 +18,9 @@ Imports:
   tidyr,
   ggplot2,
   scales,
-  crayon
+  crayon,
+  stats,
+  stringr
 Depends:
   magrittr,
   R (>= 3.4.0)

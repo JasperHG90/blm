@@ -10,12 +10,16 @@ blm(formula, data)
 \item{formula}{linear regression formula}
 
 \item{data}{data frame containing the variables in the linear regression formula}
-
-\item{center}{TRUE if you want to grand-mean center the continuous variables in the data}
 }
 \value{
 blm object containing roadmap for bayesian linear modeling
 }
 \description{
 The blm() function sets up the bayesian linear model
+}
+\examples{
+data("attitudes") # Load simulated data
+bfit <- blm("attitude ~ .", data = attitudes)
+print(bfit)
+
 }

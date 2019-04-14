@@ -82,11 +82,13 @@ summary.blm <- function(x) {
   MAPV <- t(do.call(rbind, MAP(get_value(x, "posterior"))))
   # Add MC error
   MAPV <- cbind(MAPV, MAPV[,2] / sqrt(x$sampling_settings$chain_1$iterations))
+  # Add TS error using effective sample size
+  MAPV <- cbind(MAPV, MAPV[,2] / sqrt(get_value(x, "posterior") %>% effss()))
   # Round
-  MAPV <- round(MAPV, digits = 3)
+  MAPV <- round(MAPV, digits=3)
 
   # Amend names
-  colnames(MAPV) <- c("Est. (mean)", "SD", "MCERR.")
+  colnames(MAPV) <- c("Est. (mean)", "SD", "NAIVE MCERR.", "TS MCERR.")
 
   # Calculate CI
   CIV <- t(round(CCI(get_value(x, "posterior")), digits = 3))
@@ -337,7 +339,7 @@ set_sampler.blm <- function(x, par, type = c("Gibbs", "MH")) {
 #' @importFrom magrittr '%>%'
 #' @rdname set_initial_values
 #' @examples
-#' bfit <- set_value_values(bfit, chain_1 = list("b" = c(2,5,3,4,5), sigma=0.1))
+#' bfit <- set_initial_values(bfit, chain_1 = list("b" = c(2,5,3,4,5), sigma=0.1))
 #'
 #' @export
 set_initial_values.blm <- function(x, ...) {
@@ -644,7 +646,7 @@ evaluate_ppc.blm <- function(x, iterations = 2000) {
                         as.integer(burn))
 
   # Call the gibbs sampler, simulate y values and compute residuals
-  r <- ppc_julia(X, y, iv, samplers, iterations, priors, thinning, burn)
+  r <- ppc_julia(X, y, iv, iterations, priors, thinning, burn, samplers)
 
   # Add results
   inputs$data$initial_values <- iv
@@ -683,6 +685,26 @@ evaluate_model_fit.blm <- function(x) {
   cat(crayon::bold("Model fit for blm object:\n\n"))
   print.listof(
     list("Model DIC"=final)
+  )
+
+}
+
+# Effective sample size
+#' @export
+evaluate_effective_sample_size.blm <- function(x) {
+
+  # Effective sample size
+  eff <- get_value(x, "posterior") %>%
+    effss(.)
+
+  # To df
+  df <- data.frame(n = eff)
+  row.names(df) <- c(x$sampling_settings$chain_1$varnames, "sigma")
+
+  # Names
+  cat(crayon::bold("Effective sample size for blm object:\n\n"))
+  print.listof(
+    list("Effective sample size"=df)
   )
 
 }

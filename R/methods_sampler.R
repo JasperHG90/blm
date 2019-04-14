@@ -40,7 +40,7 @@ postsamp.sampler <- function(x, X, y, priors) {
     zeta <- get_value(z, "zeta")
 
     # Call mc sampler
-    r <- mc_sampler(X, y, initial_values_current, iterations, thinning, priors, samplers, zeta)
+    r <- mc_sampler(X, y, initial_values_current, iterations, thinning, priors, samplers)
 
     # Add names
     colnames(r) <- c(z$varnames, "sigma")

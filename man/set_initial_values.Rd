@@ -23,6 +23,6 @@ updated blm object
 Set initial values for a chain
 }
 \examples{
-bfit <- set_value_values(bfit, chain_1 = list("b" = c(2,5,3,4,5), sigma=0.1))
+bfit <- set_initial_values(bfit, chain_1 = list("b" = c(2,5,3,4,5), sigma=0.1))
 
 }

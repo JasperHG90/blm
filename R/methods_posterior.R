@@ -78,6 +78,34 @@ CCI.posterior <- function(x) {
 
 }
 
+# Calculate the effective sample size for a MCMC sample
+#' @importFrom stats acf
+effss.posterior <- function(x, order=30) {
+
+  # Bind data
+  x <- bind(x)
+
+  ## Compute estimates of autocorrelation
+  autocorr <- stats::acf(x, lag.max = order, type =c("correlation"),
+                         plot = FALSE, na.action = na.fail, demean = TRUE)
+
+  ## Get n
+  n <- nrow(x)
+
+  ## Results matrix
+  ss <- rep(0, ncol(x))
+
+  ## Populate
+  for(i in 1:ncol(x)) {
+    ## SUBSET: 2 - order (input), ith variable, ith variable.
+    ss[i] <- sample_size(n=n, pk = autocorr$acf[2:order, i, i])
+  }
+
+  ## Return sample size
+  return(ss)
+
+}
+
 # Gelman-rubin statistic
 #https://blog.stata.com/2016/05/26/gelman-rubin-convergence-diagnostic-using-multiple-chains/
 # Compare the within / between variances

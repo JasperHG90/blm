@@ -8,9 +8,13 @@
 #'
 #' @param formula linear regression formula
 #' @param data data frame containing the variables in the linear regression formula
-#' @param center TRUE if you want to grand-mean center the continuous variables in the data
 #'
 #' @return blm object containing roadmap for bayesian linear modeling
+#' @examples
+#' data("attitudes") # Load simulated data
+#' bfit <- blm("attitude ~ .", data = attitudes)
+#' print(bfit)
+#'
 #' @export
 blm <- function(formula, data) {
 
