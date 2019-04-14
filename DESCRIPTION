@@ -20,7 +20,8 @@ Imports:
   scales,
   crayon,
   stats,
-  stringr
+  stringr,
+  ggExtra
 Depends:
   magrittr,
   R (>= 3.4.0)

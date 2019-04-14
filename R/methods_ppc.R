@@ -39,6 +39,7 @@ print.ppc <- function(ppc) {
 #' @importFrom ggplot2 aes
 #' @importFrom ggplot2 theme_bw
 #' @importFrom ggplot2 ggtitle
+#' @importFrom ggExtra ggMarginal
 #' @export
 plot.ppc <- function(ppc, type=c("normality", "heteroskedasticity", "independence")) {
 
@@ -54,18 +55,27 @@ plot.ppc <- function(ppc, type=c("normality", "heteroskedasticity", "independenc
 
   # Plot data
   data <- data %>%
-    as.data.frame() %>%
-    tidyr::gather(dataset, value)
+    as.data.frame()
+
+  # Add index
+  data$index <- 1:nrow(data)
+
+  # Gather data
+  data <- tidyr::gather(data, dataset, value, -index)
 
   # Update labels
   data$dataset <- ifelse(data$dataset == "V1", "Simulated", "Observed")
 
   # Plot
-  data %>%
-    ggplot2::ggplot(., ggplot2::aes(x=value, fill=dataset)) +
-    ggplot2::geom_density(alpha=0.6) +
+  p <- ggplot2::ggplot(data, ggplot2::aes(x=index, y=value, color=dataset)) +
+    ggplot2::geom_point(alpha=0.5) +
     ggplot2::theme_bw() +
+    ggplot2::theme(legend.position = "top") +
     ggplot2::ggtitle(paste0("Observed and simulated results for test '", type, "'"))
+
+  # Add marginal histogram
+  ggExtra::ggMarginal(p, type = "histogram", margins="y", groupColour = FALSE, alpha=0.3,
+                      groupFill = TRUE)
 
 }
 

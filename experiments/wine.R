@@ -1,6 +1,7 @@
 # Load wine data
 wine <- rattle.data::wine
 
+
 hist(wine$Alcohol)
 hist(wine$Ash)
 hist(wine$Alcalinity)
@@ -13,7 +14,8 @@ wine2 <- data.frame(
   "Ash" = wine$Ash,
   "Alcalinity" = wine$Alcalinity,
   "Phenols" = wine$Phenols,
-  "Nonflavanoids" = wine$Nonflavanoids
+  "Nonflavanoids" = wine$Nonflavanoids,
+  "Type" = wine$Type
 )
 
 # Set up blm
@@ -26,7 +28,7 @@ wine2[,2:5] <- scale(wine2[,2:5], center=TRUE, scale=FALSE)
 wine_fit <- blm("Alcohol ~ .",
                 data=wine2) %>%
   # Update sampling settings
-  set_sampling_options(., chains = 3, iterations = 25000, burn = 2000,
+  set_sampling_options(., chains = 3, iterations = 12000, burn = 2000,
                        thinning=2) %>%
   # Sample posterior
   sample_posterior()
@@ -50,6 +52,12 @@ summary(wine_fit)
 # Posterior predictive checks
 wine_ppc <- wine_fit %>%
   evaluate_ppc(3000)
+
+# Summary
+summary(wine_ppc)
+
+# Plot
+plot(wine_ppc, "normality")
 
 # Model fit
 wine_fit %>%
