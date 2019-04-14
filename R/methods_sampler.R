@@ -42,6 +42,11 @@ postsamp.sampler <- function(x, X, y, priors) {
     # Call mc sampler
     r <- mc_sampler(X, y, initial_values_current, iterations, thinning, priors, samplers)
 
+    # Accepted draws
+    accepts <- r$accepted
+    # Posterior
+    r <- r$posterior
+
     # Add names
     colnames(r) <- c(z$varnames, "sigma")
 
@@ -60,11 +65,13 @@ postsamp.sampler <- function(x, X, y, priors) {
 
 # Updating sampling options
 set_options.sampler <- function(x, chains = 1, iterations = 10000,
-                                burn = 1000, thinning = 1, varnames, priors) {
+                                burn = 1000, thinning = 1, varnames, priors,
+                                samplers) {
 
   # Create chains
   x <- sampler(chains = chains, iterations = iterations, burn = burn,
-               thinning = thinning, varnames, priors)
+               thinning = thinning, vars = varnames, priors = priors,
+               samplers = samplers)
 
   # Return
   return(x)
@@ -96,10 +103,11 @@ set_sampler.sampler <- function(x, label, type = c("Gibbs", "MH"), zeta=0.25) {
   for( i in seq_along(x) ) {
 
     # Set new value
-    x[[i]][["samplers"]][which(labs == label)] <- type
-
-    # Add zeta
-    x[[i]][["samplers"]]
+    if(type == "MH") {
+      x[[i]][["samplers"]][[which(labs == label)]] <- list(type, zeta)
+    } else {
+      x[[i]][["samplers"]][[which(labs == label)]] <- list(type)
+    }
 
   }
 

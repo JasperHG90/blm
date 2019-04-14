@@ -38,6 +38,9 @@ function MCMC_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
         - Gelman, A., Stern, H. S., Carlin, J. B., Dunson, D. B., Vehtari, A., & Rubin, D. B. (2013). Bayesian data analysis. Chapman and Hall/CRC.
     =#
 
+    # Open up results for accepted draws
+    accepted = zeros(size(X)[2] + 1)
+
     # Open up a results matrix
     res = Array{Float64}(undef, iterations, (size(X)[2] + 1))
 
@@ -52,6 +55,7 @@ function MCMC_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
           # Set new values for weights and sigma
           w = r["w"]
           sigma = r["sigma"]
+          accepted += r["accepted"]
 
           end;
 
@@ -65,12 +69,17 @@ function MCMC_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     res[:,end] = sqrt.(res[:,end])
 
     # Return results
-    return(res)
+    return(
+        Dict(
+            "posterior" => res,
+            "accepted" => accepted
+        )
+    )
 
     end;
 
 function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
-                        sigma::Float64, priors, samplers; zeta=0)
+                        sigma::Float64, priors, samplers)
 
     #=
     Run a single iteration of the gibbs sampler
@@ -87,6 +96,9 @@ function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
                 conditional posterior values for each parameter.
     =#
 
+    # Local value for accepted draws
+    accepted = zeros(size(X)[2] + 1)
+
     # For each prior / parameter, do
     for j in 1:length(priors)
 
@@ -94,6 +106,8 @@ function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
         if j == length(priors)
 
             sigma = gibbs_one_step_resvar(X, w, y, priors[j][:alpha], priors[j][:beta])
+            # Increment accepted
+            accepted[j] += 1
 
         # Else, coefficient
         # See the Appendix in 'docs' folder (section 5) for an elaboration on the calculation of posterior values
@@ -101,16 +115,27 @@ function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
             ## Check sampler
             ## Use Gibbs sampling? ==> sample conditional posteriors
-            if samplers[j] == "Gibbs"
+            if samplers[j][1] == "Gibbs"
 
                 w[j] = gibbs_one_step_coef(X, y, w, sigma, priors[j][:mu], priors[j][:sd], j)
+                # Increment accepted
+                accepted[j] += 1
 
             ## Use MH sampling? ==> sample conditional posteriors that are proportional up to a constant
-            elseif samplers[j] == "MH"
+        elseif samplers[j][1] == "MH"
 
-                w[j] = MH_one_step_coef(w[j], X[:, j], X[:, 1:end .!= j], y,
+                local b_current::Dict
+
+                # Call Metropolis-Hastings algorithm
+                b_current = MH_one_step_coef(w[j], X[:, j], X[:, 1:end .!= j], y,
                                         w[1:end .!= j], sigma, priors[j][:mu],
-                                        priors[j][:sd], zeta)
+                                        priors[j][:sd], samplers[j][2])
+
+                # Set new value for w
+                w[j] = b_current["samp"]
+
+                # Set accepted
+                accepted[j] = b_current["accepted"]
 
             else
 
@@ -126,7 +151,8 @@ function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     return(
         Dict(
             "w" => w,
-            "sigma" => sigma
+            "sigma" => sigma,
+            "accepted" => accepted
         )
     )
 
@@ -313,6 +339,9 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
     # 1. Call the gibbs sampler
     sampled = MCMC_sampler(X, y, w, sigma, iterations, thinning, priors, samplers)
+
+    # Subset
+    sampled = sampled["posterior"]
 
     # 2. Burn
     sampled = sampled[burn+1:end, :]

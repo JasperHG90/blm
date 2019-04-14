@@ -1,3 +1,5 @@
+rm(list=ls())
+
 # Load wine data
 wine <- rattle.data::wine
 
@@ -27,15 +29,21 @@ wine2[,2:5] <- scale(wine2[,2:5], center=TRUE, scale=FALSE)
 # Make the object
 wine_fit <- blm("Alcohol ~ .",
                 data=wine2) %>%
+  # Update samplers
+  set_sampler("b1", type="MH") %>%
   # Update sampling settings
-  set_sampling_options(., chains = 3, iterations = 12000, burn = 2000,
-                       thinning=2) %>%
-  # Sample posterior
+  set_sampling_options(., chains = 2, iterations = 10000, burn = 2000,
+                       thinning=1) %>%
+  # Sample the posterior
   sample_posterior()
 
 # Convergence diagnostics
 wine_fit %>%
   convergence_diagnostics()
+
+# Update posterior
+wine_fit <- wine_fit %>%
+  update_posterior(20000)
 
 # Effective sample size
 wine_fit %>%
@@ -57,14 +65,11 @@ wine_ppc <- wine_fit %>%
 summary(wine_ppc)
 
 # Plot
-plot(wine_ppc, "normality")
+plot(wine_ppc, "heteroskedasticity")
 
 # Model fit
 wine_fit %>%
   evaluate_model_fit()
-
-# Plot autocorrelation
-plot(wine_ppc, "independence")
 
 library(tidyr)
 indep_corr <- data.frame(

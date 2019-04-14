@@ -4,7 +4,7 @@
 \alias{chain}
 \title{Set up a single chain}
 \usage{
-chain(priors, iterations, burn, thinning, vars, ...)
+chain(priors, iterations, burn, thinning, vars, samplers, ...)
 }
 \description{
 Set up a single chain

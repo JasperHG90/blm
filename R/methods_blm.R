@@ -287,10 +287,13 @@ set_sampling_options.blm <- function(x, chains = 1, iterations = 10000,
   # Retrieve varnames
   vn <- opts$chain_1$varnames
 
+  # Retrieve samplers
+  samplers <- opts$chain_1$samplers
+
   # Call
   x <- get_value(x, "priors") %>%
     # Update options
-    set_options(opts, chains, iterations, burn, thinning, vn, .) %>%
+    set_options(opts, chains, iterations, burn, thinning, vn, ., samplers) %>%
     # Set results as new sampling objects
     set_value(x, "sampling_settings", .)
 
@@ -695,7 +698,8 @@ evaluate_effective_sample_size.blm <- function(x) {
 
   # Effective sample size
   eff <- get_value(x, "posterior") %>%
-    effss(.)
+    effss(order=15) %>%
+    round()
 
   # To df
   df <- data.frame(n = eff)

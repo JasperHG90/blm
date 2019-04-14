@@ -44,7 +44,7 @@ mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, sampl
 
   # TODO: ensure that user passes valid iterations / priors (integers)
   r <- .blm$julia$eval("MCMC_sampler")(X, as.numeric(y), w, sigma, as.integer(iterations),
-                                       as.integer(thinning), unname(priors), samplers)
+                                       as.integer(thinning), unname(priors), unname(samplers))
 
   # Burn
   return(r)
@@ -86,7 +86,7 @@ ppc_julia <- function(X, y, initial_values, iterations, priors, thinning, burn, 
   return(
     .blm$julia$eval("ppc_draws")(X, as.numeric(y), w, sigma,
                                  as.integer(iterations), as.integer(thinning),
-                                 as.integer(burn), unname(priors), samplers)
+                                 as.integer(burn), unname(priors), unname(samplers))
   )
 
 }

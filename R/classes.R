@@ -31,10 +31,16 @@ blm <- function(formula, data) {
   # Define priors
   priors_init <- priors(j, vn)
 
+  # Set samplers to Gibbs
+  # j coefficients + sigma
+  samplers <- lapply(1:(j+1), function(x) list("Gibbs"))
+  # Set names
+  names(samplers) <- c(paste0("b", 0:(j-1)), "sigma")
+
   # Set up sampler settings
   # Note these are defaults
   samplers_init <- sampler(chains = 1, iterations = 10000, burn = 1000,
-                           thinning = 1, vn, priors_init)
+                           thinning = 1, vn, priors_init, samplers)
 
   # Collect data, add class & return
   final <- list(
@@ -155,14 +161,14 @@ prior <- function(density, ...) {
 #' Sets up a sampler class
 #'
 #' @return sampler object
-sampler <- function(chains, iterations, burn, thinning, vars, priors) {
+sampler <- function(chains, iterations, burn, thinning, vars, priors, samplers) {
 
   # Initialize settings
   chains_init <- vector("list", chains)
 
   # Fill chain
   for(i in seq_along(chains_init)) {
-    chains_init[[i]] <- chain(priors, iterations, burn, thinning, vars)
+    chains_init[[i]] <- chain(priors, iterations, burn, thinning, vars, samplers)
   }
 
   # Names
@@ -177,7 +183,7 @@ sampler <- function(chains, iterations, burn, thinning, vars, priors) {
 }
 
 #' Set up a single chain
-chain <- function(priors, iterations, burn, thinning, vars, ...) {
+chain <- function(priors, iterations, burn, thinning, vars, samplers, ...) {
 
   pts <- list(...)
 
@@ -195,10 +201,9 @@ chain <- function(priors, iterations, burn, thinning, vars, ...) {
     "thinning" = as.integer(thinning),
     "params" = paste0("b", 0:length(vars)),
     "varnames" = vars,
-    "samplers" = rep("Gibbs", length(vars)),
+    "samplers" = samplers,
     "initial_values" = initialize_chain_values(priors),
-    "inits_user_defined" = inits_user_defined,
-    "zeta" = 0.25
+    "inits_user_defined" = inits_user_defined
   )
 
   # Return

@@ -4,7 +4,7 @@
 \alias{sampler}
 \title{Sets up a sampler class}
 \usage{
-sampler(chains, iterations, burn, thinning, vars, priors)
+sampler(chains, iterations, burn, thinning, vars, priors, samplers)
 }
 \value{
 sampler object
