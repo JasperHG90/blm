@@ -1,5 +1,7 @@
 # Core blm functions
 
+# Export ----
+
 #' Create a blm object
 #'
 #' The blm() function sets up the bayesian linear model
@@ -44,6 +46,8 @@ blm <- function(formula, data) {
   return(final)
 
 }
+
+# Internal use only -----
 
 #' Priors class
 #'

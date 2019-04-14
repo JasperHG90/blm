@@ -22,7 +22,7 @@ print.sampler <- function(x) {
 }
 
 # Sample the posterior distribution
-#' @importFrom maggritr '%>%'
+#' @importFrom magrittr '%>%'
 postsamp.sampler <- function(x, X, y, priors) {
 
   # Set burn

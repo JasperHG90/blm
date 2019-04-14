@@ -421,6 +421,46 @@ Autocorrelation is not an issue for these data and model.
 autocor_plot(posterior_sampled)
 ```
 
+We can also calculate the effective sample size.
+
+```{r}
+## Sample size helper
+sample_size <- function(n, pk) {
+  n / (1 + 2 * sum(pk))
+}
+
+effss <- function(posterior, order=30) {
+  
+  ## Compute estimates of autocorrelation
+  autocorr <-acf(posterior, lag.max = order, type =c("correlation"),
+                 plot = FALSE, na.action = na.fail, demean = TRUE)
+  
+  ## Get n
+  n <- nrow(posterior)
+  
+  ## Results matrix
+  ss <- rep(0, ncol(posterior))
+  
+  ## Populate
+  for(i in 1:ncol(posterior)) {
+    ## SUBSET: 2 - order (input), ith variable, ith variable.
+    ss[i] <- sample_size(n=n, pk = autocorr$acf[2:order, i, i])
+  }
+  
+  ## Return sample size
+  return(ss)
+  
+} 
+
+effss(posterior_sampled, order=15)
+```
+
+or, using the `mcmcse` package
+
+```{r}
+mcmcse::ess(posterior_sampled)
+```
+
 ## Mixing MH and Gibbs samplers
 
 In this final step, we will sample $\beta_0$ using the MH algorithm while sampling the other parameters using the Gibbs sampler.
@@ -647,6 +687,16 @@ grid.arrange(p1, p2, ncol=2)
 
 ```{r}
 autocor_plot(posterior_sampled_mh)
+```
+
+The effective sample size has decreased rather rapidly thanks to the higher autocorrelation in the MH samples.
+
+```{r}
+effss(posterior_sampled_mh)
+```
+
+```{r}
+mcmcse::ess(posterior_sampled_mh)
 ```
 
 ```{r, echo=FALSE}
