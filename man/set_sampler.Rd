@@ -7,7 +7,8 @@
 \usage{
 set_sampler(x, ...)
 
-\method{set_sampler}{blm}(x, par, type = c("Gibbs", "MH"))
+\method{set_sampler}{blm}(x, par, type = c("Gibbs", "MH"),
+  lambda = 0.25)
 }
 \arguments{
 \item{x}{a blm object}
@@ -17,6 +18,8 @@ set_sampler(x, ...)
 \item{par}{name of the coefficient, given as b0 (intercept) or b1, ... for coefficients.}
 
 \item{type}{name of the sampler to use. Either 'Gibbs' or 'MH'. Defaults to 'Gibbs'.}
+
+\item{lambda}{tuning parameter for the variance of the proposal distribution in metropolis-hastings}
 }
 \value{
 updated blm object

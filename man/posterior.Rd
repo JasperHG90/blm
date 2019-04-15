@@ -4,7 +4,14 @@
 \alias{posterior}
 \title{Sets up posterior class}
 \usage{
-posterior(samples, burn)
+posterior(samples, burn, accepts)
+}
+\arguments{
+\item{samples}{posterior samples drawn using MCMC algorithm}
+
+\item{burn}{burn-in samples to be removed}
+
+\item{accepts}{vector of length (# of coefficients + 2) indicating the number of accepted draws for each coefficient (this includes sigma and the intercept). For Gibbs, this will always be equal to the number of iterations.}
 }
 \value{
 list containing matrices of chain values (dims: iterations x coef + 1) of object posterior

@@ -26,14 +26,31 @@ blm_setup()
 # Center data
 wine2[,2:5] <- scale(wine2[,2:5], center=TRUE, scale=FALSE)
 
+# SImulate data
+d <- blm:::generate_dataset(n=100, j=3, binary=1, seed=908, heteroskedastic = FALSE, degree=10)
+X <- d$X[,-1]
+y <- d$y
+
+# To data
+wine2 <- data.frame(
+  "Alcohol" = y,
+  "Ash" = X[,1],
+  "Alcalinity" = X[,2],
+  "RedWine" = X[,3]
+)
+
+# Center
+wine2$Ash <- wine2$Ash - mean(wine2$Ash)
+wine2$Alcalinity <- wine2$Alcalinity - mean(wine2$Alcalinity)
+
 # Make the object
 wine_fit <- blm("Alcohol ~ .",
                 data=wine2) %>%
   # Update samplers
-  set_sampler("b1", type="MH") %>%
+  set_sampler("b1", type="MH", lambda = 1) %>%
   # Update sampling settings
-  set_sampling_options(., chains = 2, iterations = 10000, burn = 2000,
-                       thinning=1) %>%
+  set_sampling_options(chains = 2, iterations = 10000,
+                       burn = 2000, thinning=1) %>%
   # Sample the posterior
   sample_posterior()
 
@@ -48,6 +65,10 @@ wine_fit <- wine_fit %>%
 # Effective sample size
 wine_fit %>%
   evaluate_effective_sample_size()
+
+# Accepted draws
+wine_fit %>%
+  evaluate_accepted_draws()
 
 # Plot
 plot(wine_fit, "history")
@@ -65,32 +86,12 @@ wine_ppc <- wine_fit %>%
 summary(wine_ppc)
 
 # Plot
-plot(wine_ppc, "heteroskedasticity")
+plot(wine_ppc, "independence")
 
 # Model fit
 wine_fit %>%
   evaluate_model_fit()
 
-library(tidyr)
-indep_corr <- data.frame(
-  "index" = 1:nrow(corrs),
-  "sampled" = corrs[,1],
-  "observed" = corrs[,2]
-) %>%
-  gather(dataset, value, -index)
-
-
-library(ggplot2)
-p <- ggplot(indep_corr, aes(x=index, y=value, color=dataset, shape=dataset)) +
-  geom_point(alpha=0.5) +
-  theme(legend.position = "top")
-# Add maginals
-ggMarginal(p, type = "histogram", margins="y", groupColour = FALSE, alpha=0.3,
-           groupFill = TRUE)
-
+# Linear model
 winelm <- lm("Alcohol ~ .", data = wine2)
 plot(predict(winelm), resid(winelm))
-
-# Draw more samples
-wine_fit <- wine_fit %>%
-  update_posterior(10000)

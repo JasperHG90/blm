@@ -304,6 +304,7 @@ set_sampling_options.blm <- function(x, chains = 1, iterations = 10000,
 
 #' @param par name of the coefficient, given as b0 (intercept) or b1, ... for coefficients.
 #' @param type name of the sampler to use. Either 'Gibbs' or 'MH'. Defaults to 'Gibbs'.
+#' @param lambda tuning parameter for the variance of the proposal distribution in metropolis-hastings
 #'
 #' @examples
 #' bfit <- set_sampler(bfit, "b0", type="MH")
@@ -311,7 +312,7 @@ set_sampling_options.blm <- function(x, chains = 1, iterations = 10000,
 #' @importFrom magrittr '%>%'
 #' @rdname set_sampler
 #' @export
-set_sampler.blm <- function(x, par, type = c("Gibbs", "MH")) {
+set_sampler.blm <- function(x, par, type = c("Gibbs", "MH"), lambda=0.25) {
 
   # Match arg
   type <- match.arg(type)
@@ -329,7 +330,7 @@ set_sampler.blm <- function(x, par, type = c("Gibbs", "MH")) {
 
   # Update sampler
   x <- get_value(x, "sampling_settings") %>%
-    set_sampler(., par, type = type) %>%
+    set_sampler(., par, type = type, zeta=lambda) %>%
     set_value(x, "sampling_settings", .)
 
   # Return
@@ -694,6 +695,7 @@ evaluate_model_fit.blm <- function(x) {
 
 # Effective sample size
 #' @export
+#' @rdname evaluate_effective_sample_size
 evaluate_effective_sample_size.blm <- function(x) {
 
   # Effective sample size
@@ -709,6 +711,34 @@ evaluate_effective_sample_size.blm <- function(x) {
   cat(crayon::bold("Effective sample size for blm object:\n\n"))
   print.listof(
     list("Effective sample size"=df)
+  )
+
+}
+
+# Accepted draws
+#' @export
+#' @importFrom magrittr '%>%'
+#' @rdname evaluate_accepted_draws
+evaluate_accepted_draws.blm <- function(x) {
+
+  # Get value from posterior
+  acc <- get_value(x, "posterior") %>%
+    get_value(., "accepted")
+
+  # Bind row-wise & transpose
+  acc_b <- t(do.call(rbind.data.frame, acc))
+
+  # Row & column names
+  row.names(acc_b) <- c(x$sampling_settings$chain_1$varnames, "sigma")
+  colnames(acc_b) <- names(acc)
+
+  # To data frame
+  acc_b <- as.data.frame(acc_b)
+
+  # Print
+  cat(crayon::bold("Accepted draws for blm object:\n\n"))
+  print.listof(
+    list("Accepted draws"=acc_b)
   )
 
 }

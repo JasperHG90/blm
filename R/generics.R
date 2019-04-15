@@ -131,6 +131,18 @@ evaluate_effective_sample_size <- function(x) {
   UseMethod("evaluate_effective_sample_size", x)
 }
 
+#' View the number of accepted posterior draws for each parameter and chain
+#'
+#' If a user chooses to use the Gibbs sampler only, then the number of accepted draws is equal to the number of iterations in each chain. For the Metropolis-Hastings algorithm, this depends on the value of lambda set by the user in the \link[blm]{set_sampler} function.
+#'
+#' @param x a blm object
+#'
+#' @return prints the number of accepted draws for each parameter in each chain to the console
+#' @export
+evaluate_accepted_draws <- function(x) {
+  UseMethod("evaluate_accepted_draws", x)
+}
+
 ## Internal use only, not exported -----
 
 #' Get a value from an S3 object

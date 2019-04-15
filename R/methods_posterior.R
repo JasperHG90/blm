@@ -27,14 +27,20 @@ bind.posterior <- function(x) {
 # Append samples to a posterior distribution
 append_samples.posterior <- function(x, updates) {
 
+  # Get samples
   samples <- get_value(x, "samples")
   new_samples <- get_value(updates, "samples")
 
-  # Combine the posterior samples
-  for(i in seq_along(x)) {
+  # Add the number of accepted values
+  accepts <- get_value(x, "accepted")
+  new_accepts <- get_value(updates, "accepted")
 
-    # Make an append method for posterior class
+  # Combine the posterior samples
+  for(i in seq_along(x[["samples"]])) {
+
+    # Append data
     x[["samples"]][[i]] <- rbind(samples[[i]], new_samples[[i]])
+    x[["accepted"]][[i]] <- accepts[[i]] + new_accepts[[i]]
 
   }
 
@@ -173,7 +179,7 @@ burnin_diagnostic.posterior <- function(x) {
   # Burn
   x <- set_value(x, "samples", burn(x))
 
-  out_post <- lapply(seq_along(x), function(chain_it) {
+  out_post <- lapply(seq_along(x[["samples"]]), function(chain_it) {
 
     # Get current chain
     chain <- x[["samples"]][[chain_it]]

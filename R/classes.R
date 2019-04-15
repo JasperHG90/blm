@@ -214,13 +214,18 @@ chain <- function(priors, iterations, burn, thinning, vars, samplers, ...) {
 
 #' Sets up posterior class
 #'
+#' @param samples posterior samples drawn using MCMC algorithm
+#' @param burn burn-in samples to be removed
+#' @param accepts vector of length (# of coefficients + 2) indicating the number of accepted draws for each coefficient (this includes sigma and the intercept). For Gibbs, this will always be equal to the number of iterations.
+#'
 #' @return list containing matrices of chain values (dims: iterations x coef + 1) of object posterior
-posterior <- function(samples, burn) {
+posterior <- function(samples, burn, accepts) {
 
   # New object
   post <- list(
     "burn" = burn,
-    "samples" = samples
+    "samples" = samples,
+    "accepted" = accepts
   )
 
   # Add structure

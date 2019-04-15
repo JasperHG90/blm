@@ -42,13 +42,14 @@ postsamp.sampler <- function(x, X, y, priors) {
     # Call mc sampler
     r <- mc_sampler(X, y, initial_values_current, iterations, thinning, priors, samplers)
 
-    # Accepted draws
-    accepts <- r$accepted
-    # Posterior
-    r <- r$posterior
+    # Only browse if MH
+    if(!all(r$accepted == iterations)) {
+      #browser()
+      b <- NULL
+    }
 
     # Add names
-    colnames(r) <- c(z$varnames, "sigma")
+    colnames(r$posterior) <- c(z$varnames, "sigma")
 
     # Return
     return(r)
@@ -56,7 +57,8 @@ postsamp.sampler <- function(x, X, y, priors) {
   })
 
   # Add structure
-  posterior_samples <- posterior(posterior_samples, b)
+  posterior_samples <- posterior(lapply(posterior_samples, function(x) x$posterior), b,
+                                 lapply(posterior_samples, function(x) x$accepted))
 
   # Return
   return(posterior_samples)
