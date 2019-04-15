@@ -81,11 +81,11 @@ priors <- function(j, vn) {
       # Set prior
       if ((param-1) > 0) {
 
-        priors[[coef_name]] <- prior("normal", mu=0, sd=10000, varname = vn[param])
+        priors[[coef_name]] <- prior("normal", mu=0, sd=1000, varname = vn[param])
 
       } else {
 
-        priors[[coef_name]] <- prior("normal", mu=0, sd=10000, varname = "Intercept")
+        priors[[coef_name]] <- prior("normal", mu=0, sd=1000, varname = "Intercept")
 
       }
 

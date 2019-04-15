@@ -55,7 +55,10 @@ function MCMC_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
           # Set new values for weights and sigma
           w = r["w"]
           sigma = r["sigma"]
-          accepted += r["accepted"]
+          # If j equal to thinning, add accepts
+          if j == thinning
+              accepted += r["accepted"]
+            end;
 
           end;
 
@@ -128,8 +131,8 @@ function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
                 # Call Metropolis-Hastings algorithm
                 b_current = MH_one_step_coef(w[j], X[:, j], X[:, 1:end .!= j], y,
-                                        w[1:end .!= j], sigma, priors[j][:mu],
-                                        priors[j][:sd], samplers[j][2])
+                                            w[1:end .!= j], sigma, priors[j][:mu],
+                                            priors[j][:sd], samplers[j][2])
 
                 # Set new value for w
                 w[j] = b_current["samp"]
@@ -159,8 +162,8 @@ function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     end;
 
 function MH_one_step_coef(b_previous::Float64, xj::Array{Float64}, X::Array{Float64}, y::Array{Float64},
-                     w::Array{Float64}, sigma::Float64, prior_mu::Float64, prior_tau::Float64,
-                     zeta::Float64)
+                         w::Array{Float64}, sigma::Float64, prior_mu::Float64, prior_tau::Float64,
+                         zeta::Float64)
 
     #=
     Perform one draw (iteration) of the Metropolis-Hastings sampler
@@ -192,7 +195,8 @@ function MH_one_step_coef(b_previous::Float64, xj::Array{Float64}, X::Array{Floa
 
     end;
 
-function gibbs_one_step_coef(X, y, w, sigma, prior_mu, prior_sd, j::Int)
+function gibbs_one_step_coef(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
+                             sigma::Float64, prior_mu::Float64, prior_sd::Float64, j::Int)
 
     return(
         rand(Normal(posterior_mu(X[:,1:end .!= j], X[:,j], y, w[1:end .!= j], sigma,
@@ -202,7 +206,8 @@ function gibbs_one_step_coef(X, y, w, sigma, prior_mu, prior_sd, j::Int)
 
     end;
 
-function gibbs_one_step_resvar(X, w, y, prior_alpha, prior_beta)
+function gibbs_one_step_resvar(X::Array{Float64}, w::Array{Float64}, y::Array{Float64},
+                              prior_alpha::Float64, prior_beta::Float64)
 
     return(
         rand(InverseGamma(posterior_rate(size(X)[1], prior_alpha),
@@ -301,10 +306,10 @@ function posterior_coef(bj::Float64, xj::Array{Float64}, X::Array{Float64}, y::A
     @seealso: implementation notes on GitHub
     =#
 
-    return(
-        -(bj)^2 * ( (( transpose(xj) * xj )/(2*sigma)) + (1 / (2*prior_tau)) ) +
-        bj * ( ( sum(xj .* (y .- X * w))) / sigma ) + (prior_mu / prior_tau)
-    )
+    left = -(bj)^2 * (( sum( transpose(xj) * xj ) / (2*sigma) ) + ( 1 / ( 2*prior_tau ) ))
+    right = bj * ((sum( xj .* (y .- X * w) ) / sigma) + (prior_mu / prior_tau) )
+
+    return(left + right)
 
     end;
 

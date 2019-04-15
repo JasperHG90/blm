@@ -1,0 +1,59 @@
+---
+title: 'Final Assignment: Predicting Alcohol Content in Wine using Bayesian Linear Regression'
+author: "Jasper Ginn (s6100848)"
+date: "April 8, 2019"
+output:
+  pdf_document: 
+    number_sections: false
+header-includes:
+ \usepackage{float}
+ \usepackage{setspace}
+ \usepackage{xcolor}
+ \definecolor{mypurple}{rgb}{146,76,239}
+ \doublespacing
+ \floatplacement{figure}{H}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.pos="H", fig.width = 7, fig.height = 4, echo = FALSE, 
+                      fig.align="center", warning = FALSE, message = FALSE, eval=TRUE)
+```
+
+# Introduction
+
+```{r}
+rm(list=ls())
+# Load wine data
+wine <- rattle.data::wine
+# Create new dataset with desired predictors
+wine2 <- data.frame(
+  "Alcohol" = wine$Alcohol,
+  "Ash" = wine$Ash,
+  "Alcalinity" = wine$Alcalinity,
+  "Phenols" = wine$Phenols,
+  "Nonflavanoids" = wine$Nonflavanoids,
+  "Type" = wine$Type
+)
+
+# Load blm
+library(blm)
+
+# Set up blm
+blm_setup()
+
+# Center data
+wine2[,2:5] <- scale(wine2[,2:5], center=TRUE, scale=FALSE)
+```
+
+```{r}
+# Make the object
+wine_fit1 <- blm("Alcohol ~ .",
+                data=wine2) %>%
+  # Update samplers
+  set_sampler("b1", type="MH", lambda = 0.5) %>%
+  # Update sampling settings
+  set_sampling_options(chains = 2, iterations = 100000,
+                       burn = 20000, thinning=3) %>%
+  # Sample the posterior
+  sample_posterior()
+```

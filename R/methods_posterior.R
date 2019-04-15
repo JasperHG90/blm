@@ -142,12 +142,12 @@ GR.posterior <- function(x, iterations) {
 
     # Get chain means
     cm <- matrix(unname(
-      sapply(burn(x), function(y) mean(y[,j]))
+      sapply(x[["samples"]], function(y) mean(y[,j]))
     ), ncol=1)
 
     # Get chain vars
     cv <- matrix(unname(
-      sapply(burn(x), function(y) var(y[,j]))
+      sapply(x[["samples"]], function(y) var(y[,j]))
     ), ncol=1)
 
     # Subtract parameter mean over all chains

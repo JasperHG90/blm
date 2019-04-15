@@ -266,17 +266,17 @@ set_sampling_options.blm <- function(x, chains = 1, iterations = 10000,
     chains <- as.integer(chains)
   }
   if (missing(iterations)) {
-    iterations <- opts$chain_1$iterations
+    iterations <- as.integer(opts$chain_1$iterations)
   } else {
     iterations <- as.integer(iterations)
   }
   if (missing(burn)) {
-    burn <- opts$chain_1$burn
+    burn <- as.integer(opts$chain_1$burn)
   } else {
     burn <- as.integer(burn)
   }
   if (missing(thinning)) {
-    thinning <- opts$chain_1$thinning
+    thinning <- as.integer(opts$chain_1$thinning)
   } else {
     thinning <- as.integer(thinning)
   }
@@ -497,7 +497,7 @@ update_posterior.blm <- function(x, iterations = 1000) {
   # Set starting values to the last obtained values in the chain
   sampling_settings <- get_value(x, "sampling_settings")
   for(i in seq_along(sampling_settings)) {
-    sampling_settings[[i]]["iterations"] <- iterations
+    sampling_settings[[i]]["iterations"] <- as.integer(iterations)
     sampling_settings[[i]][["initial_values"]][["w"]][,1] <- unname(posterior_samples[["samples"]][[i]][n,1:(m-1)])
     sampling_settings[[i]][["initial_values"]][["sigma"]] <- unname(posterior_samples[["samples"]][[i]][n,m])
   }
