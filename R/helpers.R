@@ -204,8 +204,7 @@ cat.GR <- function(x) {
 #
 # @return data frame with n rows and j columns.
 generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
-                             heteroskedastic = FALSE, center = FALSE,
-                             ...) {
+                             heteroskedastic = FALSE, correlated_errors = FALSE, ...) {
 
   opts <- list(...)
   if("degree" %in% names(opts)) {
@@ -248,6 +247,9 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
   }
   # Intercept + j coefs
   coef <- c(rnorm(1, 0, 20), rnorm(j, 0, 10))
+  sigmaSq <- runif(1, 1, 10)
+
+  #browser()
 
   # Make the example heteroskedastic
   if(heteroskedastic) {
@@ -266,26 +268,47 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
       sigmaSq <- sigmaSq + (abs(X[,i])^pw)
     }
     sigmaSq
+
+    # Add intercept
+    X <- cbind(rep(1, n), X)
+
+    # Generate y
+    y <- rnorm(n,
+               mean = X %*% matrix(coef),
+               sd = sqrt(sigmaSq))
+
+  } else if(correlated_errors) { # Make the example correlated
+
+    # Create a time-series object
+    if(!is.null(seed)) {
+      set.seed(seed)
+    }
+
+    # Correlated values
+    ord <- arima.sim(list(order = c(1,0,0), ar = 0.7), n = n, sd=sqrt(sigmaSq) * degree)
+
+    # Add intercept
+    X <- cbind(rep(1, n), X)
+
+    # Generate y
+    y <- rnorm(n,
+               mean = X %*% matrix(coef) + ord,
+               sd = sqrt(sigmaSq))
+
   } else {
     # Sigma squared
     if(!is.null(seed)) {
       set.seed(seed)
     }
-    sigmaSq <- runif(1, 1, 10)
-  }
-  # Center if desired
-  if(center) {
-    X[,setdiff(1:j, binary_j)] <- apply(X[,setdiff(1:j, binary_j)],
-                                        2, function(x) (x - mean(x)))
-  }
 
-  # Add intercept
-  X <- cbind(rep(1, n), X)
+    # Add intercept
+    X <- cbind(rep(1, n), X)
 
-  # Create y
-  y <- rnorm(n,
-             mean = X %*% matrix(coef),
-             sd = sqrt(sigmaSq))
+    # Generate y
+    y <- rnorm(n,
+               mean = X %*% matrix(coef),
+               sd = sqrt(sigmaSq))
+  }
 
   # List of real values (for later)
   real <- list(

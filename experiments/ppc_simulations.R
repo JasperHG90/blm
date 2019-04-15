@@ -1,30 +1,41 @@
-## Run simulations for posterior predictive checks
+## Simulation study for PPC
 
-dat <- function() {
-  # SImulate data
-  d <- blm:::generate_dataset(n=500, j=3, binary=1, heteroskedastic = FALSE, degree=1)
-  X <- d$X[,-1]
-  y <- d$y
+library(blm)
+blm_setup()
 
-  # Bind
-  df <- as.data.frame(cbind(y, X))
-  colnames(df) <- c("attitude", "extraversion", "agreeableness", "male")
+# iterations
+k <- 1000
 
-  return(df)
+# Results
+sim_res <- matrix(0, ncol=3, nrow=k)
+
+# Loop
+t1 <- Sys.time()
+for(i in 1:k) {
+
+  # Simulate data
+  d <-blm:::generate_dataset(n = 200, j=2, binary = 1, heteroskedastic = FALSE,
+                              correlated_errors = TRUE, degree=0.4)
+
+  # Unroll
+  df <- as.data.frame(cbind(d$y, d$X[,-1]))
+  # Names
+  colnames(df) <- c("y", paste0("x", 1:(ncol(df) - 1)))
+
+  # Blm object
+  bfit <- blm("y ~ .", data=df) %>%
+    set_sampling_options(iterations = 15000, burn = 2000, chains = 2) %>%
+    sample_posterior()
+
+  # Get ppc results
+  ppcr <- bfit %>%
+    evaluate_ppc(iterations = 4000)
+
+  # Store results
+  sim_res[i, ] <- c(ppcr$results$normality, ppcr$results$homosked, ppcr$results$independence)
+
 }
+t2 <- Sys.time() - t1
 
-r1 <- rep(0, 500)
-r2 <- r1
-r3 <- r1
-for(i in 1:100) {
-  # Center
-  datc <- as.data.frame(scale(dat(), center=TRUE, scale=FALSE))
-  fit <- blm("attitude ~ .", data=datc) %>%
-    # Update sampling options
-    set_sampling_options(chains=2, iterations=10000) %>%
-    sample_posterior() %>%
-    evaluate_ppc()
-  r1[i] <- fit$results$homosked
-  r2[i] <- fit$results$normality
-  r3[i] <- fit$results$independence
-}
+# Store data
+saveRDS(sim_res, "experiments/ppc_autocor_data.rds")

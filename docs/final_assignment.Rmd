@@ -57,3 +57,28 @@ wine_fit1 <- blm("Alcohol ~ .",
   # Sample the posterior
   sample_posterior()
 ```
+
+```{r}
+normal <- readRDS("data/ppc_normal_data.rds")
+heter <- readRDS("data/ppc_heteronormal_data.rds")
+corr <- readRDS("data/ppc_autocor_data.rds")
+
+# Load ggplot
+library(ggplot2)
+library(gridExtra)
+
+p1 <- ggplot(data.frame(x=normal[,2]), aes(x=x)) +
+  geom_histogram(color="black") +
+  scale_x_continuous(limits=c(0,1))
+p2 <- ggplot(data.frame(x=normal[,3]), aes(x=x)) +
+  geom_histogram(color="black")+
+  scale_x_continuous(limits=c(0,1))
+p3 <- ggplot(data.frame(x=heter[,2]), aes(x=x)) +
+  geom_histogram(color="black")+
+  scale_x_continuous(limits=c(0,1))
+p4 <- ggplot(data.frame(x=corr[,3]), aes(x=x)) +
+  geom_histogram(color="black")+
+  scale_x_continuous(limits=c(0,1))
+
+grid.arrange(p1, p2, p3, p4)
+```
