@@ -91,6 +91,22 @@ ppc_julia <- function(X, y, initial_values, iterations, priors, thinning, burn, 
 
 }
 
+# R-squared calculation in julia
+bayes_R2 <- function(X, y, initial_values, iterations, priors, thinning, burn, samplers) {
+
+  # Unroll initial values
+  w <- initial_values$w
+  sigma <- initial_values$sigma
+
+  # Call Julia function for posterior predictive checks
+  return(
+    .blm$julia$eval("bayes_R2")(X, as.numeric(y), w, sigma,
+                                 as.integer(iterations), as.integer(thinning),
+                                 as.integer(burn), unname(priors), unname(samplers))
+  )
+
+}
+
 # Model DIC
 # See: http://kylehardman.com/BlogPosts/View/6
 DIC <- function(X, y, posterior_samples) {

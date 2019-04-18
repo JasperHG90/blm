@@ -566,3 +566,56 @@ function DIC(X, y, w, sigma, posterior)
   )
 
   end;
+
+#=
+PART IV: R-squared
+=#
+
+function bayes_R2(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
+                   sigma::Float64, iterations::Int, thinning::Int, burn::Int,
+                   priors, samplers)
+
+    #=
+    Calculate Bayesian R-squared value
+
+    This function calculates the Bayesian R-squared value. For more information, see the article below.
+
+    :param effective_iterations: number of iterations minus burn-in period
+
+    :return: Dictionary containing
+
+        - Posterior_draws ==> Theta values for the posterior distribution
+
+    :seealso: Gelman, A., Goodrich, B., Gabry, J., & Vehtari, A. (2018). R-squared for Bayesian regression models. The American Statistician, (just-accepted), 1-6.
+    =#
+
+    # 1. Call the gibbs sampler
+    sampled = MCMC_sampler(X, y, w, sigma, iterations, thinning, priors, samplers)
+
+    # Subset
+    sampled = sampled["posterior"]
+
+    # 2. Burn
+    sampled = sampled[burn+1:end, :]
+
+    # 3. Precompute linear combinations as a function of X and the posterior set of params theta = [b0,b1,...,bn]
+    lincom = X * transpose(sampled[: , 1:end-1]) # lincom dims: rows(X) * (iterations-burn)
+
+    # 4. Set up a results matrix for simulated yhat values
+    res = Array{Float64}(undef, iterations - burn, 1)
+
+    # 5. Compute R-squared value using new samples
+    for j in 1:(iterations - burn)
+
+        # R2 = var(pred_y) / (var(pred_y) + sigma^2)
+        res[j,1] = var(lincom[:,j]) / (var(lincom[:,j]) + sampled[j, end]^2)
+
+        end;
+
+    # 6. Return
+    return(Dict(
+      "posterior_draws" => sampled,
+      "rsquared" => res
+    ))
+
+    end;

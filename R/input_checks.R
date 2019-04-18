@@ -54,6 +54,9 @@ check_init_blm <- function(formula, data) {
 
   }
 
+  ## Strip row names
+  row.names(data) <- 1:nrow(data)
+
   ## Retrieve variable names from data
   varnames <- colnames(data)
 

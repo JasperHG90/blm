@@ -126,6 +126,11 @@ plot.blm <- function(x, type=c("history",
                                "density"),
                      ...) {
 
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
   # Retrieve posterior data
   pd <- get_value(x, "posterior")
   # Burn
@@ -204,7 +209,7 @@ plot.blm <- function(x, type=c("history",
         ggplot2::theme(legend.position = "None") +
         #geom_smooth(method="lm") +
         ggplot2::facet_wrap("parameter ~ .", scales = "free_y",
-                            ncol=1)
+                            ncol=2)
 
       ## Density plot
 
@@ -228,7 +233,130 @@ plot.blm <- function(x, type=c("history",
 
 }
 
+# Get coefficients from blm object
+#' @export
+coef.blm <- function(x, type = c("mean", "mode", "median")) {
+
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
+  # Match arg if user does not specify type
+  type <- match.arg(type)
+
+  # Bind posterior data
+  pb <- get_posterior_samples(x)
+  # Remove sigma
+  pb <- pb[,-ncol(pb)]
+
+  # Compute
+  r <- switch(type,
+              "mode" = apply(pb, 2, calc_mode),
+              "mean" = apply(pb, 2, mean),
+              "median" = apply(pb, 2, median))
+
+  # Return
+  return(r)
+
+}
+
+# Call coef method using coefficients
+#' @export
+coefficients.blm <- function(x, type = c("mean", "mode", "median")) {
+
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
+  # Match arg
+  type <- match.arg(type)
+
+  # Call coef
+  return(coef(x, type))
+
+}
+
+# Predict method
+#' @export
+predict.blm <- function(x, type = c("mean", "mode", "median")) {
+
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
+  # Match arg
+  type <- match.arg(type)
+
+  # Get coefficients
+  w <- matrix(coef(x, type = type), ncol=1)
+
+  # Predict
+  return(
+    x$input$X %*% w
+  )
+
+}
+
+# Residuals
+#' @export
+residuals.blm <- function(x, type = c("mean", "mode", "median")) {
+
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
+  # Match arg
+  type <- match.arg(type)
+
+  # Predict
+  pred <- predict(x, type=type)
+
+  # Subtract
+  return(x$input$y - pred)
+
+}
+
+# Residuals
+#' @export
+resid.blm <- function(x, type = c("mean", "mode", "median")) {
+
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
+  # Match arg
+  type <- match.arg(type)
+
+  return(residuals(x, type = type))
+
+}
+
 # Functions that build up the blm object with settings etc. ------
+
+# Get variable names and mappings to parameters
+#' @export
+get_parameter_names.blm <- function(x) {
+
+  cat(crayon::bold("Parameter / variable names for blm object:"))
+  cat("\n\n")
+
+  # Retrieve parameter names
+  p <- unlist(lapply(x$priors, function(x) x$varname))[-length(x$priors)-1]
+
+  # To df
+  par_names <- data.frame("variable" = names(p))
+  row.names(par_names) <- unname(p)
+  colnames(par_names) <- ""
+
+  # Print
+  print.listof(list("Mapping" = par_names))
+
+  }
 
 #' @param chains number of chains to initialize
 #' @param iterations number of iterations to run the MC sampler
@@ -483,6 +611,11 @@ sample_posterior.blm <- function(x) {
 #' @importFrom magrittr '%>%'
 update_posterior.blm <- function(x, iterations = 1000) {
 
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
   # unroll data
   X <- x$input$X
   y <- x$input$y
@@ -529,6 +662,11 @@ update_posterior.blm <- function(x, iterations = 1000) {
 #' @export
 delete_posterior.blm <- function(x) {
 
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
   # Set posterior to NULL
   return(set_value(x, "posterior", NULL))
 
@@ -537,6 +675,11 @@ delete_posterior.blm <- function(x) {
 # Retrieve posterior samples
 #' @export
 get_posterior_samples.blm <- function(x) {
+
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
 
   # Bind method on posterior samples
   get_value(x, "posterior") %>%
@@ -549,6 +692,11 @@ get_posterior_samples.blm <- function(x) {
 # Convergence diagnostics
 #' @export
 convergence_diagnostics.blm <- function(x) {
+
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
 
   var_names <- c(colnames(x$input$X), "sigma")
 
@@ -617,7 +765,6 @@ convergence_diagnostics.blm <- function(x) {
 #' @rdname evaluate_ppc
 evaluate_ppc.blm <- function(x, iterations = 2000) {
 
-
   # Check if posterior in blm object
   if(!"posterior" %in% names(x)) {
     stop("Posterior not yet constructed.")
@@ -661,6 +808,8 @@ evaluate_ppc.blm <- function(x, iterations = 2000) {
   # Add class to input
   class(inputs) <- "ppc"
 
+  browser()
+
   # Add the results to the data
   inputs <- normality_check(inputs, r$skewness)
   inputs <- homoskedast_check(inputs, r$heteroskedasticity)
@@ -674,6 +823,11 @@ evaluate_ppc.blm <- function(x, iterations = 2000) {
 # Model fit
 #' @export
 evaluate_model_fit.blm <- function(x) {
+
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
 
   # Model fit
   mfit <- DIC(x$input$X, x$input$y,
@@ -698,6 +852,11 @@ evaluate_model_fit.blm <- function(x) {
 #' @rdname evaluate_effective_sample_size
 evaluate_effective_sample_size.blm <- function(x) {
 
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
   # Effective sample size
   eff <- get_value(x, "posterior") %>%
     effss(order=15) %>%
@@ -721,6 +880,11 @@ evaluate_effective_sample_size.blm <- function(x) {
 #' @rdname evaluate_accepted_draws
 evaluate_accepted_draws.blm <- function(x) {
 
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
   # Get value from posterior
   acc <- get_value(x, "posterior") %>%
     get_value(., "accepted")
@@ -740,5 +904,57 @@ evaluate_accepted_draws.blm <- function(x) {
   print.listof(
     list("Accepted draws"=acc_b)
   )
+
+}
+
+# R-squared
+#' @export
+#' @param iterations number of samples to draw from the posterior distribution
+#' @rdname evaluate_R2
+evaluate_R2.blm <- function(x, iterations = 4000) {
+
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
+  # Get burn value
+  burn <- x$sampling_settings$chain_1$burn
+  # Update iterations
+  iterations <- burn + iterations
+
+  # Set up R-squared by sampling from the posterior
+  inputs <- list(
+    settings = list(
+      iterations = iterations,
+      burn = burn
+    )
+  )
+
+  # Get priors etc.
+  priors <- x$priors
+  thinning <- x$sampling_settings$chain_1$thinning
+  samplers <- x$sampling_settings$chain_1$samplers
+  iv <- x$sampling_settings$chain_1$initial_values
+  chains <- 1
+  X <- x$input$X
+  y <- x$input$y
+
+  # Check values
+  check_sampling_inputs(as.integer(iterations), as.integer(chains), as.integer(thinning),
+                        as.integer(burn))
+
+  # Call the gibbs sampler, simulate y values and compute R2
+  r <- bayes_R2(X, y, iv, iterations, priors, thinning, burn, samplers)
+
+  # Add
+  inputs$rsquared <- r$rsquared
+  inputs$posterior_draws <- r$posterior_draws
+
+  # Add class to input
+  class(inputs) <- "R2"
+
+  # Return
+  return(inputs)
 
 }

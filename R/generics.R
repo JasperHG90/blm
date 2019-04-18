@@ -143,6 +143,31 @@ evaluate_accepted_draws <- function(x) {
   UseMethod("evaluate_accepted_draws", x)
 }
 
+#' Calculate the Bayesian R-squared value
+#'
+#' @param x a blm object
+#'
+#' @return object of class "R2" containing input parameters, posterior draws and r-squared values computed on the posterior draws
+#'
+#' @seealso Gelman, A., Goodrich, B., Gabry, J., & Vehtari, A. (2018). R-squared for Bayesian regression models. The American Statistician, (just-accepted), 1-6.
+#' @export
+evaluate_R2 <- function(x, ...) {
+  UseMethod("evaluate_R2", x)
+}
+
+#' Retrieve mapping from variable to parameter names
+#'
+#' blm objects will mostly emit parameter names (b0, b1, etc) instead of variable names. This convenience function returns the mapping from parameter names to variable names.
+#'
+#' @param x a blm object
+#'
+#' @return prints mapping from parameter to variable names to the console
+#'
+#' @export
+get_parameter_names <- function(x) {
+  UseMethod("get_parameter_names", x)
+}
+
 ## Internal use only, not exported -----
 
 #' Get a value from an S3 object

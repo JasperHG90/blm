@@ -1,5 +1,5 @@
 ---
-title: 'Final Assignment: Predicting Alcohol Content in Wine using Bayesian Linear Regression'
+title: 'Final Assignment: Predicting Director Compensation'
 author: "Jasper Ginn (s6100848)"
 date: "April 8, 2019"
 output:
@@ -10,7 +10,7 @@ header-includes:
  \usepackage{setspace}
  \usepackage{xcolor}
  \definecolor{mypurple}{rgb}{146,76,239}
- \doublespacing
+ \singlespacing
  \floatplacement{figure}{H}
 ---
 
@@ -26,18 +26,26 @@ rm(list=ls())
 # Subset
 library(dplyr)
 d <- read.csv2("data/FinalData.csv") %>%
+  # Select only independent directors
   filter(isED == 0) %>%
-  select(Recent_Comp_Thous, Sector, isM, isED, Age) %>%
+  # Select only these variables
+  select(Recent_Comp_Thous, Sector, isM, Age) %>%
   # Remove NA
   filter(!is.na(Recent_Comp_Thous),
          !is.na(Age)) %>%
-  mutate(compensation = log10(Recent_Comp_Thous)) %>%
-  select(-Recent_Comp_Thous, -isED) %>%
+  # Log compensation
+  mutate(compensation = log(Recent_Comp_Thous)) %>%
+  # Remove these variables
+  select(-Recent_Comp_Thous) %>%
+  # Center data
   mutate(Age = Age - mean(Age),
          isM = isM - mean(isM)) %>%
-  filter(Sector %in% c("Services", "Technology", "Financial", "Consumer Goods")) %>%
+  # Filter small sectors
+  filter(!Sector %in% c("Money Center Banks", "Property & Casualty Insurance")) %>%
+  # Filter sectors and add re-factor
+  filter(Sector %in% c("Services", "Basic Materials", "Financial", "Healthcare", "Consumer Goods", "Technology")) %>%
   mutate(Sector = factor(as.character(Sector), 
-                         levels = c("Technology", "Financial", "Services", "Consumer Goods")))
+                         levels = c("Services", "Basic Materials", "Financial", "Healthcare", "Consumer Goods", "Technology")))
 
 # Outcome variable
 library(ggplot2)
@@ -46,7 +54,7 @@ d %>%
   geom_histogram(bins=50, color="black")
 
 d %>%
-  ggplot(aes(x=Age, y=log10(Recent_Comp_Thous), color=as.factor(isM))) +
+  ggplot(aes(x=Age, y=compensation, color=as.factor(isM))) +
   geom_point() +
   geom_smooth(method="lm")
 ```
@@ -57,23 +65,31 @@ library(blm)
 
 # Set up blm
 blm_setup()
-
 ```
 
 ```{r}
-set.seed(1629)
 # Make the object
-director_fit <- blm("compensation ~ Age + isM * Sector",
+director_fit <- blm("compensation ~ .",
                 data=d) %>%
   # Update samplers
-  set_sampler("b1", type="MH", lambda = 0.005) %>%
-  set_sampler("b2", type="MH", lambda = 0.05) %>%
+  #set_sampler("b5", type="MH", lambda = 0.005) %>%
+  #set_sampler("b6", type="MH", lambda = 0.05) %>%
+  # Add prior
+  #set_prior("b1", mu=2, sd=4) %>%
   # Update sampling settings
-  set_sampling_options(chains = 2, iterations = 40000,
+  set_sampling_options(chains = 2, iterations = 20000,
                        burn = 2000, thinning=3) %>%
-  # Set initial values
-  set_initial_values(chain_1 = list("b" = c(runif(9, -10, 10)), "sigma" = 10),
-                     chain_2 = list("b" = c(runif(9, -10, 10)), "sigma" = 5)) %>%
+  set_prior("b6", mu = 1.5, sd = 0.5) %>%
+  set_prior("b1", mu = -1, sd=0.1)
+  # Set priors
+  # We are predicting on a log scale so approx ~ mu 0, sd log(1000)
+  #set_initial_values(chain_1 = list("b" = c(1,1,1,1,1,1,1,1), sigma="0.1"),
+  #                   chain_2 = list("b" = c(2,2,2,2,2,2,2,2), sigma="0.2"))
+```
+
+```{r}
+# Draw samples from the posterior
+director_fit <- director_fit %>%
   # Sample the posterior
   sample_posterior()
 ```
@@ -81,13 +97,13 @@ director_fit <- blm("compensation ~ Age + isM * Sector",
 ```{r}
 # Add samples to the posterior distribution
 director_fit <- director_fit %>%
-  update_posterior(iterations = 25000)
+  update_posterior(iterations = 15000)
 ```
 
 ```{r}
 # Convergence diagnostics
 director_fit <- director_fit %>%
-  set_sampling_options(burn = 10000) 
+  set_sampling_options(burn = 6000) 
 
 director_fit %>%
   convergence_diagnostics()
@@ -126,15 +142,22 @@ director_ppc
 ```
 
 ```{r}
-pd <- apply(get_posterior_samples(director_fit), 2, mean)
-pred <- director_fit$input$X %*% pd[-10]
-res <- d$compensation - pred
-plot(pred, res)
+plot(predict(director_fit), resid(director_fit))
 ```
 
 ```{r}
 director_fit %>%
   evaluate_model_fit()
+```
+
+```{r}
+# R2
+director_r2 <- director_fit %>%
+  evaluate_R2()
+
+# Plot
+mean(director_r2$rsquared)
+plot(director_r2)
 ```
 
 ```{r}
