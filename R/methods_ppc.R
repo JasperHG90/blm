@@ -40,6 +40,7 @@ print.ppc <- function(ppc) {
 #' @importFrom ggplot2 theme_bw
 #' @importFrom ggplot2 ggtitle
 #' @importFrom ggExtra ggMarginal
+#' @importFrom latex2exp TeX
 #' @export
 plot.ppc <- function(ppc, type=c("normality", "heteroskedasticity", "independence")) {
 
@@ -69,9 +70,12 @@ plot.ppc <- function(ppc, type=c("normality", "heteroskedasticity", "independenc
   # Plot
   p <- ggplot2::ggplot(data, ggplot2::aes(x=index, y=value, color=dataset)) +
     ggplot2::geom_point(alpha=0.5) +
-    ggplot2::theme_bw() +
-    ggplot2::theme(legend.position = "top") +
-    ggplot2::ggtitle(paste0("Observed and simulated results for test '", type, "'"))
+    ggplot2::labs(title = "Observed (red) and simulated (blue) results",
+                  subtitle = paste0("test: ", type)) +
+    ggplot2::scale_color_brewer(palette = "Set1", name = "Type") +
+    ggplot2::scale_y_continuous(name = latex2exp::TeX("P_{posterior}")) +
+    theme_blm() +
+    ggplot2::theme(legend.position = "none")
 
   # Add marginal histogram
   ggExtra::ggMarginal(p, type = "histogram", margins="y", groupColour = FALSE, alpha=0.3,

@@ -118,6 +118,8 @@ summary.blm <- function(x) {
 #' @importFrom ggplot2 theme_bw
 #' @importFrom ggplot2 geom_line
 #' @importFrom ggplot2 geom_density
+#' @importFrom ggplot2 scale_color_brewer
+#' @importFrom ggplot2 labs
 #' @importFrom tidyr gather
 #' @importFrom scales pretty_breaks
 #' @importFrom stringr str_replace_all
@@ -172,7 +174,9 @@ plot.blm <- function(x, type=c("history",
       ggplot2::geom_bar(stat="identity") +
       ggplot2::scale_x_continuous(breaks= scales::pretty_breaks()) +
       ggplot2::scale_y_continuous(limits = c(-1,1)) +
-      ggplot2::facet_wrap(id ~ .)
+      theme_blm() +
+      ggplot2::facet_wrap(id ~ .) +
+      ggplot2::labs(title="Autocorrelation plot")
 
   } else {
 
@@ -205,11 +209,14 @@ plot.blm <- function(x, type=c("history",
                                             color=as.factor(chain),
                                             group = parameter)) +
         ggplot2::geom_line(alpha=0.4) +
-        ggplot2::theme_bw() +
-        ggplot2::theme(legend.position = "None") +
-        #geom_smooth(method="lm") +
+        ggplot2::scale_color_brewer(palette = "Set1", name = "chain",
+                                    labels = paste0("chain ", 1:length(unique(samples$chain)))) +
+        theme_blm() +
+        ggplot2::theme(axis.title = element_blank()) +
         ggplot2::facet_wrap("parameter ~ .", scales = "free_y",
-                            ncol=2)
+                            ncol=2) +
+        ggplot2::labs(title = "Trace plot", subtitle = "each chain is indicated by its own color")
+
 
       ## Density plot
 
@@ -218,9 +225,12 @@ plot.blm <- function(x, type=c("history",
       ggplot2::ggplot(samples, ggplot2::aes(x=value,
                                             fill = chain)) +
         ggplot2::geom_density(alpha=0.4) +
-        ggplot2::theme_bw() +
-        ggplot2::theme(legend.position = "None") +
-        ggplot2::facet_wrap("parameter ~ .", scales = "free")
+        ggplot2::scale_color_brewer(palette = "Set1", name = "chain",
+                                    labels = paste0("chain ", 1:length(unique(samples$chain)))) +
+        theme_blm() +
+        ggplot2::theme(axis.title = element_blank()) +
+        ggplot2::facet_wrap("parameter ~ .", scales = "free") +
+        ggplot2::labs(title = "Posterior densities", subtitle = "each chain is indicated by its own color")
 
     } else { ## Unknown! Raise error
 
@@ -356,7 +366,7 @@ get_parameter_names.blm <- function(x) {
   # Print
   print.listof(list("Mapping" = par_names))
 
-  }
+}
 
 #' @param chains number of chains to initialize
 #' @param iterations number of iterations to run the MC sampler
@@ -589,10 +599,10 @@ sample_posterior.blm <- function(x) {
 
   # sample the posterior
   x <- get_value(x, "sampling_settings") %>%
-        # Sample method for class 'sampler'
-        postsamp(., X, y, get_value(x, "priors")) %>%
-        # Add posterior samples to blm object
-        set_value(x, "posterior", .)
+    # Sample method for class 'sampler'
+    postsamp(., X, y, get_value(x, "priors")) %>%
+    # Add posterior samples to blm object
+    set_value(x, "posterior", .)
 
   # Return blm results
   return(x)
@@ -661,11 +671,6 @@ update_posterior.blm <- function(x, iterations = 1000) {
 # Remove the posterior
 #' @export
 delete_posterior.blm <- function(x) {
-
-  # Check if posterior in blm object
-  if(!"posterior" %in% names(x)) {
-    stop("Posterior not yet constructed.")
-  }
 
   # Set posterior to NULL
   return(set_value(x, "posterior", NULL))
@@ -807,8 +812,6 @@ evaluate_ppc.blm <- function(x, iterations = 2000) {
 
   # Add class to input
   class(inputs) <- "ppc"
-
-  browser()
 
   # Add the results to the data
   inputs <- normality_check(inputs, r$skewness)

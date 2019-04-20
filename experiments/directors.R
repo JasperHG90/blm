@@ -1,7 +1,7 @@
 rm(list=ls())
 # Subset
 library(dplyr)
-d <- read.csv2("docs/data/FinalData.csv") %>%
+d <- read.csv2("testing/FinalData.csv") %>%
   # Select only independent directors
   filter(isED == 0) %>%
   # Select only these variables
@@ -27,10 +27,12 @@ library(ggplot2)
 ggplot(d, aes(x=Age, y=compensation, group=Sector, color=as.factor(isM))) +
  geom_point() +
  geom_smooth(method="lm") +
+  theme_blm() +
  facet_wrap(~ Sector)
 
 ggplot(d %>% mutate(isM = as.factor(isM)), aes(x=compensation, group=isM, fill=isM)) +
  geom_density(alpha=0.3) +
+ theme_blm() +
  facet_wrap(~ Sector)
 
 # Load blm
@@ -54,6 +56,7 @@ dirmod1 %>%
 # Plots
 plot(dirmod1, "history")
 plot(dirmod1, "autocorrelation")
+plot(dirmod1, "density")
 
 # Summary
 summary(dirmod1)
@@ -71,6 +74,7 @@ m1_ppc <- dirmod1 %>%
 
 m1_ppc
 # Violation assumption of normality and independence
+plot(m1_ppc, "independence")
 
 # Model fit
 dirmod1 %>%
@@ -79,8 +83,8 @@ dirmod1 %>%
 ## Model II -- Adding sectors & priors
 
 # Make the object
-dirmod2 <- blm("compensation ~ .",
-                data=d) %>%
+dirmod2 <- blm("Compensation ~ .",
+                data=directors) %>%
   # Update samplers
   #set_sampler("b5", type="MH", lambda = 0.005) %>%
   #set_sampler("b6", type="MH", lambda = 0.05) %>%
@@ -92,7 +96,7 @@ dirmod2 <- blm("compensation ~ .",
   #set_prior("b6", mu = 1.5, sd = 0.5) %>%
   #set_prior("b4", mu = 3, sd=1) %>%
   # Set samplers
-  set_sampler("b4", type="MH", lambda=0.01) %>%
+  set_sampler("b3", type="MH", lambda=0.01) %>%
   # Set initial values
   set_initial_values(chain_1 = list("b" = c(4, 2, 3, 8, 10), "sigma"= 1),
                      chain_2 = list("b" = c(2, 4, 7, 2, 3), "sigma"=2)) %>%
@@ -125,6 +129,7 @@ m2r2 <- dirmod2 %>%
 
 # Plot R2
 plot(m2r2)
+quantile(m2r2$rsquared, c(0.025, 0.25, 0.5, 0.75, 0.975))
 
 # PPC
 m2ppc <- dirmod2 %>%

@@ -17,170 +17,300 @@ header-includes:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(fig.pos="H", fig.width = 7, fig.height = 4, echo = FALSE, 
                       fig.align="center", warning = FALSE, message = FALSE, eval=TRUE)
-```
 
-# Introduction
-
-```{r}
 rm(list=ls())
-# Subset
-library(dplyr)
-d <- read.csv2("data/FinalData.csv") %>%
-  # Select only independent directors
-  filter(isED == 0) %>%
-  # Select only these variables
-  select(Recent_Comp_Thous, Sector, isM, Age) %>%
-  # Remove NA
-  filter(!is.na(Recent_Comp_Thous),
-         !is.na(Age)) %>%
-  # Log compensation
-  mutate(compensation = log(Recent_Comp_Thous)) %>%
-  # Remove these variables
-  select(-Recent_Comp_Thous) %>%
-  # Center data
-  mutate(Age = Age - mean(Age),
-         isM = isM - mean(isM)) %>%
-  # Filter small sectors
-  filter(!Sector %in% c("Money Center Banks", "Property & Casualty Insurance")) %>%
-  # Filter sectors and add re-factor
-  filter(Sector %in% c("Services", "Basic Materials", "Financial", "Healthcare", "Consumer Goods", "Technology")) %>%
-  mutate(Sector = factor(as.character(Sector), 
-                         levels = c("Services", "Basic Materials", "Financial", "Healthcare", "Consumer Goods", "Technology")))
 
-# Outcome variable
-library(ggplot2)
-d %>%
-  ggplot(., aes(x=compensation)) +
-  geom_histogram(bins=50, color="black")
-
-d %>%
-  ggplot(aes(x=Age, y=compensation, color=as.factor(isM))) +
-  geom_point() +
-  geom_smooth(method="lm")
-```
-
-```{r}
-# Load blm
+# Load blm package
 library(blm)
-
-# Set up blm
-blm_setup()
-```
-
-```{r}
-# Make the object
-director_fit <- blm("compensation ~ .",
-                data=d) %>%
-  # Update samplers
-  #set_sampler("b5", type="MH", lambda = 0.005) %>%
-  #set_sampler("b6", type="MH", lambda = 0.05) %>%
-  # Add prior
-  #set_prior("b1", mu=2, sd=4) %>%
-  # Update sampling settings
-  set_sampling_options(chains = 2, iterations = 20000,
-                       burn = 2000, thinning=3) %>%
-  set_prior("b6", mu = 1.5, sd = 0.5) %>%
-  set_prior("b1", mu = -1, sd=0.1)
-  # Set priors
-  # We are predicting on a log scale so approx ~ mu 0, sd log(1000)
-  #set_initial_values(chain_1 = list("b" = c(1,1,1,1,1,1,1,1), sigma="0.1"),
-  #                   chain_2 = list("b" = c(2,2,2,2,2,2,2,2), sigma="0.2"))
-```
-
-```{r}
-# Draw samples from the posterior
-director_fit <- director_fit %>%
-  # Sample the posterior
-  sample_posterior()
-```
-
-```{r}
-# Add samples to the posterior distribution
-director_fit <- director_fit %>%
-  update_posterior(iterations = 15000)
-```
-
-```{r}
-# Convergence diagnostics
-director_fit <- director_fit %>%
-  set_sampling_options(burn = 6000) 
-
-director_fit %>%
-  convergence_diagnostics()
-```
-
-
-```{r}
-director_fit %>%
-  evaluate_accepted_draws()
-```
-
-```{r}
-# effective sample size
-director_fit %>%
-  evaluate_effective_sample_size()
-```
-
-```{r}
-# History plot
-plot(director_fit, "history")
-```
-
-```{r}
-# Autocorrelation
-plot(director_fit, "autocorrelation")
-```
-
-```{r}
-summary(director_fit)
-```
-
-```{r}
-director_ppc <- director_fit %>%
-  evaluate_ppc()
-director_ppc
-```
-
-```{r}
-plot(predict(director_fit), resid(director_fit))
-```
-
-```{r}
-director_fit %>%
-  evaluate_model_fit()
-```
-
-```{r}
-# R2
-director_r2 <- director_fit %>%
-  evaluate_R2()
-
-# Plot
-mean(director_r2$rsquared)
-plot(director_r2)
-```
-
-```{r}
-normal <- readRDS("data/ppc_normal_data.rds")
-heter <- readRDS("data/ppc_heteronormal_data.rds")
-corr <- readRDS("data/ppc_autocor_data.rds")
 
 # Load ggplot
 library(ggplot2)
 library(gridExtra)
 
-p1 <- ggplot(data.frame(x=normal[,2]), aes(x=x)) +
-  geom_histogram(color="black") +
-  scale_x_continuous(limits=c(0,1))
-p2 <- ggplot(data.frame(x=normal[,3]), aes(x=x)) +
-  geom_histogram(color="black")+
-  scale_x_continuous(limits=c(0,1))
-p3 <- ggplot(data.frame(x=heter[,2]), aes(x=x)) +
-  geom_histogram(color="black")+
-  scale_x_continuous(limits=c(-0.02,1))
-p4 <- ggplot(data.frame(x=corr[,3]), aes(x=x)) +
-  geom_histogram(color="black")+
-  scale_x_continuous(limits=c(0,1))
+# Get the directors data
+data("directors")
 
+# Preprocess directors data
+library(dplyr)
+directors <- directors %>%
+  # Log compensation
+  mutate(Compensation = log(Compensation)) %>%
+  # Subtract mean from Age variable
+  mutate(Age = Age - mean(Age),
+         Male = as.numeric(Male) - mean(as.numeric(Male)))
+
+# Define a convenience function. Basically, take nice output from a stargazer latex regression table & modify it for blm models.
+```
+
+```{r julia}
+# Set up blm julia
+blm_setup()
+```
+
+# Introduction
+
+```{r models, results='hide', fig.show='hide'}
+## Run two models.
+
+# Model 1: only age and male dummy -----
+
+# Priors are uninformative (mean 0, sd 1000)
+# Initial values are drawn from the priors
+dirmod1 <- blm("Compensation ~ Age + Male",
+                    data=directors) %>%
+  # Set sampling options
+  set_sampling_options(chains = 2, iterations = 40000,
+                       burn = 8000, thinning=3) %>%
+  set_initial_values(chain_1 = list("b" = c(7, -5, 0), "sigma" = 1),
+                     chain_2 = list("b" = c(-5, 0, 7), "sigma" = 2)) %>%
+  # Sample
+  sample_posterior()
+coef(dirmod1)
+coef(lm("Compensation ~ Age + Male", data=directors)) # Sanity check
+# Inspect convergence
+dirmod1 %>%
+  convergence_diagnostics() # OK
+
+# Plots
+plot(dirmod1, "history")
+plot(dirmod1, "density")
+plot(dirmod1, "autocorrelation") # OK
+
+# Summary
+summary(dirmod1)
+# ==> neither male nor age is a predictor of logged compensation (CCI contains 0)
+
+# R-squared value
+m1r2 <- dirmod1 %>%
+  evaluate_R2()
+
+# Plot
+plot(m1r2)
+median(m1r2$rsquared) # R-squared ~ 0.021
+
+# Posterior predictive checks
+m1ppc <- dirmod1 %>%
+  evaluate_ppc()
+
+# Summary
+summary(m1ppc)
+p <- plot(m1ppc, "normality") ; plot(p) # Two-sided test ==> violation 
+p <- plot(m1ppc, "heteroskedasticity") ; plot(p) # One-sided test ==> violation (data are more heteroskedastic)
+p <- plot(m1ppc, "independence") ; plot(p) # Two-sided test ==> violation (data are correlated)
+
+# Model fit
+dirmod1 %>%
+  evaluate_model_fit() # ==> DIC is 509 with 4 parameters
+
+# Model 2: Age, gender and sector -----
+
+# Hypothesis: the relationship between gender and compensation differs across sectors
+# We have three: financial (base case), services and Basic materials
+
+# Create the model
+dirmod2 <- blm("Compensation ~ .",
+                data=directors) 
+
+# Retrieve parameter names
+dirmod2 %>% get_parameter_names()
+
+# Update the model specification
+dirmod2 <- dirmod2 %>%
+  # Need to delete posterior when we change settings
+  # (only has an effect if posterior already present)
+  delete_posterior() %>%
+  # Set an informative prior on the coefficients
+  # Male (b4) is speculated to have 17% pay increase over women
+  #set_prior("b4", mu = 1.7, sd=0.3) %>%
+  
+  # Change the sampler of Age to metropolis hastings
+  # Lambda parameter controls the variance of the (normal) proposal distribution
+  set_sampler("b3", type="MH", lambda=0.01) %>%
+  # Update sampling settings
+  set_sampling_options(chains = 2, iterations = 60000,
+                       burn = 15000, thinning=4) %>%
+  # Set initial values
+  # If we draw from the priors the starting values will be too large
+  # This is an issue for MH because it takes many more iterations to converge
+  set_initial_values(chain_1 = list("b" = c(4, 2, 3, 8, 10), "sigma"= 1),
+                     chain_2 = list("b" = c(2, 4, 7, 2, 3), "sigma"=2)) %>%
+  # Sample the posterior distribution
+  sample_posterior()
+
+# Evaluate the accepted draws
+dirmod2 %>% evaluate_accepted_draws() # ~ 40-45%
+
+# Look at burn-in diagnostics
+dirmod2 %>% 
+  convergence_diagnostics()
+
+# Check history plot
+plot(dirmod2, "history") # Burn-in is not high enough
+
+# Update burn-in size & draw more samples from the posterior
+#dirmod2 <- dirmod2 %>%
+#  set_sampling_options(burn = 12000) %>%
+#  update_posterior(iterations = 20000)
+
+# Evaluate the accepted draws
+dirmod2 %>% evaluate_accepted_draws() # ~ 30%
+
+# Check history
+plot(dirmod2, "history") # This seems OK
+# Check autocorrelation
+plot(dirmod2, "autocorrelation") # Not a problem
+
+# Evaluate the effect of MH on the effective sample size
+dirmod2 %>% evaluate_effective_sample_size() 
+
+# View densities
+plot(dirmod2, "density")
+
+# Summary
+summary(dirmod2)
+# ==> Male still not a predictor
+# ==> age now a predictor
+# ==> Both sectors increase compensation for directors
+
+# R-squared value
+m2r2 <- dirmod2 %>%
+  evaluate_R2()
+
+# Plot
+plot(m2r2)
+median(m2r2$rsquared) # R-squared ~ .089 ==> sometimes returns 0.5 but only after updating using update_posterior() ????
+quantile(m2r2$rsquared, c(0.025, 0.25, 0.5, 0.75, 0.975)) # 95% CCI [.46, .54]
+
+# Posterior predictive checks
+m2ppc <- dirmod2 %>%
+  evaluate_ppc()
+
+# Summary
+summary(m2ppc)
+p <- plot(m2ppc, "normality") ; plot(p) # Two-sided test ==> violation ==> less skewed compared to model 1
+p <- plot(m2ppc, "heteroskedasticity") ; plot(p) # One-sided test ==> violation (data are more heteroskedastic) ==> more extreme than model 1
+p <- plot(m2ppc, "independence") ; plot(p) # Two-sided test ==> violation (data are correlated) ==> less extreme than model 1 so we're better taking into account group effects
+
+# Model fit
+dirmod2 %>%
+  evaluate_model_fit() # ==> DIC is 487.895 with 6 parameters ==> fit is better than model 1
+```
+
+```{r}
+plot(predict(dirmod2), resid(dirmod2))
+```
+
+```{r, eval=TRUE, results='asis'}
+# Calculate 95% CCI
+CCI1 <- t(apply(get_posterior_samples(dirmod1), 2, quantile, c(0.025, 0.25, 0.5, 0.75, 0.975))[c(1, 5),]) %>% round(., digits=3)
+CCI2 <- t(apply(get_posterior_samples(dirmod2), 2, quantile, c(0.025, 0.25, 0.5, 0.75, 0.975))[c(1, 5),]) %>% round(., digits=3)
+
+# Call stargazer
+# ==> we use to linear models with the same variables and replace the coefficients / confidence intervals with those of the blm models
+s <- capture.output(
+        stargazer::stargazer(lm("Compensation ~ Age + Male", data=directors), lm("Compensation ~ .", data=directors),
+                           #title = "Results for BLM models", #dep.var.caption = "Compensation",
+                           dep.var.labels = "Compensation",
+                           type = "html",
+                          # Replace coefficients
+                           coef = list(coef(dirmod1), coef(dirmod2)), 
+                           ci = TRUE,
+                           ci.custom = list(CCI1, CCI2),
+                          # Replace se 
+                           #se = list(get_posterior_samples(dirmod1) %>% apply(2, sd),
+                          #           get_posterior_samples(dirmod2) %>% apply(2, sd)),
+                          
+                          # Turn these settings off / on
+                          p.auto = FALSE, 
+                          df=FALSE, 
+                          t.auto=FALSE, 
+                          intercept.top = TRUE,
+                          intercept.bottom = FALSE,
+                          header=FALSE,
+                          initial.zero = FALSE,
+                          keep.stat = c("n", "rsq", "ser"),
+                          order = c(1, 5, 4, 3, 2),
+                          report = c("cvs"),
+                          single.row = FALSE,
+                          add.lines = list(c("DIC", 508, 488),
+                                           c("Par.",4, 6)))
+        )
+
+# Remove line 34
+# s <- s[-26]
+# # Change standard error
+# s[23] <- paste0("Residual standard deviation & ", 
+#                 round(mean(get_posterior_samples(dirmod1)[,4]), digits=3),
+#                 " & ",
+#                 round(mean(get_posterior_samples(dirmod2)[,6]), digits=3),
+#                 " \\\\ ")
+# # Change R2
+# s[22] <- paste0("R$^{2}$ & ", 
+#                 round(median(m1r2$rsquared), digits=3),
+#                 " & ",
+#                 round(median(m2r2$rsquared), digits=3),
+#                 "\\\\ ")
+
+# Print table
+cat(
+  paste0(
+    s, collapse = "\n"
+  )
+)
+``` 
+
+```{r r-squared, fig.cap="Bayesian R-squared value for model 1 (left) and model 2 (right).", fig.height=2, fig.width=5}
+# Plot r-squared
+p1 <- plot(m1r2) + theme_blm(text_size = 10) +
+  theme(axis.title = element_blank())
+p2 <- plot(m2r2) + theme_blm(text_size = 10) +
+  theme(axis.title = element_blank())
+
+# Grid
+grid.arrange(p1, p2, ncol=2)
+```
+
+```{r simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The data are drawn using the function generate\\_data() in the blm library.", fig.width=5, fig.height=3}
+normal <- readRDS("data/ppc_normal_data.rds")
+heter <- readRDS("data/ppc_heteronormal_data.rds")
+corr <- readRDS("data/ppc_autocor_data.rds")
+
+# PPC heteroskedasticity, no violation
+p1 <- ggplot(data.frame(x=normal[,2]), aes(x=x)) +
+  geom_histogram(color="black", fill="lightgrey") +
+  scale_x_continuous(limits=c(0,1)) + theme_blm() +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_blank()) +
+  labs(title = "(a) PPC heteroskedasticity", subtitle="      no violations")
+# PPC independence, no violation
+p2 <- ggplot(data.frame(x=normal[,3]), aes(x=x)) +
+  geom_histogram(color="black", fill="lightgrey") +
+  scale_x_continuous(limits=c(0,1)) + theme_blm() +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_blank()) +
+  labs(title = "(b) PPC independence", subtitle="      no violations")
+# PPC heteroskedasticity, assumption violated
+p3 <- ggplot(data.frame(x=heter[,2]), aes(x=x)) +
+  geom_histogram(color="black", fill="lightgrey")  + 
+  theme_blm() + 
+  scale_x_continuous(limits=c(-0.02,1)) +
+  theme(axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.text.y = element_blank()) +
+  labs(title = "(c) PPC heteroskedasticity", subtitle="      assumption violated")
+# PPC independence, violated
+p4 <- ggplot(data.frame(x=corr[,3]), aes(x=x)) +
+  geom_histogram(color="black", fill="lightgrey") +
+  scale_x_continuous(limits=c(0,1)) + theme_blm() +
+    theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank()) +
+  labs(title = "(d) PPC independence", subtitle="      assumption violated")
+
+# Merge plots
 grid.arrange(p1, p2, p3, p4)
 ```

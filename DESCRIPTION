@@ -21,7 +21,9 @@ Imports:
   crayon,
   stats,
   stringr,
-  ggExtra
+  ggExtra,
+  latex2exp,
+  RColorBrewer
 Depends:
   magrittr,
   R (>= 3.4.0)
