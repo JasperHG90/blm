@@ -7,12 +7,14 @@
 \usage{
 evaluate_R2(x, ...)
 
-\method{evaluate_R2}{blm}(x, iterations = 4000)
+\method{evaluate_R2}{blm}(x, iterations = 4000, return_samples = FALSE)
 }
 \arguments{
 \item{x}{a blm object}
 
 \item{iterations}{number of samples to draw from the posterior distribution}
+
+\item{return_samples}{logical. If TRUE, then the function will also return the posterior predictive samples.}
 }
 \value{
 object of class "R2" containing input parameters, posterior draws and r-squared values computed on the posterior draws

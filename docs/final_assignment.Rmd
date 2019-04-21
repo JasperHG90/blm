@@ -61,6 +61,7 @@ dirmod1 <- blm("Compensation ~ Age + Male",
   # Set sampling options
   set_sampling_options(chains = 2, iterations = 40000,
                        burn = 8000, thinning=3) %>%
+  # Set initial values
   set_initial_values(chain_1 = list("b" = c(7, -5, 0), "sigma" = 1),
                      chain_2 = list("b" = c(-5, 0, 7), "sigma" = 2)) %>%
   # Sample
@@ -69,7 +70,7 @@ coef(dirmod1)
 coef(lm("Compensation ~ Age + Male", data=directors)) # Sanity check
 # Inspect convergence
 dirmod1 %>%
-  convergence_diagnostics() # OK
+  evaluate_convergence_diagnostics() # OK
 
 # Plots
 plot(dirmod1, "history")
@@ -81,12 +82,18 @@ summary(dirmod1)
 # ==> neither male nor age is a predictor of logged compensation (CCI contains 0)
 
 # R-squared value
-m1r2 <- dirmod1 %>%
+dirmod1 <- dirmod1 %>%
   evaluate_R2()
 
 # Plot
-plot(m1r2)
-median(m1r2$rsquared) # R-squared ~ 0.021
+dirmod1 %>% 
+  get_value("rsq") %>%
+  plot()
+
+# Median
+dirmod1 %>%
+  get_value("rsq") %>%
+  summary()# R-squared ~ 0.021
 
 # Posterior predictive checks
 m1ppc <- dirmod1 %>%
@@ -261,9 +268,9 @@ cat(
 
 ```{r r-squared, fig.cap="Bayesian R-squared value for model 1 (left) and model 2 (right).", fig.height=2, fig.width=5}
 # Plot r-squared
-p1 <- plot(m1r2) + theme_blm(text_size = 10) +
+p1 <- dirmod1 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
   theme(axis.title = element_blank())
-p2 <- plot(m2r2) + theme_blm(text_size = 10) +
+p2 <- dirmod2 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
   theme(axis.title = element_blank())
 
 # Grid
@@ -278,7 +285,8 @@ corr <- readRDS("data/ppc_autocor_data.rds")
 # PPC heteroskedasticity, no violation
 p1 <- ggplot(data.frame(x=normal[,2]), aes(x=x)) +
   geom_histogram(color="black", fill="lightgrey") +
-  scale_x_continuous(limits=c(0,1)) + theme_blm() +
+  scale_x_continuous(limits=c(0,1)) + 
+  theme_blm(text_size = 10) +
   theme(axis.title.x = element_blank(),
         axis.title.y = element_blank(),
         axis.text.y = element_blank(),
@@ -287,7 +295,8 @@ p1 <- ggplot(data.frame(x=normal[,2]), aes(x=x)) +
 # PPC independence, no violation
 p2 <- ggplot(data.frame(x=normal[,3]), aes(x=x)) +
   geom_histogram(color="black", fill="lightgrey") +
-  scale_x_continuous(limits=c(0,1)) + theme_blm() +
+  scale_x_continuous(limits=c(0,1)) + 
+  theme_blm(text_size = 10) +
   theme(axis.title.x = element_blank(),
         axis.title.y = element_blank(),
         axis.text.y = element_blank(),
@@ -296,7 +305,7 @@ p2 <- ggplot(data.frame(x=normal[,3]), aes(x=x)) +
 # PPC heteroskedasticity, assumption violated
 p3 <- ggplot(data.frame(x=heter[,2]), aes(x=x)) +
   geom_histogram(color="black", fill="lightgrey")  + 
-  theme_blm() + 
+  theme_blm(text_size = 10) + 
   scale_x_continuous(limits=c(-0.02,1)) +
   theme(axis.title.x = element_blank(),
       axis.title.y = element_blank(),
@@ -305,7 +314,8 @@ p3 <- ggplot(data.frame(x=heter[,2]), aes(x=x)) +
 # PPC independence, violated
 p4 <- ggplot(data.frame(x=corr[,3]), aes(x=x)) +
   geom_histogram(color="black", fill="lightgrey") +
-  scale_x_continuous(limits=c(0,1)) + theme_blm() +
+  scale_x_continuous(limits=c(0,1)) + 
+  theme_blm(text_size = 10) +
     theme(axis.title.x = element_blank(),
         axis.title.y = element_blank(),
         axis.text.y = element_blank()) +

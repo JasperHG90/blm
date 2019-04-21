@@ -101,8 +101,18 @@ summary.blm <- function(x) {
   cat(has_sampled)
   cat("\n\n")
   print.listof(obs)
+  cat("---------------------\n\n")
   print.listof(list("Maximum a posteriori (MAP) estimates" = MAPV))
   print.listof(list("95% credible interval" = CIV))
+  cat("---------------------\n\n")
+
+  # Cat model DIC
+  summary(get_value(x, "DIC"))
+
+  # If R-squared, cat value
+  if("rsq" %in% names(x)) {
+    summary(get_value(x, "rsq"))
+  }
 
 }
 
@@ -602,7 +612,11 @@ sample_posterior.blm <- function(x) {
     # Sample method for class 'sampler'
     postsamp(., X, y, get_value(x, "priors")) %>%
     # Add posterior samples to blm object
-    set_value(x, "posterior", .)
+    set_value(x, "posterior", .) %>%
+    # Calculate model DIC
+    evaluate_model_fit() %>%
+    # Calculate R-squared
+    evaluate_R2()
 
   # Return blm results
   return(x)
@@ -652,7 +666,11 @@ update_posterior.blm <- function(x, iterations = 1000) {
     # Append samples to original
     append_samples(posterior_samples, .) %>%
     # Add to blm object
-    set_value(x, "posterior", .)
+    set_value(x, "posterior", .) %>%
+    # Calculate model DIC
+    evaluate_model_fit() %>%
+    # Calculate R-squared
+    evaluate_R2()
 
   # Update number of iterations on the sample
   x <- get_value(x, "sampling_settings") %>%
@@ -696,7 +714,7 @@ get_posterior_samples.blm <- function(x) {
 
 # Convergence diagnostics
 #' @export
-convergence_diagnostics.blm <- function(x) {
+evaluate_convergence_diagnostics.blm <- function(x) {
 
   # Check if posterior in blm object
   if(!"posterior" %in% names(x)) {
@@ -764,11 +782,11 @@ convergence_diagnostics.blm <- function(x) {
 # EVALUATION ----
 
 # posterior predictive checks
-# This returns a SEPARATE object ==> all the simulations are heavy on the memory.
 #' @param iterations number of iterations to run for posterior predictive checks. This number will be tagged on to the burn parameter specified under \link[blm]{set_sampling_options}.
+#' @param return_samples logical. If TRUE, then the function will also return the posterior predictive samples.
 #' @export
 #' @rdname evaluate_ppc
-evaluate_ppc.blm <- function(x, iterations = 2000) {
+evaluate_ppc.blm <- function(x, iterations = 2000, return_samples = FALSE) {
 
   # Check if posterior in blm object
   if(!"posterior" %in% names(x)) {
@@ -818,8 +836,19 @@ evaluate_ppc.blm <- function(x, iterations = 2000) {
   inputs <- homoskedast_check(inputs, r$heteroskedasticity)
   inputs <- independence_check(inputs, r$independence)
 
-  # Return
-  return(inputs)
+  # Check if keep samples
+  if(return_samples) {
+
+    x$ppc <- inputs
+    return(x)
+
+  } else {
+
+    inputs$data <- NULL
+    x$ppc <- inputs
+    return(x)
+
+  }
 
 }
 
@@ -842,11 +871,16 @@ evaluate_model_fit.blm <- function(x) {
   # Row names
   row.names(final) <- c("(Model)")
 
-  # Print
-  cat(crayon::bold("Model fit for blm object:\n\n"))
-  print.listof(
-    list("Model DIC"=final)
+  # Structure
+  res <- list(
+    "DIC" = final
   )
+  class(res) <- "DIC"
+
+  # Add to object
+  x$DIC <- res
+  # Return
+  return(x)
 
 }
 
@@ -913,8 +947,9 @@ evaluate_accepted_draws.blm <- function(x) {
 # R-squared
 #' @export
 #' @param iterations number of samples to draw from the posterior distribution
+#' @param return_samples logical. If TRUE, then the function will also return the posterior predictive samples.
 #' @rdname evaluate_R2
-evaluate_R2.blm <- function(x, iterations = 4000) {
+evaluate_R2.blm <- function(x, iterations = 4000, return_samples=FALSE) {
 
   # Check if posterior in blm object
   if(!"posterior" %in% names(x)) {
@@ -952,12 +987,20 @@ evaluate_R2.blm <- function(x, iterations = 4000) {
 
   # Add
   inputs$rsquared <- r$rsquared
+
+  # Add samples
   inputs$posterior_draws <- r$posterior_draws
 
   # Add class to input
   class(inputs) <- "R2"
 
+  # If user wants posterior samples ...
+  if(!return_samples) {
+    inputs$posterior_draws <- NULL
+  }
+
   # Return
-  return(inputs)
+  x$rsq <- inputs
+  return(x)
 
 }

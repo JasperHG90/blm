@@ -116,8 +116,8 @@ evaluate_model_fit <- function(x) {
 #'
 #' @return prints summary of convergence diagnostics to R console
 #' @export
-convergence_diagnostics <- function(x) {
-  UseMethod("convergence_diagnostics", x)
+evaluate_convergence_diagnostics <- function(x) {
+  UseMethod("evaluate_convergence_diagnostics", x)
 }
 
 #' Calculate the effective sample size
@@ -168,15 +168,16 @@ get_parameter_names <- function(x) {
   UseMethod("get_parameter_names", x)
 }
 
-## Internal use only, not exported -----
-
 #' Get a value from an S3 object
 #'
 #' @param x object with a get_value() method
 #' @param var string. name of the value to retrieve from the object.
+#' @export
 get_value <- function(x, var) {
   UseMethod("get_value", x)
 }
+
+## Internal use only, not exported -----
 
 #' Set a value for an S3 object
 #'

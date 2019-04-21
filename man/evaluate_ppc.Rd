@@ -7,12 +7,15 @@
 \usage{
 evaluate_ppc(x, ...)
 
-\method{evaluate_ppc}{blm}(x, iterations = 2000)
+\method{evaluate_ppc}{blm}(x, iterations = 2000,
+  return_samples = FALSE)
 }
 \arguments{
 \item{x}{blm object}
 
 \item{iterations}{number of iterations to run for posterior predictive checks. This number will be tagged on to the burn parameter specified under \link[blm]{set_sampling_options}.}
+
+\item{return_samples}{logical. If TRUE, then the function will also return the posterior predictive samples.}
 }
 \value{
 prints summary of the ppc to the R console

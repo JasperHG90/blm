@@ -1,12 +1,22 @@
 ## Shared methods
 
-# Get a value from a blm or related object
+#' @export
+get_value.blm <- function(x, var) {
+
+  ## Get this value
+  return(x[[var]])
+
+}
+
+# Get a value from a blm or related object (internal objects)
 get_value.sampler <-
   get_value.priors <-
   get_value.prior <-
   get_value.posterior <-
-  get_value.blm <-
-  get_value.chain <- function(x, var) {
+  get_value.chain <-
+  get_value.R2 <-
+  get_value.ppc <-
+  get_value.DIC <- function(x, var) {
 
     ## Get this value
     return(x[[var]])
