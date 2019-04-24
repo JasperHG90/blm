@@ -44,7 +44,7 @@ directors <- directors %>%
 
 ```{r julia}
 # Set up blm julia
-blm_setup()
+blm_setup() 
 ```
 
 # Introduction
@@ -319,6 +319,7 @@ p4 <- ggplot(data.frame(x=corr[,3]), aes(x=x)) +
     theme(axis.title.x = element_blank(),
         axis.title.y = element_blank(),
         axis.text.y = element_blank()) +
+  
   labs(title = "(d) PPC independence", subtitle="      assumption violated")
 
 # Merge plots

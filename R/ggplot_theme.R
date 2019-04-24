@@ -20,8 +20,7 @@ theme_blm <- function(text_size = 12,
                       line_size = text_size / 170,
                       rect_size = text_size / 170){
   # Take theme minimal ...
-  theme_minimal(base_size = text_size,
-                base_line_size = line_size) %+replace%
+  theme_minimal(base_size = text_size) %+replace%
   # ... and replace these values
     theme(
       plot.title = element_text(
@@ -46,13 +45,6 @@ theme_blm <- function(text_size = 12,
       axis.text = element_text(
         color = rgb(105, 105, 105, maxColorValue = 255),
         size = rel(1)),
-      panel.grid.major = element_line(
-        rgb(105, 105, 105, maxColorValue = 255),
-        linetype = "dotted"),
-      panel.grid.minor = element_line(
-        rgb(105, 105, 105, maxColorValue = 255),
-        linetype = "dotted",
-        size = rel(4)),
       axis.line = element_line(color = rgb(105, 105, 105, maxColorValue = 255), size = 0.5),
       complete = TRUE
     )

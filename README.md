@@ -24,7 +24,9 @@ Installing the R library from GitHub is straightforward
 devtools::install_github("JasperHG90/blm")
 ```
 
-R dependencies will be installed automatically. You will also need an installation of Julia (>= 1.0.0). [MORE INFO].
+R dependencies will be installed automatically. You will also need an installation of Julia (>= 1.0.0, in practice either the long-term stable release or the current stable version), which you can install from [here](https://julialang.org/downloads/).
+
+On Windows, be sure to add your Julia installation to the PATH variable. 
 
 To test whether R can find the Julia installation, execute the following in R:
 
