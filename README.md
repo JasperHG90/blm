@@ -32,7 +32,7 @@ On Windows, follow the following steps.
 
 1. When installing Julia, take note of your installation path
 
-<img src="img/1recordpath.png"/>
+<img src="img/1recordpath.png"/ style="width:300px">
 
 2. Search for 'path' in the windows search path and select 'edit the system environment variables'
 
@@ -50,6 +50,8 @@ On Windows, follow the following steps.
 
 <img src="img/5addpath.png"/>
 
+6. Restart RStudio.
+
 ## Setting up R & Julia
 
 To test whether R can find the Julia installation, execute the following in R:
@@ -60,7 +62,7 @@ library(blm)
 blm_setup()
 ```
 
-If this succeeds, you should see the following message:
+If this succeeds, you should see something akin to the following message:
 
 ```shell
 Julia version 1.0.3 at location /home/jasper/julia-1.0.3/bin will be used.
