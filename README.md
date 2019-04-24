@@ -32,7 +32,7 @@ On Windows, follow the following steps.
 
 1. When installing Julia, take note of your installation path
 
-<img src="img/1recordpath.png" style="width:100px">
+<img src="img/1recordpath.png" width="200px">
 
 2. Search for 'path' in the windows search path and select 'edit the system environment variables'
 
