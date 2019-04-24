@@ -26,7 +26,31 @@ devtools::install_github("JasperHG90/blm")
 
 R dependencies will be installed automatically. You will also need an installation of Julia (>= 1.0.0, in practice either the long-term stable release or the current stable version), which you can install from [here](https://julialang.org/downloads/).
 
-On Windows, be sure to add your Julia installation to the PATH variable. 
+### Aside: installing Julia on Windows
+
+On Windows, follow the following steps.
+
+1. When installing Julia, take note of your installation path
+
+<img src="img/1recordpath.png"/>
+
+2. Search for 'path' in the windows search path and select 'edit the system environment variables'
+
+<img src="img/2findpathvars.png"/>
+
+3. Click on 'environment variables'
+
+<img src="img/3chooseenv.png"/>
+
+4, Select the 'path' variable under 'user variables for <yourusername>' and click 'edit'
+
+<img src="img/4editpath.png"/>
+
+5. Click on 'new' and paste the path you copied at step one, followed by '\bin'. Then click 'OK'.
+
+<img src="img/5addpath.png"/>
+
+## Setting up R & Julia
 
 To test whether R can find the Julia installation, execute the following in R:
 
