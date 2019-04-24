@@ -5,11 +5,18 @@
 #' Set sampling options on a blm object
 #'
 #' @param x blm object
-#' @param ... other options (chains, iterations etc.)
+#' @param chains number of chains to initialize
+#' @param iterations number of iterations to run the MC sampler
+#' @param thinning set thinning parameter
+#' @param burn number of samples that will be discarded
 #'
+#' @examples
+#' bfit <- set_sampling_options(bfit, chains=2, iterations=20000, thinning=3, burn = 2000)
+#'
+#' @importFrom magrittr '%>%'
 #' @return updated blm object
 #' @export
-set_sampling_options <- function(x, ...) {
+set_sampling_options <- function(x, chains, iterations, thinning, burn) {
   UseMethod("set_sampling_options", x)
 }
 
@@ -146,12 +153,14 @@ evaluate_accepted_draws <- function(x) {
 #' Calculate the Bayesian R-squared value
 #'
 #' @param x a blm object
+#' @param iterations number of samples to draw from the posterior distribution
+#' @param return_samples logical. If TRUE, then the function will also return the posterior predictive samples.
 #'
 #' @return object of class "R2" containing input parameters, posterior draws and r-squared values computed on the posterior draws
 #'
 #' @seealso Gelman, A., Goodrich, B., Gabry, J., & Vehtari, A. (2018). R-squared for Bayesian regression models. The American Statistician, (just-accepted), 1-6.
 #' @export
-evaluate_R2 <- function(x, ...) {
+evaluate_R2 <- function(x, iterations, return_samples) {
   UseMethod("evaluate_R2", x)
 }
 

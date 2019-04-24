@@ -101,7 +101,7 @@ m1ppc <- dirmod1 %>%
 
 # Summary
 summary(m1ppc)
-p <- plot(m1ppc, "normality") ; plot(p) # Two-sided test ==> violation 
+p <- plot(m1ppc %>% get_value("ppc"), "normality") ; plot(p) # Two-sided test ==> violation 
 p <- plot(m1ppc, "heteroskedasticity") ; plot(p) # One-sided test ==> violation (data are more heteroskedastic)
 p <- plot(m1ppc, "independence") ; plot(p) # Two-sided test ==> violation (data are correlated)
 

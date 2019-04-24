@@ -378,16 +378,6 @@ get_parameter_names.blm <- function(x) {
 
 }
 
-#' @param chains number of chains to initialize
-#' @param iterations number of iterations to run the MC sampler
-#' @param thinning set thinning parameter
-#' @param burn number of samples that will be discarded
-#'
-#' @examples
-#' bfit <- set_sampling_options(bfit, chains=2, iterations=20000, thinning=3, burn = 2000)
-#'
-#' @importFrom magrittr '%>%'
-#' @rdname set_sampling_options
 #' @export
 set_sampling_options.blm <- function(x, chains = 1, iterations = 10000,
                                      thinning = 1, burn = 1000) {
@@ -854,6 +844,7 @@ evaluate_ppc.blm <- function(x, iterations = 2000, return_samples = FALSE) {
 
 # Model fit
 #' @export
+#' @rdname evaluate_model_fit
 evaluate_model_fit.blm <- function(x) {
 
   # Check if posterior in blm object
@@ -946,9 +937,6 @@ evaluate_accepted_draws.blm <- function(x) {
 
 # R-squared
 #' @export
-#' @param iterations number of samples to draw from the posterior distribution
-#' @param return_samples logical. If TRUE, then the function will also return the posterior predictive samples.
-#' @rdname evaluate_R2
 evaluate_R2.blm <- function(x, iterations = 4000, return_samples=FALSE) {
 
   # Check if posterior in blm object
