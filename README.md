@@ -32,23 +32,23 @@ On Windows, follow the following steps.
 
 1. When installing Julia, take note of your installation path
 
-<img src="img/1recordpath.png" width="200px">
+<img src="img/1recordpath.png" width="500px">
 
 2. Search for 'path' in the windows search path and select 'edit the system environment variables'
 
-<img src="img/2findpathvars.png"/>
+<img src="img/2findpathvars.png" width="500px"/>
 
 3. Click on 'environment variables'
 
-<img src="img/3chooseenv.png"/>
+<img src="img/3chooseenv.png" width="500px"/>
 
 4, Select the 'path' variable under 'user variables for <yourusername>' and click 'edit'
 
-<img src="img/4editpath.png"/>
+<img src="img/4editpath.png" width="500px"/>
 
 5. Click on 'new' and paste the path you copied at step one, followed by '\bin'. Then click 'OK'.
 
-<img src="img/5addpath.png"/>
+<img src="img/5addpath.png" width="500px"/>
 
 6. Restart RStudio.
 
