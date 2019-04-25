@@ -248,10 +248,10 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
 
   for(i in 1:j) {
     if(!i %in% binary_j) {
-      # Mean and var
-      m <- runif(1, 1, 10)
-      v <- runif(1, 1, 3)
-      X[,i] <- rnorm(n, m, v)
+      # Mean and sd
+      m <- runif(1, 5, 10) * sign(runif(1, -1, 1))
+      sd <- runif(1, 1, 3)
+      X[,i] <- rnorm(n, m, sd)
     } else {
       X[,i] <- rbinom(n, 1, 0.5)
     }
@@ -262,7 +262,7 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
     set.seed(seed)
   }
   # Intercept + j coefs
-  coef <- c(rnorm(1, 0, 20), rnorm(j, 0, 10))
+  coef <- c(rnorm(1, 0, 20), rnorm(j, 0, 5))
   sigmaSq <- runif(1, 1, 10)
 
   #browser()
@@ -301,7 +301,7 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
     }
 
     # Correlated values
-    ord <- arima.sim(list(order = c(1,0,0), ar = 0.7), n = n, sd=sqrt(sigmaSq) * degree)
+    ord <- arima.sim(list(order = c(1,0,0), ar = degree), n = n, sd=sqrt(sigmaSq))
 
     # Add intercept
     X <- cbind(rep(1, n), X)

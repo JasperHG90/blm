@@ -128,8 +128,7 @@ dirmod2 <- dirmod2 %>%
   delete_posterior() %>%
   # Set an informative prior on the coefficients
   # Male (b4) is speculated to have 17% pay increase over women
-  #set_prior("b4", mu = 1.7, sd=0.3) %>%
-  
+  set_prior("b4", mu = 1.7, sd=0.3) %>%
   # Change the sampler of Age to metropolis hastings
   # Lambda parameter controls the variance of the (normal) proposal distribution
   set_sampler("b3", type="MH", lambda=0.01) %>%
@@ -149,7 +148,7 @@ dirmod2 %>% evaluate_accepted_draws() # ~ 40-45%
 
 # Look at burn-in diagnostics
 dirmod2 %>% 
-  convergence_diagnostics()
+  evaluate_convergence_diagnostics()
 
 # Check history plot
 plot(dirmod2, "history") # Burn-in is not high enough
@@ -180,23 +179,24 @@ summary(dirmod2)
 # ==> Both sectors increase compensation for directors
 
 # R-squared value
-m2r2 <- dirmod2 %>%
-  evaluate_R2()
+
 
 # Plot
-plot(m2r2)
-median(m2r2$rsquared) # R-squared ~ .089 ==> sometimes returns 0.5 but only after updating using update_posterior() ????
-quantile(m2r2$rsquared, c(0.025, 0.25, 0.5, 0.75, 0.975)) # 95% CCI [.46, .54]
+plot(m2r2$rsq)
+median(m2r2$rsq$rsquared) # R-squared ~ .089 ==> sometimes returns 0.5 but only after updating using update_posterior() ????
+quantile(m2r2$rsq$rsquared, c(0.025, 0.25, 0.5, 0.75, 0.975)) # 95% CCI [.46, .54]
 
 # Posterior predictive checks
 m2ppc <- dirmod2 %>%
-  evaluate_ppc()
+  evaluate_ppc(return_samples=TRUE)
 
 # Summary
-summary(m2ppc)
-p <- plot(m2ppc, "normality") ; plot(p) # Two-sided test ==> violation ==> less skewed compared to model 1
-p <- plot(m2ppc, "heteroskedasticity") ; plot(p) # One-sided test ==> violation (data are more heteroskedastic) ==> more extreme than model 1
-p <- plot(m2ppc, "independence") ; plot(p) # Two-sided test ==> violation (data are correlated) ==> less extreme than model 1 so we're better taking into account group effects
+summary(m2ppc$ppc)
+p <- plot(m2ppc$ppc, "normality") ; plot(p) # Two-sided test ==> violation ==> less skewed compared to model 1
+p <- plot(m2ppc$ppc, "heteroskedasticity") ; plot(p) # One-sided test ==> violation (data are more heteroskedastic) ==> more extreme than model 1
+p <- plot(m2ppc$ppc, "independence") ; plot(p) # Two-sided test ==> violation (data are correlated) ==> less extreme than model 1 so we're better taking into account group effects
+
+## Autocorrelation ==> not strange. Board members of the same COMPANY are more alike than board members of other company. Hence the correlation in the errors.
 
 # Model fit
 dirmod2 %>%
@@ -277,10 +277,34 @@ p2 <- dirmod2 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
 grid.arrange(p1, p2, ncol=2)
 ```
 
-```{r simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The data are drawn using the function generate\\_data() in the blm library.", fig.width=5, fig.height=3}
+```{r simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The color indicates the severity of the violation; the green bars indicate mild violation, blue indicates medium violation and red indicates severe violation. The script used to generate the data and run the simulations may be found here.", fig.width=5, fig.height=3}
+
+# Convenience function to flatten array
+flatten_array <- function(x) {
+  
+  # To list and return
+  lapply(1:dim(x)[3], function(y) {
+    ss <- x[,,y]
+    colnames(ss) <- c("normality", "heteroskedasticity", "independence")
+    # To df
+    ss <- as.data.frame(ss)
+    # Return
+    return(ss)
+  })
+  
+}
+
+# Read data
 normal <- readRDS("data/ppc_normal_data.rds")
-heter <- readRDS("data/ppc_heteronormal_data.rds")
-corr <- readRDS("data/ppc_autocor_data.rds")
+finsim <- readRDS("data/final.rds")
+heterosked <- finsim$heterosked$results %>% 
+  flatten_array() %>%
+  bind_rows(.id="severity") %>%
+  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
+indep <- finsim$indep$results %>% 
+  flatten_array() %>%
+  bind_rows(.id="severity") %>%
+  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
 
 # PPC heteroskedasticity, no violation
 p1 <- ggplot(data.frame(x=normal[,2]), aes(x=x)) +
@@ -303,23 +327,26 @@ p2 <- ggplot(data.frame(x=normal[,3]), aes(x=x)) +
         axis.text.x = element_blank()) +
   labs(title = "(b) PPC independence", subtitle="      no violations")
 # PPC heteroskedasticity, assumption violated
-p3 <- ggplot(data.frame(x=heter[,2]), aes(x=x)) +
-  geom_histogram(color="black", fill="lightgrey")  + 
+p3 <- ggplot(heterosked, aes(x=heteroskedasticity, fill=severity)) +
+  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
   theme_blm(text_size = 10) + 
+  scale_fill_brewer(palette = "Set1", direction=-1) +
   scale_x_continuous(limits=c(-0.02,1)) +
   theme(axis.title.x = element_blank(),
       axis.title.y = element_blank(),
-      axis.text.y = element_blank()) +
+      axis.text.y = element_blank(),
+      legend.position = "none") +
   labs(title = "(c) PPC heteroskedasticity", subtitle="      assumption violated")
 # PPC independence, violated
-p4 <- ggplot(data.frame(x=corr[,3]), aes(x=x)) +
-  geom_histogram(color="black", fill="lightgrey") +
-  scale_x_continuous(limits=c(0,1)) + 
+p4 <- ggplot(indep, aes(x=independence, fill=severity)) +
+  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
+  scale_fill_brewer(palette = "Set1", direction=-1) +
+  scale_x_continuous(limits=c(-0.02,1)) +
   theme_blm(text_size = 10) +
     theme(axis.title.x = element_blank(),
         axis.title.y = element_blank(),
-        axis.text.y = element_blank()) +
-  
+        axis.text.y = element_blank(),
+        legend.position = "none") +
   labs(title = "(d) PPC independence", subtitle="      assumption violated")
 
 # Merge plots

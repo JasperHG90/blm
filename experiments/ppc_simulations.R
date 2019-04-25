@@ -1,4 +1,5 @@
 ## Simulation study for PPC
+## Plan: Run
 
 library(blm)
 blm_setup()
@@ -7,35 +8,84 @@ blm_setup()
 k <- 1000
 
 # Results
-sim_res <- matrix(0, ncol=3, nrow=k)
+sim_res <- array(0L, c(k, 3, 3))
 
-# Loop
-t1 <- Sys.time()
-for(i in 1:k) {
+# Progress bar
+library(utils)
+pb <- txtProgressBar(min = 0, max = (k * (3 * 2)) + k, style = 3) # (k * (length(grid) * length(degrees))) + k [==>] (last k is for no violation)
 
-  # Simulate data
-  d <-blm:::generate_dataset(n = 200, j=2, binary = 1, heteroskedastic = FALSE,
-                              correlated_errors = TRUE, degree=0.4)
+# Grid of values to test
+# See: generate_dataset in helpers.R (line 222)
+grid <- list(
+  "noviolation" = list(
+    "results" = array(0L, c(k, 3, 1)),
+    "degrees" = 1 # Degrees will be ignored if no violation but it eases coding in the for-loop below
+  ),
+  "heterosked" = list(
+    "degrees" = c("mild" = 1, "medium"=3, "severe" = 5),
+    "results" = sim_res
+  ),
+  "indep" = list(
+    "degrees" = c("mild"=0.1, "medium"=0.5, "severe"=0.9), # Determines 'ar' param for an arima.sim
+    "results" = sim_res
+  )
+)
 
-  # Unroll
-  df <- as.data.frame(cbind(d$y, d$X[,-1]))
-  # Names
-  colnames(df) <- c("y", paste0("x", 1:(ncol(df) - 1)))
+# For each test
+# keep track of total i for progress bar
+i_pb <- 0
+# For each assumption
+for(j in seq_along(grid)) {
 
-  # Blm object
-  bfit <- blm("y ~ .", data=df) %>%
-    set_sampling_options(iterations = 15000, burn = 2000, chains = 2) %>%
-    sample_posterior()
+  # For each degree
+  for(d in seq_along(grid[[j]][["degrees"]])) {
 
-  # Get ppc results
-  ppcr <- bfit %>%
-    evaluate_ppc(iterations = 4000)
+    # For each simulation
+    for(i in 1:k) {
 
-  # Store results
-  sim_res[i, ] <- c(ppcr$results$normality, ppcr$results$homosked, ppcr$results$independence)
+      # Increment i_pb
+      i_pb <- i_pb + 1
+
+      # Set pb
+      setTxtProgressBar(pb, i_pb)
+
+      # Unroll data
+      noviolation <- ifelse(j == 1, TRUE, FALSE)
+      heteroskedastic <- ifelse(j == 2, TRUE, FALSE)
+      independence <- !heteroskedastic & !noviolation
+
+      # Simulate data
+      dat <-blm:::generate_dataset(n = 100, j=2, binary = 0, heteroskedastic = heteroskedastic,
+                                 correlated_errors = independence, degree=grid[[j]][["degrees"]][[d]])
+
+      # Unroll
+      df <- as.data.frame(cbind(dat$y, dat$X[,-1]))
+      # Names
+      colnames(df) <- c("y", paste0("x", 1:(ncol(df) - 1)))
+
+      # Blm object
+      bfit <- blm("y ~ .", data=df) %>%
+        set_sampling_options(iterations = 15000, burn = 2000, chains = 1) %>%
+        sample_posterior() %>%
+        # PPC
+        evaluate_ppc(iterations = 4000)
+
+      # Store ppc
+      ppcr <- get_value(bfit, "ppc")
+      # Store results
+      grid[[j]][["results"]][i, , d] <- c(ppcr$results$normality, ppcr$results$homosked, ppcr$results$independence)
+
+      # Save every 10 iterations
+      if(i %% 10 == 0) {
+        # Store data
+        saveRDS(sim_res, "experiments/ppc_simulated/tmp.rds")
+      }
+
+    }
+
+  }
 
 }
-t2 <- Sys.time() - t1
 
 # Store data
 saveRDS(sim_res, "experiments/ppc_autocor_data.rds")
