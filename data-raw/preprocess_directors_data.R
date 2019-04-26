@@ -8,7 +8,7 @@ directors <- read.csv2("testing/FinalData.csv") %>%
   # Select only independent directors
   filter(isED == 0) %>%
   # Select only these variables
-  select(Recent_Comp_Thous, Sector, isM, Age) %>%
+  select(Recent_Comp_Thous, Sector, isM, Age, Company) %>%
   # Remove NA
   filter(!is.na(Recent_Comp_Thous),
          !is.na(Age)) %>%
@@ -18,9 +18,10 @@ directors <- read.csv2("testing/FinalData.csv") %>%
   filter(Sector %in% c("Financial", "Services", "Basic Materials")) %>%
   mutate(Sector = factor(as.character(Sector),
                          levels = c("Financial", "Services", "Basic Materials")),
-         Male = factor(isM, levels=c(0,1))) %>%
+         Male = factor(isM, levels=c(0,1)),
+         Company = as.character(Company)) %>%
   select(-isM) %>%
   rename(Compensation = Recent_Comp_Thous)
 
 # Save data
-devtools::use_data(directors)
+devtools::use_data(directors, overwrite = TRUE)

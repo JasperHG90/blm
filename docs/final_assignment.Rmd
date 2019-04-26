@@ -49,6 +49,11 @@ blm_setup()
 
 # Introduction
 
+$$
+\tag{1}
+\hat{\log(\text{compensation}_i)} = \beta_0 + \beta_{1} \times \text{age}_i + \beta_2 \times \text{male}_i + \beta_3 \times \text{SectorServices}_i + \beta_4 \times \text{SectorBasicMaterials}_i + \epsilon_i
+$$
+
 ```{r models, results='hide', fig.show='hide'}
 ## Run two models.
 
@@ -115,7 +120,7 @@ dirmod1 %>%
 # We have three: financial (base case), services and Basic materials
 
 # Create the model
-dirmod2 <- blm("Compensation ~ .",
+dirmod2 <- blm("Compensation ~ Sector + Age + Male",
                 data=directors) 
 
 # Retrieve parameter names
@@ -128,7 +133,7 @@ dirmod2 <- dirmod2 %>%
   delete_posterior() %>%
   # Set an informative prior on the coefficients
   # Male (b4) is speculated to have 17% pay increase over women
-  set_prior("b4", mu = 1.7, sd=0.3) %>%
+  set_prior("b4", mu = .17, sd=0.001) %>%
   # Change the sampler of Age to metropolis hastings
   # Lambda parameter controls the variance of the (normal) proposal distribution
   set_sampler("b3", type="MH", lambda=0.01) %>%
@@ -144,7 +149,8 @@ dirmod2 <- dirmod2 %>%
   sample_posterior()
 
 # Evaluate the accepted draws
-dirmod2 %>% evaluate_accepted_draws() # ~ 40-45%
+dirmod2 %>% 
+  evaluate_accepted_draws() # ~ 40-45%
 
 # Look at burn-in diagnostics
 dirmod2 %>% 
@@ -167,7 +173,8 @@ plot(dirmod2, "history") # This seems OK
 plot(dirmod2, "autocorrelation") # Not a problem
 
 # Evaluate the effect of MH on the effective sample size
-dirmod2 %>% evaluate_effective_sample_size() 
+dirmod2 %>% 
+  evaluate_effective_sample_size() 
 
 # View densities
 plot(dirmod2, "density")
@@ -190,6 +197,40 @@ quantile(m2r2$rsq$rsquared, c(0.025, 0.25, 0.5, 0.75, 0.975)) # 95% CCI [.46, .5
 m2ppc <- dirmod2 %>%
   evaluate_ppc(return_samples=TRUE)
 
+# Residual plot
+errs <- data.frame(
+  "residuals_model" = resid(dirmod2),
+  "predicted_model" = predict(dirmod2),
+  "company" = directors$Company
+)
+
+library(ggplot2)
+p1 <- ggplot(errs, aes(x=predicted_model, y=residuals_model, color=as.factor(company))) +
+  geom_point() +
+  theme_blm() +
+  theme(legend.position="none")
+library(purrr)
+rc <- errs %>%
+  split(.$company) %>%
+  map(function(x) {
+    x$residuals_lagged <- c(NA, x$residuals_model[1:length(x$residuals_model)-1])
+    cor(x$residuals_model, x$residuals_lagged, use="complete.obs")
+  }) %>%
+  unlist()
+
+rc <- data.frame(
+  "cor" = unname(rc),
+  "comp" = names(rc)
+)
+
+p2 <- ggplot(rc, aes(x=reorder(comp, -abs(cor)), y=cor)) +
+  geom_bar(stat="identity") +
+  theme_blm() +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank()) # ==> correlation by boards, should do a multilevel model here to accomodate hierarchical structure of the data.
+
+library(gridExtra)
+grid.arrange(p1, p2, ncol=2)
 # Summary
 summary(m2ppc$ppc)
 p <- plot(m2ppc$ppc, "normality") ; plot(p) # Two-sided test ==> violation ==> less skewed compared to model 1
