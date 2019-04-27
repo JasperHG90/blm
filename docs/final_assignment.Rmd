@@ -42,7 +42,7 @@ directors <- directors %>%
 # Define a convenience function. Basically, take nice output from a stargazer latex regression table & modify it for blm models.
 ```
 
-```{r julia}
+```{r julia setup}
 # Set up blm julia
 blm_setup() 
 ```
@@ -51,13 +51,13 @@ blm_setup()
 
 $$
 \tag{1}
-\hat{\log(\text{compensation}_i)} = \beta_0 + \beta_{1} \times \text{age}_i + \beta_2 \times \text{male}_i + \beta_3 \times \text{SectorServices}_i + \beta_4 \times \text{SectorBasicMaterials}_i + \epsilon_i
+\hat{\log(\text{compensation}_i)} = \beta_0 + \beta_{1} \text{age}_i + \beta_2\text{male}_i + \beta_3\text{SectorServices}_i + \beta_4\text{SectorBasicMaterials}_i + \epsilon_i
 $$
 
-```{r models, results='hide', fig.show='hide'}
+```{r model1, include = FALSE}
 ## Run two models.
 
-# Model 1: only age and male dummy -----
+# Model 1: only age and male dummy ==> baseline model -----
 
 # Priors are uninformative (mean 0, sd 1000)
 # Initial values are drawn from the priors
@@ -71,6 +71,7 @@ dirmod1 <- blm("Compensation ~ Age + Male",
                      chain_2 = list("b" = c(-5, 0, 7), "sigma" = 2)) %>%
   # Sample
   sample_posterior()
+# Sanity check for coefficients
 coef(dirmod1)
 coef(lm("Compensation ~ Age + Male", data=directors)) # Sanity check
 # Inspect convergence
@@ -86,10 +87,6 @@ plot(dirmod1, "autocorrelation") # OK
 summary(dirmod1)
 # ==> neither male nor age is a predictor of logged compensation (CCI contains 0)
 
-# R-squared value
-dirmod1 <- dirmod1 %>%
-  evaluate_R2()
-
 # Plot
 dirmod1 %>% 
   get_value("rsq") %>%
@@ -102,18 +99,27 @@ dirmod1 %>%
 
 # Posterior predictive checks
 m1ppc <- dirmod1 %>%
-  evaluate_ppc()
+  evaluate_ppc(return_samples=TRUE)
 
 # Summary
 summary(m1ppc)
-p <- plot(m1ppc %>% get_value("ppc"), "normality") ; plot(p) # Two-sided test ==> violation 
-p <- plot(m1ppc, "heteroskedasticity") ; plot(p) # One-sided test ==> violation (data are more heteroskedastic)
-p <- plot(m1ppc, "independence") ; plot(p) # Two-sided test ==> violation (data are correlated)
+p <- plot(m1ppc %>% 
+            get_value("ppc"), 
+          "normality") ; plot(p) # Two-sided test ==> violation 
+p <- plot(m1ppc %>% 
+            get_value("ppc"), 
+          "heteroskedasticity") ; plot(p) # One-sided test ==> violation (data are more heteroskedastic)
+p <- plot(m1ppc %>%
+            get_value("ppc"), 
+          "independence") ; plot(p) # Two-sided test ==> violation (data are correlated)
 
 # Model fit
 dirmod1 %>%
-  evaluate_model_fit() # ==> DIC is 509 with 4 parameters
+  get_value("DIC") %>%
+  summary()# ==> DIC is 509 with 4 parameters
+```
 
+```{r model2, include = FALSE}
 # Model 2: Age, gender and sector -----
 
 # Hypothesis: the relationship between gender and compensation differs across sectors
@@ -147,6 +153,15 @@ dirmod2 <- dirmod2 %>%
                      chain_2 = list("b" = c(2, 4, 7, 2, 3), "sigma"=2)) %>%
   # Sample the posterior distribution
   sample_posterior()
+
+# Compute a z-score difference from the posterior to the prior
+# Idea: how much does the posterior shift when confronted with new data?
+#        calculate on the scale of the posterior
+thprior <- rnorm(1, mean=dirmod2$priors$b4$mu, sd=dirmod2$priors$b4$sd)
+ps <- get_posterior_samples(dirmod2) 
+pmu <- apply(ps, 2, mean)
+psd <- apply(ps, 2, sd)
+z <- abs((pmu["Male"] - thprior) / psd["Male"])
 
 # Evaluate the accepted draws
 dirmod2 %>% 
@@ -244,11 +259,7 @@ dirmod2 %>%
   evaluate_model_fit() # ==> DIC is 487.895 with 6 parameters ==> fit is better than model 1
 ```
 
-```{r}
-plot(predict(dirmod2), resid(dirmod2))
-```
-
-```{r, eval=TRUE, results='asis'}
+```{r model results (including model fit), eval=TRUE, results='asis'}
 # Calculate 95% CCI
 CCI1 <- t(apply(get_posterior_samples(dirmod1), 2, quantile, c(0.025, 0.25, 0.5, 0.75, 0.975))[c(1, 5),]) %>% round(., digits=3)
 CCI2 <- t(apply(get_posterior_samples(dirmod2), 2, quantile, c(0.025, 0.25, 0.5, 0.75, 0.975))[c(1, 5),]) %>% round(., digits=3)
@@ -307,18 +318,11 @@ cat(
 )
 ``` 
 
-```{r r-squared, fig.cap="Bayesian R-squared value for model 1 (left) and model 2 (right).", fig.height=2, fig.width=5}
-# Plot r-squared
-p1 <- dirmod1 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
-  theme(axis.title = element_blank())
-p2 <- dirmod2 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
-  theme(axis.title = element_blank())
-
-# Grid
-grid.arrange(p1, p2, ncol=2)
+```{r classical residuals}
+plot(predict(dirmod2), resid(dirmod2))
 ```
 
-```{r simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The color indicates the severity of the violation; the green bars indicate mild violation, blue indicates medium violation and red indicates severe violation. The script used to generate the data and run the simulations may be found here.", fig.width=5, fig.height=3}
+```{r ppc simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The color indicates the severity of the violation; the green bars indicate mild violation, blue indicates medium violation and red indicates severe violation. The script used to generate the data and run the simulations may be found here.", fig.width=5, fig.height=3}
 
 # Convenience function to flatten array
 flatten_array <- function(x) {
@@ -393,3 +397,155 @@ p4 <- ggplot(indep, aes(x=independence, fill=severity)) +
 # Merge plots
 grid.arrange(p1, p2, p3, p4)
 ```
+
+
+```{r r-squared plot, fig.cap="Bayesian R-squared value for model 1 (left) and model 2 (right).", fig.height=2, fig.width=5}
+# Plot r-squared
+p1 <- dirmod1 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
+  theme(axis.title = element_blank())
+p2 <- dirmod2 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
+  theme(axis.title = element_blank())
+
+# Grid
+grid.arrange(p1, p2, ncol=2)
+```
+
+## Differences in Bayesian and Frequentist inference
+
+```{r effect of prior variance, fig.height=4, fig.width=5, fig.cap="Effect of adjusting the prior variance of the coefficient for variable Male (a) on the posterior distribution (b). The mean is set at M=.17 which represents a 17% increase in compensation for males versus females. Reducing the prior variance represents increased certainty about the estimate of our domain knowledge and weights the information from the data more strongly compared to domain knowledge (c) and (d)."}
+# Posterior shrinkage
+dirmod3 <- blm("Compensation ~ Sector + Age + Male",
+                data=directors) %>%
+  # Need to delete posterior when we change settings
+  # (only has an effect if posterior already present)
+  delete_posterior() %>%
+  # Set an informative prior on the coefficients
+  # Male (b4) is speculated to have 17% pay increase over women
+  set_prior("b4", mu = .17, sd=0.001) %>%
+  # Update sampling settings
+  set_sampling_options(chains = 2, iterations = 20000,
+                       burn = 4000, thinning=3) %>%
+  # Set initial values
+  # If we draw from the priors the starting values will be too large
+  # This is an issue for MH because it takes many more iterations to converge
+  set_initial_values(chain_1 = list("b" = c(4, 2, 3, 8, 10), "sigma"= 1),
+                     chain_2 = list("b" = c(2, 4, 7, 2, 3), "sigma"=2)) %>%
+  # Sample the posterior distribution
+  sample_posterior()
+
+# Change prior and run for another 600000 observations
+dirmod3 <- dirmod3 %>%
+  set_prior("b4", mu = .17, sd=0.01) %>%
+  update_posterior(iterations=20000)
+# Same
+dirmod3 <- dirmod3 %>%
+  set_prior("b4", mu = .17, sd=0.1) %>%
+  update_posterior(iterations=20000)
+
+# Retrieve posterior samples for male variable, burn and label by prior variance 
+library(purrr)
+pd <- get_value(dirmod3, "posterior") %>%
+  get_value("samples") %>%
+  map(function(x) {
+    r1 <- x[4001:20000,"Male"]
+    r2 <- x[24001:40000, "Male"]
+    r3 <- x[44001:60000, "Male"]
+    return(
+      data.frame(
+        "Male" = c(r1, r2, r3),
+        "Prior" = factor(c(rep(1, length(r1)),rep(2, length(r2)), rep(3, length(r3))),
+                         labels = c("0.001", "0.01", "0.1"))
+      )
+    )
+  }) %>%
+  bind_rows()
+
+# Calculate SD by prior
+pd_sd <- pd %>%
+  group_by(Prior) %>%
+  summarize(psd = sd(Male),
+            pmn = mean(Male))
+
+# Posterior z-value
+zscore <- function(mean, sd, theta) (mean - theta) / sd
+z1 <- zscore(pd_sd$pmn[1], pd_sd$psd[1], .17)
+z2 <- zscore(pd_sd$pmn[2], pd_sd$psd[2], .17)
+z3 <- zscore(pd_sd$pmn[3], pd_sd$psd[3], .17)
+
+# Posterior scaling of sd
+ps1 <- pd_sd$psd[1]^2 / as.numeric(levels(pd_sd$Prior)[1])^2 # 841
+ps2 <- pd_sd$psd[2]^2 / as.numeric(levels(pd_sd$Prior)[2])^2 # 35
+ps3 <- pd_sd$psd[3]^2 / as.numeric(levels(pd_sd$Prior)[3])^2 # 0.53
+
+library(ggplot2)
+library(ggpubr)
+priorvar <- ggplot(data.frame(
+  "Male" = c(rnorm(10000, mean=.17, sd=0.001), 
+             rnorm(10000, mean=.17, sd=.01), 
+             rnorm(10000, mean=.17, sd=.1)),
+  "Prior" = factor(c(rep(1, 10000), rep(2, 10000), rep(3, 10000)), labels = c("0.001", "0.01", "0.1"))
+  ),
+  aes(x=Male, fill=Prior)) +
+  geom_histogram(alpha=0.4, position="identity", color="black") +
+  theme_blm() +
+  theme(axis.title = element_blank(),
+        axis.text.y=element_blank()) +
+  scale_fill_brewer(palette = "Set1",
+                    name="Prior variance") +
+  labs(title = "(a) Prior distribution")
+
+# Posterior distribution
+postvar <- ggplot(pd, aes(x=Male, fill=Prior)) +
+  geom_histogram(alpha=0.4, position="identity", color="black") +
+  theme_blm() +
+  theme(axis.title = element_blank(),
+        axis.text.y=element_blank()) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(title= "(b) Posterior distribution")
+
+# Shift
+closeup <- data.frame(
+  "value" = c(pd$Male[pd$Prior == "0.01"],rnorm(32000, mean=.17, sd=.01)),
+  "type" = c(rep("posterior", 32000), rep("prior", 32000))
+)
+library(latex2exp)
+posteriorshift <- ggplot(closeup, aes(x=value, group=type, fill=type)) +
+  geom_histogram(alpha=0.1, position="identity", color="black") +
+  # Error bar for prior
+  geom_errorbarh(aes(xmin=unname(quantile(closeup$value[closeup$type == "prior"], 0.025)),
+                     xmax=unname(quantile(closeup$value[closeup$type == "prior"], 0.975)),
+                     y = -600)) +
+  annotate(geom="text", x=.13, y=-600, label=TeX("$95% CCI (prior)$"), hjust=.5) +
+  # Error bar for posterior
+  geom_errorbarh(aes(xmin=unname(quantile(closeup$value[closeup$type == "posterior"], 0.025)),
+                     xmax=unname(quantile(closeup$value[closeup$type == "posterior"], 0.975)),
+                     y = -1500)) +
+  annotate(geom="text", x=pd_sd$pmn[2], y=-2200, label=TeX("$95% CCI (posterior)$")) +
+  # Line for prior
+  geom_segment(aes(x=.17,xend=.17, y=0, yend=19400), linetype="dashed", color="black",
+             size = 0.35) +
+  annotate(geom="text", x=.19, y=20000, label=TeX("$\\mu_{prior}$")) +
+  # Line for posterior
+  geom_segment(aes(x=pd_sd$pmn[2],xend=pd_sd$pmn[2], y=0, yend=19400), linetype="dashed", color="black",
+             size = 0.35) +
+  annotate(geom="text", x=pd_sd$pmn[2]-.05, y=20000, label=TeX("$\\mu_{posterior}$")) +
+  theme_blm() +
+  theme(axis.title = element_blank(),
+      axis.text.y=element_blank(),
+      legend.position = "none") +
+  labs(title = "(c) Prior/posterior comparison",
+       subtitle = "For prior with variance 0.01")
+  
+# Text table
+tab <- ggtexttable(round(data.frame(
+  "prior_var" = c(0.001, 0.01, 0.1),
+  "z_score" = c(z1, z2, z3),
+  "shrinkage" = c(ps1, ps2, ps3)
+), digits=3), rows=NULL, theme=ttheme("minimal"))
+
+# Arrange plots with common legend
+ggarrange(priorvar, postvar, posteriorshift, tab, ncol=2, nrow=2, common.legend=TRUE, legend="top")
+```
+
+The effect of changing the prior variance can be summarized using a posterior shrinking factor (CITE BETANCOURT) and posterior z-score. The shrinking factor shows us the factor by which the variance of the posterior distribution shrinks or expands compared to the prior variance. The posterior z-score tells us the direction and magnitude by which the posterior mean shifts compared to the prior mean; if we are confident in the precision of our domain knowledge (resulting in small prior variance), the resulting posterior weights this information strongly and we end up with a posterior mean that lies closer to the prior mean (represented by the z-score). However, given that we have small variance, and if this is not corroborated by the data, then the shrinkage factor will be large. 
+
