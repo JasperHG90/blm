@@ -126,6 +126,8 @@ DIC <- function(X, y, posterior_samples) {
   ## Two parts to DIC ==> (1) sum of log of likelihood P(y|theta_MAP)
 
   # Call Julia implementation
+  # NOTE: sigma here is the standard deviation. We use posterior values. These have been squared-rooted
+  #  after sampling.
   r <- .blm$julia$eval("DIC")(X, as.numeric(y),
                               coefs, sigma, pb)
 

@@ -32,7 +32,13 @@ print.ppc <- function(ppc) {
   summary(ppc)
 }
 
-# Plot method
+#' Plot posterior predictive samples
+#'
+#' Plotting is only possible if you choose to return 'return_samples=TRUE' in \code{evaluate_ppc()}
+#'
+#' @param ppc a posterior predictive check object (ppc)
+#' @param type one of 'normality', 'heteroskedasticity' or 'independence'
+#'
 #' @importFrom magrittr '%>%'
 #' @importFrom ggplot2 ggplot
 #' @importFrom ggplot2 geom_density
@@ -41,6 +47,17 @@ print.ppc <- function(ppc) {
 #' @importFrom ggplot2 ggtitle
 #' @importFrom ggExtra ggMarginal
 #' @importFrom latex2exp TeX
+#'
+#' @examples
+#' data("directors")
+#' fit <- blm("Compensation ~ Age", data=directors) %>%
+#'    sample_posterior()
+#' # Calculate PPC
+#' fit <- fit %>%
+#'    evaluate_ppc(return_samples=TRUE)
+#' # Plot
+#' plot(fit %>% get_value('ppc'), 'normality')
+#'
 #' @export
 plot.ppc <- function(ppc, type=c("normality", "heteroskedasticity", "independence")) {
 

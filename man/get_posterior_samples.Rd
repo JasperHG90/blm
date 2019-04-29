@@ -15,3 +15,11 @@ a matrix of dimensions iterations x (variables + 1)
 \description{
 Retrieve the posterior samples as a data frame from a blm object.
 }
+\examples{
+data("directors")
+fit <- blm("Compensation ~ Age", data=directors) \%>\%
+   sample_posterior()
+# Retrieve samples (burned automatically)
+psamples <- get_posterior_samples(fit)
+
+}

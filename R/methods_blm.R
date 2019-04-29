@@ -116,7 +116,15 @@ summary.blm <- function(x) {
 
 }
 
-# Plot method
+#' Plot a blm object
+#'
+#' @param x blm object
+#' @param type one of 'history' (trace plot), 'autocorrelation' or 'density'
+#' @param ... other options passed for specific plots. Accepted arguments are:
+#' \describe{
+#'     \item{chain}{Integer >= 1 specifying which chain to use for autocorrelation plot. If not chosen, chain 1 is automatically used.}
+#' }
+#'
 #' @export
 #' @importFrom ggplot2 ggplot
 #' @importFrom ggplot2 aes
@@ -440,15 +448,6 @@ set_sampling_options.blm <- function(x, chains = 1, iterations = 10000,
 
 }
 
-#' @param par name of the coefficient, given as b0 (intercept) or b1, ... for coefficients.
-#' @param type name of the sampler to use. Either 'Gibbs' or 'MH'. Defaults to 'Gibbs'.
-#' @param lambda tuning parameter for the variance of the proposal distribution in metropolis-hastings
-#'
-#' @examples
-#' bfit <- set_sampler(bfit, "b0", type="MH")
-#'
-#' @importFrom magrittr '%>%'
-#' @rdname set_sampler
 #' @export
 set_sampler.blm <- function(x, par, type = c("Gibbs", "MH"), lambda=0.25) {
 
@@ -476,13 +475,6 @@ set_sampler.blm <- function(x, par, type = c("Gibbs", "MH"), lambda=0.25) {
 
 }
 
-#' @param ... named argument containing (1) a chain name (e.g. 'chain_1') and (2) a list of initial values. See examples.
-#'
-#' @importFrom magrittr '%>%'
-#' @rdname set_initial_values
-#' @examples
-#' bfit <- set_initial_values(bfit, chain_1 = list("b" = c(2,5,3,4,5), sigma=0.1))
-#'
 #' @export
 set_initial_values.blm <- function(x, ...) {
 
@@ -542,18 +534,7 @@ set_initial_values.blm <- function(x, ...) {
 
 }
 
-#' Class method to change priors for available parameters
-#'
-#' @param par name of the coefficient, given as b0 (intercept) or b1, ... for coefficients.
-#' @param ... other arguments passed to function. In the case of intercept and coefficients, these are 'mu' and 'sd' (prior means and variances). In the case of the residual variance, the rate and shape/scale parameter must be passed as 'alpha' and 'beta'
-#'
-#' @examples
-#' bfit <- set_prior(bfit,"b0", mu=40, sd=7)
-#' bfit <- set_prior(bfit, "sigma", alpha=2, beta=1)
-#'
 #' @export
-#' @rdname set_prior
-#' @importFrom magrittr '%>%'
 set_prior.blm <- function(x, par, ...) {
 
   # Get opts
@@ -589,8 +570,6 @@ set_prior.blm <- function(x, par, ...) {
 
 # Execute a blm plan
 #' @export
-#' @rdname sample_posterior
-#' @importFrom magrittr '%>%'
 sample_posterior.blm <- function(x) {
 
   # unroll data
@@ -614,15 +593,7 @@ sample_posterior.blm <- function(x) {
 }
 
 # Update an already sampled blm plan
-#' @param iterations number of additional samples to draw from the posterior.
-#'
-#' @examples
-#' bfit <- update_posterior(blm, iterations=5000)
-#'
-#' @return blm object with updated count of posterior samples.
 #' @export
-#' @rdname update_posterior
-#' @importFrom magrittr '%>%'
 update_posterior.blm <- function(x, iterations = 1000) {
 
   # Check if posterior in blm object
@@ -772,10 +743,7 @@ evaluate_convergence_diagnostics.blm <- function(x) {
 # EVALUATION ----
 
 # posterior predictive checks
-#' @param iterations number of iterations to run for posterior predictive checks. This number will be tagged on to the burn parameter specified under \link[blm]{set_sampling_options}.
-#' @param return_samples logical. If TRUE, then the function will also return the posterior predictive samples.
 #' @export
-#' @rdname evaluate_ppc
 evaluate_ppc.blm <- function(x, iterations = 2000, return_samples = FALSE) {
 
   # Check if posterior in blm object
@@ -844,7 +812,6 @@ evaluate_ppc.blm <- function(x, iterations = 2000, return_samples = FALSE) {
 
 # Model fit
 #' @export
-#' @rdname evaluate_model_fit
 evaluate_model_fit.blm <- function(x) {
 
   # Check if posterior in blm object
@@ -877,7 +844,6 @@ evaluate_model_fit.blm <- function(x) {
 
 # Effective sample size
 #' @export
-#' @rdname evaluate_effective_sample_size
 evaluate_effective_sample_size.blm <- function(x) {
 
   # Check if posterior in blm object
@@ -904,8 +870,6 @@ evaluate_effective_sample_size.blm <- function(x) {
 
 # Accepted draws
 #' @export
-#' @importFrom magrittr '%>%'
-#' @rdname evaluate_accepted_draws
 evaluate_accepted_draws.blm <- function(x) {
 
   # Check if posterior in blm object

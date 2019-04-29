@@ -15,3 +15,11 @@ blm object minus posterior samples
 \description{
 Generally, there is no good reason to delete the posterior samples. The only situation in which this may occur if the user has already sampled the posterior and wants to change the sampling plan, which is locked after the posterior is sampled.
 }
+\examples{
+data("directors")
+fit <- blm("Compensation ~ Age", data=directors) \%>\%
+   sample_posterior()
+# Delete posterior samples
+fit <- fit \%>\% delete_posterior
+
+}

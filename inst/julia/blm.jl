@@ -85,7 +85,7 @@ function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
                         sigma::Float64, priors, samplers)
 
     #=
-    Run a single iteration of the gibbs sampler
+    Run a single iteration of the MCMC sampler
 
     :param X: Design matrix containing j+1 coefficients (first coefficient must equal intercept variable). The design matrix is created in R using model.matrix()
     :param y: Numeric array with outcome variables. Length(y) == nrow(X)
@@ -95,8 +95,6 @@ function MCMC_one_step(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
     :param samplers: Dict containing information on which sampling strategy to follow for each coefficient (gibbs or MH)
 
     :return: Dict containing draws for each conditional posterior distribution.
-    :seealso: The file 'conditionalposterior.pdf' in the 'docs' folder for an elaboration on the derivation of the
-                conditional posterior values for each parameter.
     =#
 
     # Local value for accepted draws
@@ -167,6 +165,23 @@ function MH_one_step_coef(b_previous::Float64, xj::Array{Float64}, X::Array{Floa
 
     #=
     Perform one draw (iteration) of the Metropolis-Hastings sampler
+
+    :param b_previous: Scalar. Previous value of the jth coefficient.
+    :param xj: Array. values of the jth column of the design matrix X as a column vector
+    :param X: Array. design matrix X excluding the jth column
+    :param y: Array. outcome values y
+    :param w: Array. parameter matrix w excluding the jth row (i.e. the jth coefficient)
+    :param sigma: Scalar. variance parameter
+    :param prior_mu: Scalar. prior mean
+    :param prior_tau: Scalar. prior variance
+    :para, zeta: Scalar. tuning parameter. Controls the variance of the proposal distribution (a normal).
+
+    :return: A dict containing:
+               - samp: either a new value or b_proposed
+               - accepted: indicator (1/0) if proposal was accepted
+
+    :seealso:
+        - 'MH.pdf' in '/docs' folder for implementation notes
     =#
 
     # Draw proposal
@@ -198,6 +213,20 @@ function MH_one_step_coef(b_previous::Float64, xj::Array{Float64}, X::Array{Floa
 function gibbs_one_step_coef(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
                              sigma::Float64, prior_mu::Float64, prior_sd::Float64, j::Int)
 
+     #=
+     Perform one draw (iteration) of the Gibbs sampler
+
+     :param X: Array. design matrix X
+     :param y: Array. outcome values y
+     :param w: Array. parameter matrix w
+     :param sigma: Scalar. variance parameter
+     :param prior_mu: Scalar. prior mean
+     :param prior_tau: Scalar. prior variance
+     :param j: Scalar. indicator value for the jth coefficient. (e.g. if this is the second coefficient then j=2)
+
+     :return: single draw of the posterior distribution
+     =#
+
     return(
         rand(Normal(posterior_mu(X[:,1:end .!= j], X[:,j], y, w[1:end .!= j], sigma,
                                         prior_mu, prior_sd),
@@ -208,6 +237,19 @@ function gibbs_one_step_coef(X::Array{Float64}, y::Array{Float64}, w::Array{Floa
 
 function gibbs_one_step_resvar(X::Array{Float64}, w::Array{Float64}, y::Array{Float64},
                               prior_alpha::Float64, prior_beta::Float64)
+
+      #=
+      Perform one draw (iteration) of the Gibbs sampler (residual variance)
+
+      :param X: Array. design matrix X
+      :param y: Array. outcome values y
+      :param w: Array. parameter matrix w
+      :param prior_alpha: Scalar. prior scale
+      :param prior_beta: Scalar. prior rate
+
+      :return: single draw of the posterior distribution
+      =#
+
 
     return(
         rand(InverseGamma(posterior_rate(size(X)[1], prior_alpha),
@@ -301,9 +343,22 @@ function posterior_coef(bj::Float64, xj::Array{Float64}, X::Array{Float64}, y::A
                         w::Array{Float64}, sigma::Float64, prior_mu::Float64, prior_tau::Float64)
 
     #=
-    Sample the logged non-normalized posterior for a coefficient
+    Sample the logged non-normalized posterior for a coefficient.
 
-    @seealso: implementation notes on GitHub
+    :param b_previous: Scalar. Previous value of the jth coefficient.
+    :param xj: Array. values of the jth column of the design matrix X as a column vector
+    :param X: Array. design matrix X excluding the jth column
+    :param y: Array. outcome values y
+    :param w: Array. parameter matrix w excluding the jth row (i.e. the jth coefficient)
+    :param sigma: Scalar. variance parameter
+    :param prior_mu: Scalar. prior mean
+    :param prior_tau: Scalar. prior variance
+    :para, zeta: Scalar. tuning parameter. Controls the variance of the proposal distribution (a normal).
+
+    :return: Scalar. single draw from the logged and unnormalized posterior distribution
+
+    :seealso:
+        - 'MH.pdf' in '/docs' folder for implementation notes
     =#
 
     left = -(bj)^2 * (( sum( transpose(xj) * xj ) / (2*sigma) ) + ( 1 / ( 2*prior_tau ) ))
@@ -332,7 +387,16 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
         2. Homogeneity of variances (using adj. R^2 of a linear regression on squared residuals).
         3. Independence of errors (using correlation of lagged residuals).
 
-    :param effective_iterations: number of iterations minus burn-in period
+    :param X: Design matrix containing j+1 coefficients (first coefficient must equal intercept variable). The design matrix is created in R using model.matrix()
+    :param y: Numeric array with outcome variables. Length(y) == nrow(X)
+    :param w: Coefficient matrix containing initial values. nrow(w) == ncol(X)
+    :param sigma: Single initial value for the variance.
+    :param iterations: Number of sampling iteratios in each chain
+    :param thinning: thinning parameter. The value for thinning determines the observation that will be used as a draw from the posterior.
+                        That is, if thinning = 3, then the first two draws will be discarded and only the third draw will be returned as a draw
+                        from the posterior distribution.
+    :param priors: Dict containing information on the priors of each coefficient and sigma
+    :param samplers: Dict containing information on which sampling strategy to follow for each coefficient (gibbs or MH)
 
     :return: Dictionary containing:
         1. sim_y              [==>] 2D Tensor ([iterations - burn] * 1) of simulated y values
@@ -432,8 +496,10 @@ function predict_y(X::Array{Float64}, y::Array{Float64})
   #=
   Predict outcome variable y
 
-  :param X:
-  :param y:
+  :param X: Array. Design matrix
+  :param y: Array. Vector containing dependent variable values.
+
+  :return: predicted value for y computed using OLS estimates
   =#
 
   # Linear model, prediction and return
@@ -445,6 +511,11 @@ function adjR2(X::Array{Float64}, y::Array{Float64})
 
   #=
   Calculate sums of squares & R2
+
+  :param X: Array. Design matrix
+  :param y: Array. Vector containing dependent variable values.
+
+  :return: Scalar. Adjusted R^2 value
   =#
 
   local TSS::Float64
@@ -469,6 +540,10 @@ function skewness(x::Array{Float64})
 
   #=
   Calculate skewness in standardized vector x
+
+  :param x: Array. Column vector of length n
+
+  :return: Scalar. Skewness statistic
   =#
 
   return((sum(x.^3) / size(x)[1]) / ((sum(x.^2) / size(x)[1])^1.5))
@@ -478,7 +553,11 @@ function skewness(x::Array{Float64})
 function center(x::Array{Float64})
 
   #=
-  Convenience function used to center a vector by its mean
+  Convenience function used to center an Array by its mean
+
+  :param x: Array. Column vector of length n
+
+  :return: Array with same dimensions of X, such that each column has been grand-mean centered
   =#
 
   return(x .- (sum(x) / size(x)[1]))
@@ -488,7 +567,12 @@ function center(x::Array{Float64})
 function cor(x::Array{Float64}, y::Array{Float64})
 
   #=
-  Pearson correlation coefficient
+  Calculate the pearson correlation coefficient
+
+  :param x: Array. Column vector of length n
+  :param y: Array. Column vector of length n
+
+  :return: estimate of the pearson correlation coefficient
   =#
 
   return( (sum(center(x) .* center(y)) ) / ( sqrt(sum(center(x).^2)) * sqrt(sum(center(y).^2)) ) )
@@ -499,6 +583,11 @@ function independence(x::Array{Float64}, k::Int)
 
   #=
   Check correlation of x against x lagged by one
+
+  :param x: Array. Column vector of length n
+  :param k: Scalar. Indicates the lag value. (i.e. lag of 1 lags x by one)
+
+  :return: correlation of x with x lagged by k
   =#
 
   return(cor(x[k+1:end,:], x[1:end-k,:]))
@@ -510,14 +599,34 @@ PART III: Model Fit
 =#
 
 # Convenience function for density from pdf (dnorm)
-function dnorm(x, mu, sigma)
+function dnorm(x::Float64, mu::Float64, sigma::Float64)
+
+  #=
+  Compute the probability density function of x for a normal with mean mu and sd sigma
+
+  :param x: Scalar. value for which you want the pdf
+  :param mu: mean of the normal distribution.
+  :param sigma: standard deviation of the normal distribution.
+
+  :return: pdf of x
+  =#
 
   pdf(Normal(mu, sigma), x)
 
   end;
 
 # Convenience function for LL
-function logLikelihood(y, pred_y, sd)
+function logLikelihood(y::Array{Float64}, pred_y::Array{Float64}, sd::Float64)
+
+    #=
+    Compute the log likelihood for an outcome given the predicted value
+
+    :param y: Array. Column vector with actual outcome values
+    :param pred_y : Array. Column vector of predicted outcome values.
+    :sd: standard deviation of the posterior distribution at sample i
+
+    :return: Scalar. Sum of log likelihood for each value y.
+    =#
 
   # Results
   R = Array{Float64}(undef, size(y)[1])
@@ -535,7 +644,21 @@ function logLikelihood(y, pred_y, sd)
   end;
 
 # Compute DIC
-function DIC(X, y, w, sigma, posterior)
+function DIC(X::Array{Float64}, y::Array{Float64}, w::Array{Float64}, sigma::Float64, posterior::Array{Float64})
+
+  #=
+  Compute the Deviance Information Criterion (DIC)
+
+  :param X: Array. Design matrix X
+  :param y: Array. Column vector with outcome variables
+  :param sigma: Scalar. MAP value of the posterior standard deviation (residual standard error)
+  :param posterior: posterior samples drawn using MCMC.
+
+  :return: Dict containing:
+    - DIC: the DIC value
+    - Eff. P: estimate of the effective number of parameters
+    - LL : summed log likelihood
+  =#
 
   # Linear combinations
   predy = X * w
@@ -580,13 +703,23 @@ function bayes_R2(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
     This function calculates the Bayesian R-squared value. For more information, see the article below.
 
-    :param effective_iterations: number of iterations minus burn-in period
+    :param X: Design matrix containing j+1 coefficients (first coefficient must equal intercept variable). The design matrix is created in R using model.matrix()
+    :param y: Numeric array with outcome variables. Length(y) == nrow(X)
+    :param w: Coefficient matrix containing initial values. nrow(w) == ncol(X)
+    :param sigma: Single initial value for the variance.
+    :param iterations: Number of sampling iteratios in each chain
+    :param thinning: thinning parameter. The value for thinning determines the observation that will be used as a draw from the posterior.
+                        That is, if thinning = 3, then the first two draws will be discarded and only the third draw will be returned as a draw
+                        from the posterior distribution.
+    :param priors: Dict containing information on the priors of each coefficient and sigma
+    :param samplers: Dict containing information on which sampling strategy to follow for each coefficient (gibbs or MH)
 
     :return: Dictionary containing
+        - Posterior_draws: Array. posterior predicted samples.
+        - Rsquared: Array. Column vector containing r-squared value for each of the samples.
 
-        - Posterior_draws ==> Theta values for the posterior distribution
-
-    :seealso: Gelman, A., Goodrich, B., Gabry, J., & Vehtari, A. (2018). R-squared for Bayesian regression models. The American Statistician, (just-accepted), 1-6.
+    :seealso:
+        - Gelman, A., Goodrich, B., Gabry, J., & Vehtari, A. (2018). R-squared for Bayesian regression models. The American Statistician, (just-accepted), 1-6.
     =#
 
     # 1. Call the gibbs sampler

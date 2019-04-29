@@ -25,7 +25,14 @@ set_sampling_options <- function(x, chains, iterations, thinning, burn) {
 #' The use can set the sampler to either (1) 'Gibbs' (default for all coefficients) or (2) 'MH' (metropolis-hastings algorithm, only for coefficients).
 #'
 #' @param x a blm object
-#' @param ... other arguments passed to the function
+#' @param par name of the coefficient, given as b0 (intercept) or b1, ... for coefficients.
+#' @param type name of the sampler to use. Either 'Gibbs' or 'MH'. Defaults to 'Gibbs'.
+#' @param lambda tuning parameter for the variance of the proposal distribution in metropolis-hastings
+#'
+#' @examples
+#' bfit <- set_sampler(bfit, "b0", type="MH")
+#'
+#' @importFrom magrittr '%>%'
 #'
 #' @return updated blm object
 #' @export
@@ -36,7 +43,12 @@ set_sampler <- function(x, ...) {
 #' Set initial values for a chain
 #'
 #' @param x blm object
-#' @param ... other arguments passed to the function
+#' @param ... named argument containing (1) a chain name (e.g. 'chain_1') and (2) a list of initial values. See examples.
+#'
+#' @importFrom magrittr '%>%'
+#'
+#' @examples
+#' bfit <- set_initial_values(bfit, chain_1 = list("b" = c(2,5,3,4,5), sigma=0.1))
 #'
 #' @return updated blm object
 #' @export
@@ -44,10 +56,15 @@ set_initial_values <- function(x, ...) {
   UseMethod("set_initial_values", x)
 }
 
-#' Set priors for a blm object
+#' Change priors for available parameters
 #'
-#' @param x blm object
-#' @param ... optional arguments needed to specify a prior
+#' @param par name of the coefficient, given as b0 (intercept) or b1, ... for coefficients.
+#' @param ... other arguments passed to function. In the case of intercept and coefficients, these are 'mu' and 'sd' (prior means and variances). In the case of the residual variance, the rate and shape/scale parameter must be passed as 'alpha' and 'beta'
+#'
+#' @examples
+#' bfit <- set_prior(bfit,"b0", mu=40, sd=7)
+#' bfit <- set_prior(bfit, "sigma", alpha=2, beta=1)
+#' @importFrom magrittr '%>%'
 #'
 #' @return updated blm object with new priors
 #' @export
@@ -60,6 +77,14 @@ set_prior <- function(x, ...) {
 #' @param x blm object
 #'
 #' @return blm object containing sampled posterior
+#'
+#' @importFrom magrittr '%>%'
+#'
+#' @examples
+#' data("directors")
+#' fit <- blm("Compensation ~ Age", data=directors) %>%
+#'    sample_posterior()
+#'
 #' @export
 sample_posterior <- function(x) {
   UseMethod("sample_posterior", x)
@@ -68,7 +93,17 @@ sample_posterior <- function(x) {
 #' Draw more samples from a sampled posterior distribution.
 #'
 #' @param x blm object
-#' @param ... other options passed to function
+#' @param iterations number of additional samples to draw from the posterior.
+#'
+#' @examples
+#' data("directors")
+#' fit <- blm("Compensation ~ Age", data=directors) %>%
+#'    sample_posterior()
+#' # Update posterior samples
+#' fit <- fit %>% update_posterior(iterations=2000)
+#'
+#' @return blm object with updated count of posterior samples.
+#' @importFrom magrittr '%>%'
 #'
 #' @export
 update_posterior <- function(x, ...) {
@@ -81,6 +116,13 @@ update_posterior <- function(x, ...) {
 #'
 #' @param x blm object
 #'
+#' @examples
+#' data("directors")
+#' fit <- blm("Compensation ~ Age", data=directors) %>%
+#'    sample_posterior()
+#' # Delete posterior samples
+#' fit <- fit %>% delete_posterior
+#'
 #' @return blm object minus posterior samples
 #' @export
 delete_posterior <- function(x) {
@@ -91,6 +133,13 @@ delete_posterior <- function(x) {
 #'
 #' @param x blm object
 #'
+#' @examples
+#' data("directors")
+#' fit <- blm("Compensation ~ Age", data=directors) %>%
+#'    sample_posterior()
+#' # Retrieve samples (burned automatically)
+#' psamples <- get_posterior_samples(fit)
+#'
 #' @return a matrix of dimensions iterations x (variables + 1)
 #' @export
 get_posterior_samples <- function(x) {
@@ -100,6 +149,8 @@ get_posterior_samples <- function(x) {
 #' Set up posterior predictive checks
 #'
 #' @param x blm object
+#' @param iterations number of iterations to run for posterior predictive checks. This number will be tagged on to the burn parameter specified under \link[blm]{set_sampling_options}.
+#' @param return_samples logical. If TRUE, then the function will also return the posterior predictive samples.
 #'
 #' @return prints summary of the ppc to the R console
 #' @export
@@ -144,6 +195,8 @@ evaluate_effective_sample_size <- function(x) {
 #'
 #' @param x a blm object
 #'
+#' @importFrom magrittr '%>%'
+#'
 #' @return prints the number of accepted draws for each parameter in each chain to the console
 #' @export
 evaluate_accepted_draws <- function(x) {
@@ -181,6 +234,14 @@ get_parameter_names <- function(x) {
 #'
 #' @param x object with a get_value() method
 #' @param var string. name of the value to retrieve from the object.
+#'
+#' @examples
+#' data("directors")
+#' fit <- blm("Compensation ~ Age", data=directors) %>%
+#'    sample_posterior()
+#' # Get DIC and print
+#' fit %>% get_value("DIC") %>% summary()
+#'
 #' @export
 get_value <- function(x, var) {
   UseMethod("get_value", x)

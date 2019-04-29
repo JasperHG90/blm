@@ -398,7 +398,6 @@ p4 <- ggplot(indep, aes(x=independence, fill=severity)) +
 grid.arrange(p1, p2, p3, p4)
 ```
 
-
 ```{r r-squared plot, fig.cap="Bayesian R-squared value for model 1 (left) and model 2 (right).", fig.height=2, fig.width=5}
 # Plot r-squared
 p1 <- dirmod1 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
