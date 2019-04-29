@@ -12,9 +12,38 @@ All core functions return S3 objects. Data embedded in these objects can be retr
 
 The following documents contain specific information or implementation notes:
 
-- Course summary
-- Implementation notes Gibbs sampler
-- Implementation notes Metropolis-Hastings sampler
+- [Course summary](https://github.com/JasperHG90/blm/blob/master/docs/course_summary.pdf)
+- [Implementation notes Gibbs sampler](https://github.com/JasperHG90/blm/blob/master/docs/conditionalposterior.pdf)
+- [Implementation notes Metropolis-Hastings sampler](https://github.com/JasperHG90/blm/blob/master/docs/MH.pdf)
+
+## Folder structure
+
+    ├── data                                        # Contains data used in the package
+    │   └── directors.rda              
+    ├── data-raw                                    # R script used to create 'directors.rda'
+    │   └── preprocess_directors_data.R  
+    ├── docs                                        # Implementation notes, course summary and final assignment
+    │   ├── conditionalposteriors.pdf               #  - Implementation notes for Gibbs sampler               
+    │   ├── MH.pdf                                  #  - Implementation notes for Metropolis-Hastings sampler
+    │   ├── final_assigment.pdf                     #  - Final assignment for the course
+    │   └── course_summary.pdf                      #  - Course summary
+    ├── experiments                                 # Various files used to test out new features / run simulations
+        └── ...
+    ├── img                                         # Tools and utilities
+    ├── inst
+    ├── man
+    ├── notes
+    ├── R
+    ├── tests
+    ├── vignettes
+    ├── LICENSE
+    ├── .gitignore
+    ├── .Rbuildignore
+    ├── .travis.yml
+    ├── .blm.Rproj
+    ├── .DESCRIPTION
+    ├── NAMESPACE
+    └── README.md
 
 ## Installation
 
@@ -71,6 +100,10 @@ Finish loading setup script for JuliaCall.
 ```
 
 This means you are good to go.
+
+## References
+
+The following resources were used.
 
 ## Short example
 
