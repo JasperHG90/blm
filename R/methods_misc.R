@@ -14,10 +14,10 @@ summary.DIC <- function(x) {
 summary.R2 <- function(x) {
 
   # List for summary
-  tab <- matrix(0L, nrow = 1, ncol = 3)
+  tab <- matrix(0L, nrow = 1, ncol = 5)
   rownames(tab) <- "(Model)"
-  colnames(tab) <- c("2.5%", "median", "97.5%")
-  tab[1,] <- round(quantile(x$rsquared, c(0.025, 0.5, 0.975)), digits=3)
+  colnames(tab) <- c("2.5%", "25%", "50%", "75%", "97.5%")
+  tab[1,] <- round(quantile(x$rsquared, c(0.025, 0.25, 0.5, 0.75, 0.975)), digits=4)
 
   # Print
   print.listof(list("Model R-squared" = tab))

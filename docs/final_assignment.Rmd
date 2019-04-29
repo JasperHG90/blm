@@ -16,9 +16,9 @@ header-includes:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(fig.pos="H", fig.width = 7, fig.height = 4, echo = FALSE, 
-                      fig.align="center", warning = FALSE, message = FALSE, eval=TRUE)
+                      fig.align="center", warning = FALSE, message = FALSE, eval=FALSE)
 
-rm(list=ls())
+#rm(list=ls())
 
 # Load blm package
 library(blm)
@@ -92,32 +92,39 @@ dirmod1 %>%
   get_value("rsq") %>%
   plot()
 
-# Median
-dirmod1 %>%
-  get_value("rsq") %>%
-  summary()# R-squared ~ 0.021
-
 # Posterior predictive checks
-m1ppc <- dirmod1 %>%
+dirmod1 <- dirmod1 %>%
   evaluate_ppc(return_samples=TRUE)
 
-# Summary
-summary(m1ppc)
-p <- plot(m1ppc %>% 
-            get_value("ppc"), 
-          "normality") ; plot(p) # Two-sided test ==> violation 
-p <- plot(m1ppc %>% 
-            get_value("ppc"), 
-          "heteroskedasticity") ; plot(p) # One-sided test ==> violation (data are more heteroskedastic)
-p <- plot(m1ppc %>%
-            get_value("ppc"), 
-          "independence") ; plot(p) # Two-sided test ==> violation (data are correlated)
-
-# Model fit
+# Summary of ppc
 dirmod1 %>%
-  get_value("DIC") %>%
-  summary()# ==> DIC is 509 with 4 parameters
+  get_value("ppc") %>%
+  summary() # Vio;lating independence
+
+# Plot results of the ppc
+p1 <- plot(dirmod1 %>% 
+            get_value("ppc"), 
+          "normality") # Two-sided test ==> violation 
+p2 <- plot(dirmod1 %>% 
+            get_value("ppc"), 
+          "heteroskedasticity") # One-sided test ==> violation (data are more heteroskedastic)
+p3 <- plot(dirmod1 %>%
+            get_value("ppc"), 
+          "independence") # Two-sided test ==> violation (data are correlated)
+
+# Plot
+grid.arrange(p1, p2, p3, ncol=3)
 ```
+
+```{r ppc results}
+dirmod1 %>%
+  get_value("ppc") %>%
+  get_value("data") %>%
+  .$independence %>%
+  apply(2, mean)
+```
+
+From the PPC plots, we see that the data are violating the assumption of independence as the MAP of the correlation coefficient for the observed data indicates a strong positive correlation $(\hat{r}_{\text{MAP, PPC}} = .466)$.
 
 ```{r model2, include = FALSE}
 # Model 2: Age, gender and sector -----
@@ -259,7 +266,7 @@ dirmod2 %>%
   evaluate_model_fit() # ==> DIC is 487.895 with 6 parameters ==> fit is better than model 1
 ```
 
-```{r model results (including model fit), eval=TRUE, results='asis'}
+```{r model results (including model fit), eval=FALSE, results='asis'}
 # Calculate 95% CCI
 CCI1 <- t(apply(get_posterior_samples(dirmod1), 2, quantile, c(0.025, 0.25, 0.5, 0.75, 0.975))[c(1, 5),]) %>% round(., digits=3)
 CCI2 <- t(apply(get_posterior_samples(dirmod2), 2, quantile, c(0.025, 0.25, 0.5, 0.75, 0.975))[c(1, 5),]) %>% round(., digits=3)
@@ -267,10 +274,11 @@ CCI2 <- t(apply(get_posterior_samples(dirmod2), 2, quantile, c(0.025, 0.25, 0.5,
 # Call stargazer
 # ==> we use to linear models with the same variables and replace the coefficients / confidence intervals with those of the blm models
 s <- capture.output(
-        stargazer::stargazer(lm("Compensation ~ Age + Male", data=directors), lm("Compensation ~ .", data=directors),
+        stargazer::stargazer(lm("Compensation ~ Age + Male", data=directors), 
+                             lm("Compensation ~ Age + Male + Sector", data=directors),
                            #title = "Results for BLM models", #dep.var.caption = "Compensation",
                            dep.var.labels = "Compensation",
-                           type = "html",
+                           type = "latex",
                           # Replace coefficients
                            coef = list(coef(dirmod1), coef(dirmod2)), 
                            ci = TRUE,
@@ -317,6 +325,34 @@ cat(
   )
 )
 ``` 
+
+\begin{table}[!htbp] \centering 
+  \caption{Model results } 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{2}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-3} 
+\\[-1.8ex] & \multicolumn{2}{c}{Compensation} \\ 
+\\[-1.8ex] & (1) & (2)\\ 
+\hline \\[-1.8ex] 
+Constant & 4.991  (4.936, 5.046) & 4.821 (4.732, 4.910) \\ 
+SectorBasic Materials &  & .225 (.079, .370) \\ 
+SectorServices &  & .292 (.169, .414) \\ 
+Male & .065 ($-$.085, .215) & .153 (.095, .209) \\ 
+Age & .008 (0.000, .017) & .009 (.001, .017) \\ 
+\hline \\[-1.8ex] 
+Observations & 336 & 336 \\ 
+Par. & 4 & 6 \\ 
+DIC & 508 & 488 \\ 
+R$^{2}$ & .021 & .098 \\ 
+Residual Std. Error & .516 & .501 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{2}{r}{Baseline is sector 'Financials'} \\
+\end{tabular} 
+\end{table}
 
 ```{r classical residuals}
 plot(predict(dirmod2), resid(dirmod2))

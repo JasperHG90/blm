@@ -104,7 +104,7 @@ effss.posterior <- function(x, order=30) {
   ## Populate
   for(i in 1:ncol(x)) {
     ## SUBSET: 2 - order (input), ith variable, ith variable.
-    ss[i] <- sample_size(n=n, pk = autocorr$acf[2:order, i, i])
+    ss[i] <- round(min(sample_size(n=n, pk = autocorr$acf[2:order, i, i]), n))
   }
 
   ## Return sample size

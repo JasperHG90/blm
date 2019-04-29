@@ -12,7 +12,7 @@ summary.ppc <- function(ppc) {
   )
 
   # Bind results
-  bpr <- round(do.call(cbind.data.frame, ppc$results), digits=3)
+  bpr <- round(do.call(cbind.data.frame, ppc$results), digits=4)
   colnames(bpr) <- c("Normality", "Heteroskedasticity", "Independence")
   row.names(bpr) <- c("p")
 
@@ -84,13 +84,22 @@ plot.ppc <- function(ppc, type=c("normality", "heteroskedasticity", "independenc
   # Update labels
   data$dataset <- ifelse(data$dataset == "V1", "Simulated", "Observed")
 
+  # Make y label for plot
+  if(type == "normality") {
+    ylab <- "Skewness"
+  } else if(type == "independence") {
+    ylab <- "Pearson correlation coefficient"
+  } else {
+    ylab <- latex2exp::TeX("Adj. R^2 (residuals)")
+  }
+
   # Plot
   p <- ggplot2::ggplot(data, ggplot2::aes(x=index, y=value, color=dataset)) +
     ggplot2::geom_point(alpha=0.5) +
     ggplot2::labs(title = "Observed (red) and simulated (blue) results",
                   subtitle = paste0("test: ", type)) +
     ggplot2::scale_color_brewer(palette = "Set1", name = "Type") +
-    ggplot2::scale_y_continuous(name = latex2exp::TeX("P_{posterior}")) +
+    ggplot2::scale_y_continuous(name = ylab) +
     theme_blm() +
     ggplot2::theme(legend.position = "none")
 

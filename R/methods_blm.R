@@ -91,7 +91,7 @@ summary.blm <- function(x) {
   colnames(MAPV) <- c("Est. (mean)", "SD", "NAIVE MCERR.", "TS MCERR.")
 
   # Calculate CI
-  CIV <- t(round(CCI(get_value(x, "posterior")), digits = 3))
+  CIV <- t(round(CCI(get_value(x, "posterior")), digits = 4))
 
   # Print MAP & SE
   cat(crayon::bold("Model results for blm object:"))
