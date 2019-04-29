@@ -33,6 +33,7 @@ The folder structure is described below. Important files are annotated.
     ├── experiments                                 # Various files used to test out new features / run simulations
         └── ...
     ├── img                                         # Images used by the README
+        └── ...
     ├── inst
         └── julia
             └── blm.jl                              # Julia script containing core blm functions.
