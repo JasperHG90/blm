@@ -76,33 +76,21 @@ autocor <- function(x, n=10) {
 }
 
 # Posterior predictive checks in julia
-ppc_julia <- function(X, y, initial_values, iterations, priors, thinning, burn, samplers) {
-
-  # Unroll initial values
-  w <- initial_values$w
-  sigma <- initial_values$sigma
+ppc_julia <- function(X, y, posterior_samples) {
 
   # Call Julia function for posterior predictive checks
   return(
-    .blm$julia$eval("ppc_draws")(X, as.numeric(y), w, sigma,
-                                 as.integer(iterations), as.integer(thinning),
-                                 as.integer(burn), unname(priors), unname(samplers))
+    .blm$julia$eval("ppc_draws")(X, as.numeric(y), posterior_samples)
   )
 
 }
 
 # R-squared calculation in julia
-bayes_R2 <- function(X, y, initial_values, iterations, priors, thinning, burn, samplers) {
-
-  # Unroll initial values
-  w <- initial_values$w
-  sigma <- initial_values$sigma
+bayes_R2 <- function(X, y, posterior_samples) {
 
   # Call Julia function for posterior predictive checks
   return(
-    .blm$julia$eval("bayes_R2")(X, as.numeric(y), w, sigma,
-                                 as.integer(iterations), as.integer(thinning),
-                                 as.integer(burn), unname(priors), unname(samplers))
+    .blm$julia$eval("bayes_R2")(X, as.numeric(y), posterior_samples)
   )
 
 }

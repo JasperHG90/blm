@@ -372,9 +372,7 @@ function posterior_coef(bj::Float64, xj::Array{Float64}, X::Array{Float64}, y::A
 PART II: Posterior Predictive Checks
 =#
 
-function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
-                   sigma::Float64, iterations::Int, thinning::Int, burn::Int,
-                   priors, samplers)
+function ppc_draws(X::Array{Float64}, y::Array{Float64}, sampled::Array{Float64})
 
     #=
     Perform posterior predictive checking.
@@ -389,14 +387,7 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
     :param X: Design matrix containing j+1 coefficients (first coefficient must equal intercept variable). The design matrix is created in R using model.matrix()
     :param y: Numeric array with outcome variables. Length(y) == nrow(X)
-    :param w: Coefficient matrix containing initial values. nrow(w) == ncol(X)
-    :param sigma: Single initial value for the variance.
-    :param iterations: Number of sampling iteratios in each chain
-    :param thinning: thinning parameter. The value for thinning determines the observation that will be used as a draw from the posterior.
-                        That is, if thinning = 3, then the first two draws will be discarded and only the third draw will be returned as a draw
-                        from the posterior distribution.
-    :param priors: Dict containing information on the priors of each coefficient and sigma
-    :param samplers: Dict containing information on which sampling strategy to follow for each coefficient (gibbs or MH)
+    :param sampled: posterior samples for the parameters
 
     :return: Dictionary containing:
         1. sim_y              [==>] 2D Tensor ([iterations - burn] * 1) of simulated y values
@@ -406,29 +397,20 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
         5. independence       [==>] 2D Tensor ([iterations - burn] * 2) containing test values on the test for independence of errors
     =#
 
-    # 1. Call the gibbs sampler
-    sampled = MCMC_sampler(X, y, w, sigma, iterations, thinning, priors, samplers)
-
-    # Subset
-    sampled = sampled["posterior"]
-
-    # 2. Burn
-    sampled = sampled[burn+1:end, :]
-
-    # 3. Precompute linear combinations as a function of X and the posterior set of params theta = [b0,b1,...,bn]
+    # 1. Precompute linear combinations as a function of X and the posterior set of params theta = [b0,b1,...,bn]
     lincom = X * transpose(sampled[: , 1:end-1]) # lincom dims: rows(X) * (iterations-burn)
 
-    # 4. Set up a results matrix for simulated yhat values
-    res = Array{Float64}(undef, iterations - burn, size(X)[1])
+    # 2. Set up a results matrix for simulated yhat values
+    res = Array{Float64}(undef, size(sampled)[1], size(X)[1])
 
-    # 5. Set up a results matrix for residuals, skewness stats, heteroskedasticity stats and correlation stats
-    resids = Array{Float64}(undef, iterations - burn, size(X)[1], 2)
-    skewed = Array{Float64}(undef, iterations - burn, 2)
-    heterosked = Array{Float64}(undef, iterations - burn, 2)
-    correlate = Array{Float64}(undef, iterations - burn, 2)
+    # 3. Set up a results matrix for residuals, skewness stats, heteroskedasticity stats and correlation stats
+    resids = Array{Float64}(undef, size(sampled)[1], size(X)[1], 2)
+    skewed = Array{Float64}(undef, size(sampled)[1], 2)
+    heterosked = Array{Float64}(undef, size(sampled)[1], 2)
+    correlate = Array{Float64}(undef, size(sampled)[1], 2)
 
-    # 5. Draw from a normal distribution given each specific y value and populate results matrix
-    for j in 1:(iterations - burn)
+    # 4. Draw from a normal distribution given each specific y value and populate results matrix
+    for j in 1:(size(sampled)[1])
 
         # Simulate y
         res[j,:] = simulate_y(lincom[:,j], sampled[j,end])
@@ -453,7 +435,7 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
         end;
 
-    # 6. Return
+    # 5. Return
     return(Dict(
       "sim_y" => res,
       "residuals" => resids,
@@ -694,9 +676,7 @@ function DIC(X::Array{Float64}, y::Array{Float64}, w::Array{Float64}, sigma::Flo
 PART IV: R-squared
 =#
 
-function bayes_R2(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
-                   sigma::Float64, iterations::Int, thinning::Int, burn::Int,
-                   priors, samplers)
+function bayes_R2(X::Array{Float64}, y::Array{Float64}, sampled::Array{Float64})
 
     #=
     Calculate Bayesian R-squared value
@@ -705,50 +685,29 @@ function bayes_R2(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
 
     :param X: Design matrix containing j+1 coefficients (first coefficient must equal intercept variable). The design matrix is created in R using model.matrix()
     :param y: Numeric array with outcome variables. Length(y) == nrow(X)
-    :param w: Coefficient matrix containing initial values. nrow(w) == ncol(X)
-    :param sigma: Single initial value for the variance.
-    :param iterations: Number of sampling iteratios in each chain
-    :param thinning: thinning parameter. The value for thinning determines the observation that will be used as a draw from the posterior.
-                        That is, if thinning = 3, then the first two draws will be discarded and only the third draw will be returned as a draw
-                        from the posterior distribution.
-    :param priors: Dict containing information on the priors of each coefficient and sigma
-    :param samplers: Dict containing information on which sampling strategy to follow for each coefficient (gibbs or MH)
+    :param sampled: posterior samples for the parameters
 
-    :return: Dictionary containing
-        - Posterior_draws: Array. posterior predicted samples.
-        - Rsquared: Array. Column vector containing r-squared value for each of the samples.
+    :return: Array. Column vector containing r-squared value for each of the samples.
 
     :seealso:
         - Gelman, A., Goodrich, B., Gabry, J., & Vehtari, A. (2018). R-squared for Bayesian regression models. The American Statistician, (just-accepted), 1-6.
     =#
 
-    # 1. Call the gibbs sampler
-    sampled = MCMC_sampler(X, y, w, sigma, iterations, thinning, priors, samplers)
-
-    # Subset
-    sampled = sampled["posterior"]
-
-    # 2. Burn
-    sampled = sampled[burn+1:end, :]
-
-    # 3. Precompute linear combinations as a function of X and the posterior set of params theta = [b0,b1,...,bn]
+    # 1. Precompute linear combinations as a function of X and the posterior set of params theta = [b0,b1,...,bn]
     lincom = X * transpose(sampled[: , 1:end-1]) # lincom dims: rows(X) * (iterations-burn)
 
-    # 4. Set up a results matrix for simulated yhat values
-    res = Array{Float64}(undef, iterations - burn, 1)
+    # 2. Set up a results matrix for simulated yhat values
+    res = Array{Float64}(undef, size(sampled)[1], 1)
 
-    # 5. Compute R-squared value using new samples
-    for j in 1:(iterations - burn)
+    # 3. Compute R-squared
+    for j in 1:(size(sampled)[1])
 
         # R2 = var(pred_y) / (var(pred_y) + sigma^2)
         res[j,1] = var(lincom[:,j]) / (var(lincom[:,j]) + sampled[j, end]^2)
 
         end;
 
-    # 6. Return
-    return(Dict(
-      "posterior_draws" => sampled,
-      "rsquared" => res
-    ))
+    # 4. Return
+    return(res)
 
     end;

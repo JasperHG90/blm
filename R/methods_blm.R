@@ -742,47 +742,69 @@ evaluate_convergence_diagnostics.blm <- function(x) {
 
 # EVALUATION ----
 
-# posterior predictive checks
+# R-squared
 #' @export
-evaluate_ppc.blm <- function(x, iterations = 2000, return_samples = FALSE) {
+evaluate_R2.blm <- function(x, iterations = 4000, return_samples=FALSE) {
 
   # Check if posterior in blm object
   if(!"posterior" %in% names(x)) {
     stop("Posterior not yet constructed.")
   }
 
-  # Get burn value
-  burn <- x$sampling_settings$chain_1$burn
-  # Update iterations
-  iterations <- burn + iterations
+  # Set up R-squared by sampling from the posterior
+  inputs <- list()
 
-  # Set up posterior predictive check by sampling from the posterior
-  inputs <- list(
-    settings = list(
-      iterations = iterations,
-      burn = burn
-    )
-  )
-
-  # Get priors etc.
-  priors <- x$priors
-  thinning <- x$sampling_settings$chain_1$thinning
-  samplers <- x$sampling_settings$chain_1$samplers
-  iv <- x$sampling_settings$chain_1$initial_values
-  chains <- 1
+  # Get inputs
   X <- x$input$X
   y <- x$input$y
 
-  # Check values
-  check_sampling_inputs(as.integer(iterations), as.integer(chains), as.integer(thinning),
-                        as.integer(burn))
+  # Get posterior samples
+  postsamps <- x %>%
+    get_value("posterior") %>%
+    bind() %>%
+    as.matrix()
+
+  # Call compute R2
+  r <- bayes_R2(X, y, postsamps)
+
+  # Add
+  inputs$rsquared <- r
+
+  # Add class to input
+  class(inputs) <- "R2"
+
+  # Return
+  x$rsq <- inputs
+  return(x)
+
+}
+
+# posterior predictive checks
+#' @export
+evaluate_ppc.blm <- function(x, return_samples = FALSE) {
+
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
+  # Get y from inputs
+  X <- x$input$X
+  y <- x$input$y
+
+  # Get posterior samples
+  postsamps <- x %>%
+    get_value("posterior") %>%
+    bind() %>%
+    as.matrix()
+
+  # Results
+  inputs <- list()
 
   # Call the gibbs sampler, simulate y values and compute residuals
-  r <- ppc_julia(X, y, iv, iterations, priors, thinning, burn, samplers)
+  r <- ppc_julia(X, y, postsamps)
 
   # Add results
-  inputs$data$initial_values <- iv
-  inputs$data$X <- X
   inputs$data$sim_y <- r$sim_y
   inputs$data$residuals <- r$residuals
 
@@ -896,63 +918,5 @@ evaluate_accepted_draws.blm <- function(x) {
   print.listof(
     list("Accepted draws"=acc_b)
   )
-
-}
-
-# R-squared
-#' @export
-evaluate_R2.blm <- function(x, iterations = 4000, return_samples=FALSE) {
-
-  # Check if posterior in blm object
-  if(!"posterior" %in% names(x)) {
-    stop("Posterior not yet constructed.")
-  }
-
-  # Get burn value
-  burn <- x$sampling_settings$chain_1$burn
-  # Update iterations
-  iterations <- burn + iterations
-
-  # Set up R-squared by sampling from the posterior
-  inputs <- list(
-    settings = list(
-      iterations = iterations,
-      burn = burn
-    )
-  )
-
-  # Get priors etc.
-  priors <- x$priors
-  thinning <- x$sampling_settings$chain_1$thinning
-  samplers <- x$sampling_settings$chain_1$samplers
-  iv <- x$sampling_settings$chain_1$initial_values
-  chains <- 1
-  X <- x$input$X
-  y <- x$input$y
-
-  # Check values
-  check_sampling_inputs(as.integer(iterations), as.integer(chains), as.integer(thinning),
-                        as.integer(burn))
-
-  # Call the gibbs sampler, simulate y values and compute R2
-  r <- bayes_R2(X, y, iv, iterations, priors, thinning, burn, samplers)
-
-  # Add
-  inputs$rsquared <- r$rsquared
-
-  # Add samples
-  inputs$posterior_draws <- r$posterior_draws
-
-  # Add class to input
-  class(inputs) <- "R2"
-
-  # If user wants posterior samples ...
-  if(!return_samples) {
-    inputs$posterior_draws <- NULL
-  }
-
-  # Return
-  x$rsq <- inputs
-  return(x)
 
 }

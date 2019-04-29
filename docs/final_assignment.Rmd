@@ -18,7 +18,7 @@ header-includes:
 knitr::opts_chunk$set(fig.pos="H", fig.width = 7, fig.height = 4, echo = FALSE, 
                       fig.align="center", warning = FALSE, message = FALSE, eval=FALSE)
 
-#rm(list=ls())
+rm(list=ls())
 
 # Load blm package
 library(blm)
@@ -64,7 +64,7 @@ $$
 dirmod1 <- blm("Compensation ~ Age + Male",
                     data=directors) %>%
   # Set sampling options
-  set_sampling_options(chains = 2, iterations = 40000,
+  set_sampling_options(chains = 2, iterations = 30000,
                        burn = 8000, thinning=3) %>%
   # Set initial values
   set_initial_values(chain_1 = list("b" = c(7, -5, 0), "sigma" = 1),
@@ -94,7 +94,7 @@ dirmod1 %>%
 
 # Posterior predictive checks
 dirmod1 <- dirmod1 %>%
-  evaluate_ppc(return_samples=TRUE)
+  evaluate_ppc(return_samples=FALSE)
 
 # Summary of ppc
 dirmod1 %>%
@@ -266,10 +266,43 @@ dirmod2 %>%
   evaluate_model_fit() # ==> DIC is 487.895 with 6 parameters ==> fit is better than model 1
 ```
 
+```{r model 3 (by company)}
+dirmod3 <- blm("Compensation ~ Company + Age + Male",
+                data=directors) 
+
+# Retrieve parameter names
+dirmod3 %>% get_parameter_names()
+
+# Update the model specification
+dirmod3 <- dirmod3 %>%
+  # Need to delete posterior when we change settings
+  # (only has an effect if posterior already present)
+  delete_posterior() %>%
+  # Set an informative prior on the coefficients
+  # Male (b4) is speculated to have 17% pay increase over women
+  set_prior("b53", mu = .17, sd=0.001) %>%
+  # Update sampling settings
+  set_sampling_options(chains = 2, iterations = 10000,
+                       burn = 3000, thinning=1) %>%
+  # Set initial values
+  # If we draw from the priors the starting values will be too large
+  # This is an issue for MH because it takes many more iterations to converge
+  set_initial_values(chain_1 = list("b" = runif(54, 1, 10), "sigma"= 1),
+                     chain_2 = list("b" = runif(54, 1, 10), "sigma"=2)) %>%
+  # Sample the posterior distribution
+  sample_posterior()
+
+dp3 <- dirmod3 %>%
+  evaluate_ppc()
+
+```
+
 ```{r model results (including model fit), eval=FALSE, results='asis'}
 # Calculate 95% CCI
-CCI1 <- t(apply(get_posterior_samples(dirmod1), 2, quantile, c(0.025, 0.25, 0.5, 0.75, 0.975))[c(1, 5),]) %>% round(., digits=3)
-CCI2 <- t(apply(get_posterior_samples(dirmod2), 2, quantile, c(0.025, 0.25, 0.5, 0.75, 0.975))[c(1, 5),]) %>% round(., digits=3)
+CCI1 <- t(apply(get_posterior_samples(dirmod1), 2, quantile, c(0.025, 0.25, 0.5, 0.75, 0.975))[c(1, 5),]) %>% r
+ound(., digits=3)
+CCI2 <- t(apply(get_posterior_samples(dirmod2), 2, quantile, c(0.025, 0.25, 0.5, 0.75, 0.975))[c(1, 5),]) %>% 
+  round(., digits=3)
 
 # Call stargazer
 # ==> we use to linear models with the same variables and replace the coefficients / confidence intervals with those of the blm models
@@ -434,7 +467,7 @@ p4 <- ggplot(indep, aes(x=independence, fill=severity)) +
 grid.arrange(p1, p2, p3, p4)
 ```
 
-```{r r-squared plot, fig.cap="Bayesian R-squared value for model 1 (left) and model 2 (right).", fig.height=2, fig.width=5}
+```{r r-squared plot, fig.cap="Bayesian R-squared value for model 1 (left) and model 2 (right). The proportion of cases in which the R-squared value of model 2 exceeds that of model 1 is .99", fig.height=2, fig.width=5}
 # Plot r-squared
 p1 <- dirmod1 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
   theme(axis.title = element_blank())
