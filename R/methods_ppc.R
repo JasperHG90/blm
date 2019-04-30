@@ -58,6 +58,8 @@ print.ppc <- function(ppc) {
 #' # Plot
 #' plot(fit %>% get_value('ppc'), 'normality')
 #'
+#' @seealso
+#'
 #' @export
 plot.ppc <- function(ppc, type=c("normality", "heteroskedasticity", "independence")) {
 

@@ -781,7 +781,7 @@ evaluate_R2.blm <- function(x) {
 
 # posterior predictive checks
 #' @export
-evaluate_ppc.blm <- function(x, p=1) {
+evaluate_ppc.blm <- function(x, return_all=TRUE, p=1) {
 
   # Check if posterior in blm object
   if(!"posterior" %in% names(x)) {

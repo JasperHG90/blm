@@ -149,11 +149,12 @@ get_posterior_samples <- function(x) {
 #' Set up posterior predictive checks
 #'
 #' @param x blm object
-#' @param p proportion of samples used to compute posterior predictive checks. Defaults to p=1
+#' @param return_all logical. If TRUE, then the function will return the discrepancy statistics for the simulated and observed data.
+#' @param p proportion of samples used to compute posterior predictive checks. Defaults to p=1.
 #'
 #' @return prints summary of the ppc to the R console
 #' @export
-evaluate_ppc <- function(x, p=1) {
+evaluate_ppc <- function(x, return_all=TRUE, p=1) {
   UseMethod("evaluate_ppc", x)
 }
 
