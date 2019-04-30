@@ -42,7 +42,7 @@ mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, sampl
   w <- initial_values$w
   sigma <- initial_values$sigma
 
-  # TODO: ensure that user passes valid iterations / priors (integers)
+  # Call MCMC sampler in Julia
   r <- .blm$julia$eval("MCMC_sampler")(X, as.numeric(y), w, sigma, as.integer(iterations),
                                        as.integer(thinning), unname(priors), unname(samplers))
 

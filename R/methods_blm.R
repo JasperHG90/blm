@@ -396,7 +396,7 @@ set_sampling_options.blm <- function(x, chains = 1, iterations = 10000,
   # Update sampling options
   if("posterior" %in% names(x)) {
     if(!missing(chains) | !missing(iterations) | !missing(thinning)) {
-      # TODO: refuse to update sampler values if posterior already sampled!
+      # refuse to update sampler values if posterior already sampled!
       stop("Posterior already sampled. Cannot update sampling settings. Use update_posterior() to sample more values from the posterior distribution or use delete_posterior() to remove it from your results. After deletion, you can update the sampler settings.")
     } else if(!missing(burn)) {
       # Update the burn settings in the posterior
