@@ -4,14 +4,10 @@
 \alias{evaluate_R2}
 \title{Calculate the Bayesian R-squared value}
 \usage{
-evaluate_R2(x, iterations, return_samples)
+evaluate_R2(x)
 }
 \arguments{
 \item{x}{a blm object}
-
-\item{iterations}{number of samples to draw from the posterior distribution}
-
-\item{return_samples}{logical. If TRUE, then the function will also return the posterior predictive samples.}
 }
 \value{
 object of class "R2" containing input parameters, posterior draws and r-squared values computed on the posterior draws

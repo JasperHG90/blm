@@ -4,14 +4,12 @@
 \alias{evaluate_ppc}
 \title{Set up posterior predictive checks}
 \usage{
-evaluate_ppc(x, ...)
+evaluate_ppc(x, p = 1)
 }
 \arguments{
 \item{x}{blm object}
 
-\item{iterations}{number of iterations to run for posterior predictive checks. This number will be tagged on to the burn parameter specified under \link[blm]{set_sampling_options}.}
-
-\item{return_samples}{logical. If TRUE, then the function will also return the posterior predictive samples.}
+\item{p}{proportion of samples used to compute posterior predictive checks. Defaults to p=1}
 }
 \value{
 prints summary of the ppc to the R console

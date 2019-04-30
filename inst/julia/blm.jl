@@ -437,8 +437,6 @@ function ppc_draws(X::Array{Float64}, y::Array{Float64}, sampled::Array{Float64}
 
     # 5. Return
     return(Dict(
-      "sim_y" => res,
-      "residuals" => resids,
       "heteroskedasticity" => heterosked,
       "skewness" => skewed,
       "independence" => correlate

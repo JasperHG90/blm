@@ -744,7 +744,7 @@ evaluate_convergence_diagnostics.blm <- function(x) {
 
 # R-squared
 #' @export
-evaluate_R2.blm <- function(x, iterations = 4000, return_samples=FALSE) {
+evaluate_R2.blm <- function(x) {
 
   # Check if posterior in blm object
   if(!"posterior" %in% names(x)) {
@@ -781,11 +781,16 @@ evaluate_R2.blm <- function(x, iterations = 4000, return_samples=FALSE) {
 
 # posterior predictive checks
 #' @export
-evaluate_ppc.blm <- function(x, return_samples = FALSE) {
+evaluate_ppc.blm <- function(x, p=1) {
 
   # Check if posterior in blm object
   if(!"posterior" %in% names(x)) {
     stop("Posterior not yet constructed.")
+  }
+
+  # Check if p between 0 and 1
+  if(!(p >= 0 & p <= 1)) {
+    stop("'p' must be between 0 and 1")
   }
 
   # Get y from inputs
@@ -797,6 +802,10 @@ evaluate_ppc.blm <- function(x, return_samples = FALSE) {
     get_value("posterior") %>%
     bind() %>%
     as.matrix()
+
+  # Subset
+  selected <- runif(nrow(postsamps))
+  postsamps <- postsamps[selected <= p, ]
 
   # Results
   inputs <- list()
@@ -817,14 +826,15 @@ evaluate_ppc.blm <- function(x, return_samples = FALSE) {
   inputs <- independence_check(inputs, r$independence)
 
   # Check if keep samples
-  if(return_samples) {
+  if(return_all) {
 
     x$ppc <- inputs
     return(x)
 
   } else {
 
-    inputs$data <- NULL
+    inputs$data$sim_y <- NULL
+    inputs$data$residuals <- NULL
     x$ppc <- inputs
     return(x)
 

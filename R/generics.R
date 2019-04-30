@@ -149,12 +149,11 @@ get_posterior_samples <- function(x) {
 #' Set up posterior predictive checks
 #'
 #' @param x blm object
-#' @param iterations number of iterations to run for posterior predictive checks. This number will be tagged on to the burn parameter specified under \link[blm]{set_sampling_options}.
-#' @param return_samples logical. If TRUE, then the function will also return the posterior predictive samples.
+#' @param p proportion of samples used to compute posterior predictive checks. Defaults to p=1
 #'
 #' @return prints summary of the ppc to the R console
 #' @export
-evaluate_ppc <- function(x, ...) {
+evaluate_ppc <- function(x, p=1) {
   UseMethod("evaluate_ppc", x)
 }
 
@@ -206,14 +205,12 @@ evaluate_accepted_draws <- function(x) {
 #' Calculate the Bayesian R-squared value
 #'
 #' @param x a blm object
-#' @param iterations number of samples to draw from the posterior distribution
-#' @param return_samples logical. If TRUE, then the function will also return the posterior predictive samples.
 #'
 #' @return object of class "R2" containing input parameters, posterior draws and r-squared values computed on the posterior draws
 #'
 #' @seealso Gelman, A., Goodrich, B., Gabry, J., & Vehtari, A. (2018). R-squared for Bayesian regression models. The American Statistician, (just-accepted), 1-6.
 #' @export
-evaluate_R2 <- function(x, iterations, return_samples) {
+evaluate_R2 <- function(x) {
   UseMethod("evaluate_R2", x)
 }
 

@@ -70,7 +70,9 @@ dirmod1 <- blm("Compensation ~ Age + Male",
   set_initial_values(chain_1 = list("b" = c(7, -5, 0), "sigma" = 1),
                      chain_2 = list("b" = c(-5, 0, 7), "sigma" = 2)) %>%
   # Sample
-  sample_posterior()
+  sample_posterior() %>%
+  # Compute posterior predictive checks (using a random sample of 20% of the data)
+  evaluate_ppc(p=0.2)
 # Sanity check for coefficients
 coef(dirmod1)
 coef(lm("Compensation ~ Age + Male", data=directors)) # Sanity check
@@ -91,10 +93,6 @@ summary(dirmod1)
 dirmod1 %>% 
   get_value("rsq") %>%
   plot()
-
-# Posterior predictive checks
-dirmod1 <- dirmod1 %>%
-  evaluate_ppc(return_samples=FALSE)
 
 # Summary of ppc
 dirmod1 %>%
@@ -146,7 +144,7 @@ dirmod2 <- dirmod2 %>%
   delete_posterior() %>%
   # Set an informative prior on the coefficients
   # Male (b4) is speculated to have 17% pay increase over women
-  set_prior("b4", mu = .17, sd=0.001) %>%
+  set_prior("b4", mu = .17, sd=0.01) %>%
   # Change the sampler of Age to metropolis hastings
   # Lambda parameter controls the variance of the (normal) proposal distribution
   set_sampler("b3", type="MH", lambda=0.01) %>%
@@ -279,8 +277,8 @@ dirmod3 <- dirmod3 %>%
   # (only has an effect if posterior already present)
   delete_posterior() %>%
   # Set an informative prior on the coefficients
-  # Male (b4) is speculated to have 17% pay increase over women
-  set_prior("b53", mu = .17, sd=0.001) %>%
+  # Males are expected to have 17% pay increase over women
+  #set_prior("b53", mu = .17, sd=0.01) %>%
   # Update sampling settings
   set_sampling_options(chains = 2, iterations = 10000,
                        burn = 3000, thinning=1) %>%
@@ -292,8 +290,9 @@ dirmod3 <- dirmod3 %>%
   # Sample the posterior distribution
   sample_posterior()
 
-dp3 <- dirmod3 %>%
-  evaluate_ppc()
+# Run PPC
+dirmod3 <- dirmod3 %>%
+  evaluate_ppc(p=0.5)
 
 ```
 
