@@ -1,0 +1,31 @@
+# model with level-1 variables for JAGS
+
+model {
+
+	# Priors (sector)
+	tau_u0 ~ dgamma(.01, .01)
+  # Hyperprior for intercept
+  gamma_00 ~ dnorm(0, 1.0E-4) # N(m, s2inv)
+  # Hyperpriors for the coefficients
+  gamma_10 ~ dnorm(0, 1.0E-4)
+  gamma_20 ~ dnorm(0, 1.0E-4)
+  # For each sector
+	for (j in 1:k){
+		b0[j] ~ dnorm(gamma_00, tau_u0) # random intercept for every company
+	}
+
+  # Priors
+  # Individual precision
+	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect (variance within sectors)
+  # For each individual
+	for (i in 1:n) {
+		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
+		# Sector-specific intercept + level-1 variables
+		mu[i] <- b0[sector[i]] + gamma_10*age[i] + gamma_20*gender[i]
+	}
+
+  # Invert gamma
+  sigma_e <- 1 / sqrt(tau)
+  sigma_u0 <- 1 / sqrt(tau_u0)
+
+}

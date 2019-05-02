@@ -1,0 +1,38 @@
+# model with level-1 and level-2 variables + random coefficients for JAGS
+
+model {
+
+	# Priors (sector)
+	tau_u0 ~ dgamma(.01, .01)
+	tau_u1 ~ dgamma(.01, .01)
+	tau_u2 ~ dgamma(.01, .01)
+  # Hyperprior for intercept
+  gamma_00 ~ dnorm(0, 1.0E-4) # N(m, s2inv)
+  # Hyperpriors for the coefficients
+  gamma_10 ~ dnorm(0, 1.0E-4)
+  gamma_20 ~ dnorm(0, 1.0E-4)
+  gamma_01 ~ dnorm(0, 1.0E-4)
+  # For each sector
+	for (j in 1:k){
+		b0[j] ~ dnorm(gamma_00, tau_u0) # random intercept for every company
+		b1[j] ~ dnorm(gamma_10, tau_u1) # random slope for age
+		b2[j] ~ dnorm(gamma_20, tau_u2) # random slope for gender
+	}
+
+  # Priors
+  # Individual precision
+	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect (variance within sectors)
+  # For each individual
+	for (i in 1:n) {
+		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
+		# Sector-specific intercept + random coefficient for level 1 variables + level 2 variables
+		mu[i] <- b0[sector[i]] + b1[sector[i]]*age[i] + b2[sector[i]]*gender[i] + gamma_01*avg_compensation[sector[i]]
+	}
+
+  # Invert gamma
+  sigma_e <- 1 / sqrt(tau)
+  sigma_u0 <- 1 / sqrt(tau_u0)
+  sigma_u1 <- 1 / sqrt(tau_u1)
+  sigma_u2 <- 1 / sqrt(tau_u2)
+
+}

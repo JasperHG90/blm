@@ -1,0 +1,349 @@
+---
+title: "Multilevel analysis of directors data using JAGS"
+author: "Jasper Ginn"
+date: "April 8, 2019"
+output:
+  pdf_document: 
+    number_sections: false
+header-includes:
+ \usepackage{float}
+ \usepackage{setspace}
+ \usepackage{xcolor}
+ \definecolor{mypurple}{rgb}{146,76,239}
+ \doublespacing
+ \floatplacement{figure}{H}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.pos="H", fig.width = 7, fig.height = 4, echo = TRUE, 
+                      fig.align="center", warning = FALSE, message = FALSE, eval=TRUE)
+```
+
+```{r load data}
+# Get the directors data
+library(blm)
+data("directors")
+
+# Preprocess directors data
+library(dplyr)
+directors <- directors %>%
+  # Log compensation
+  mutate(Compensation = log(Compensation)) %>%
+  # Subtract mean from Age variable
+  mutate(Age = Age - mean(Age),
+         Male = as.numeric(Male) - mean(as.numeric(Male)))
+  
+# Jags data
+dir_jags <- with(directors, list(# Outcome for individuals
+                                 compensation = Compensation,
+                                 # Age of individuals
+                                 age=Age,
+                                 # Gender of individuals
+                                 gender=Male,
+                                 # Sector-level variables
+                                 sector=as.numeric(as.factor(directors$Company)),   
+                                 # Avg. outcome per sector
+                                 avg_compensation = unname(tapply(directors$Compensation, 
+                                                                  directors$Company, mean)),
+                                 # Group totals
+                                 # Number of individuals
+                                 n=nrow(directors),     
+                                 # Number of sectors
+                                 k=length(unique(directors$Company)),
+                                 # Number of individual-level predictors
+                                 p1=2, # 2 predictors 
+                                 # Number of sector-level predictors
+                                 p2=1)) 
+```
+
+```{r simulated data, eval=FALSE, include=FALSE}
+# Set seed
+set.seed(501)
+
+# Sample size (employees)
+n <- 400
+# Groups (companies)
+k <- 10
+# Sample companies
+companies <- sample(1:k, n, replace=TRUE)
+
+# Specify level 2 mean and variance (company level)
+# That is, the mean of level 2: (in '000 dollars)
+u_expected <- 120
+u_sd <- 20
+# Generate the group means using these numbers
+u_companies <- rnorm(k, mean = u_expected, sd = u_sd)
+
+# Specify level 1 intercept of each employee, depending on the company they work for
+intcp <- matrix(0, nrow = n, ncol = k)
+# Populate with 1 if employee belongs to company k
+for (i in 1:n) {
+  intcp[i, companies[i]] <- 1
+}
+# Create true intercept for employees
+b0_true <- intcp %*% u_companies
+# Create true slope for age
+b1_true_age <- 2.2
+# Generate data for age (sorted)
+age <- sort(rnorm(n, mean=40, sd=5))
+# True residual variance
+sd_true <- 30
+# Create the outcome variable y (compensation)
+compensation <- rnorm(n, mean = b0_true + b1_true_age * age, sd = 10)
+
+# To data frame
+directors <- data.frame(Compensation = compensation, Age=age, Company=companies)
+
+# Convert to JAGS format ----
+
+# Jags data
+dir_jags <- with(directors, list(compensation = Compensation, age=Age, company=Company,
+                                  n=n, k=k))
+
+```
+
+The **directors** dataset that is included with the `blm` library has a natural hierarchical structure with individuals nested in companies nested in industries nested in sectors. In this document, we will construct a multilevel model in JAGS using companies and individuals. 
+
+```{r, eval=TRUE, fig.cap="Within and between variance of director compensation across companies"}
+library(ggplot2)
+ggplot(directors, aes(x=Company, y=Compensation, color=Company)) +
+  geom_point() +
+  geom_boxplot() +
+  geom_hline(yintercept = mean(directors$Compensation)) +
+  theme_blm() +
+  scale_x_discrete(name = "Companies") +
+  scale_y_continuous(name = "Compensation (logged)") +
+  theme(legend.position="none",
+        axis.text.x = element_blank())
+```
+
+From figure 1, it should be clear that the compensation variable across companies is not exactly normally distributed, but we will ignore that for now.
+
+## The intercept-only model
+
+The intercept-only model for the directors data is given by the following equations:
+
+\begin{align}
+\text{compensation}_{ij} = 
+& \beta_{0j} + e_{ij} \tag{1} \\ 
+\beta_{0j} =
+& \gamma_{00} + u_{0j} \\
+\text{compensation}_{ij} =
+& \gamma_{00} + u_{0j} + e_{ij}
+\end{align}
+
+In words, this means we expect that a director's compensation is dependent on a grand mean over all sectors ($\gamma_{00}$) with some error term that captures the variation across sectors ($u_{0j}$) and an error term that captures variation across directors ($e_{ij}$).
+
+Alternatively, we can specify the model as follows:
+
+$$
+\begin{aligned}
+\text{compensation}_{ij} 
+&\sim N(\beta_{0j}, \sigma^2_e) \\
+\beta_{0j} 
+&\sim N(\gamma_{00}, \sigma^2_{u_0}) \\
+\gamma_{00} 
+&\sim N(m, s^2) \\
+\sigma^2_{u_0} 
+&\sim IG(\alpha_{2_0}, \beta_{2_0}) \\
+\sigma^2_e
+&\sim IG(\alpha_{1}, \beta_{1})
+\end{aligned}
+$$
+
+ONLY USE THE LEVEL-3 VARIABLE TO MAKE LIFE EASIER IN JAGS!
+
+To run the model in JAGS, we construct the following code
+
+```{r model 1 intercept-only model, eval=TRUE}
+library(rjags)
+library(tidyr)
+
+# Initial values
+dir_inits <- list(
+  init1 <- list(tau=runif(1), tau_u0=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1))
+)
+
+# Specify model in JAGS
+mod_io <- jags.model("1_intercept_only.txt", 
+                     data = dir_jags,
+                     inits = dir_inits,
+                     n.chains=2)
+
+# Burn
+update(mod_io, n.iter=40000)
+
+# Draw samples
+params <- c("sigma_e", "sigma_u0", "gamma_00")
+# Run the chain
+resm1 <- coda.samples(mod_io, variable.names = params, n.iter=200000, thin = 5)
+
+# MAP values
+MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
+
+# Variance explained
+vl2 <- MAPm1[3]^2 / sum(MAPm1[-1]^2) #99.2%
+vl1 <- 1-vl2
+
+# Variance estimate of level 2 >0
+
+DICm1 <- dic.samples(mod_io, thin=3, n.iter=10000)
+```
+
+The values returned by JAGS allows us to calculate the *intraclass correlation coefficient*, defined as:
+
+$$
+\rho=\frac{\sigma^2_{u_0}}{\sigma^2_e + \sigma^2_{u_0}}
+$$
+
+In the case of the directors data, the ICC equals `r unname(round(vl2, digits=2))`. This means:
+
+1. That roughly $27\%$ of the variance can be found at the level 2 (sector) variable.
+2. That the expected correlation of two randomly picked directors in a given sector is $.27$.
+
+Finally, we note that $0$ is not included in the credible interval of $\sigma^2_{u_0}$, which leads us to the conclusion that a multilevel model is appropriate. $(95\% \ \ CCI=[.086, 1.11])$.
+
+## Level 1 variables
+
+The second-level
+
+```{r model2 level 1 predictors}
+# Initial values
+dir_inits <- list(
+  init1 <- list(tau=runif(1), tau_u0=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1))
+)
+
+# Specify model in JAGS
+mod_io <- jags.model("2_level_one_predictors.txt", 
+                     data = dir_jags,
+                     inits = dir_inits,
+                     n.chains=2)
+
+# Burn
+update(mod_io, n.iter=40000)
+
+# Draw samples
+params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10", "gamma_20")
+# Run the chain
+resm2 <- coda.samples(mod_io, variable.names = params, n.iter=200000, thin = 5)
+
+# MAP values
+MAPm2 <- apply(do.call(rbind.data.frame, resm2), 2, mean)
+
+# All variance estimates > 0 so most likely significant
+DICm2 <- dic.samples(mod_io, thin=5, n.iter=20000)
+
+```
+
+- Little bit weird: error at level 2 went up? https://www.statmodel.com/download/Level-2%20R-square%20decreasing%20when%20adding%20level1-covariate.pdf
+
+Explained variance at each level:
+
+1. Level 1
+
+$$
+R^2_{L1} = \frac{\sigma^2_{e|\text{baseline}} - \sigma^2_{e|\text{model 1}}}{\sigma^2_{e|\text{baseline}}} = \frac{.2553 - .2504}{.2553} = 1.91\%
+$$
+
+2. Level 2
+
+$$
+R^2_{L2} = \frac{\sigma^2_{u_0|\text{baseline}} - \sigma^2_{u_0|\text{model 1}}}{\sigma^2_{u_0|\text{baseline}}} = \frac{.0936 - .0999}{.0936} = -6.73\%
+$$
+
+## Model 3: adding level 2 variables
+
+```{r model3 level 2 predictors}
+# Initial values
+dir_inits <- list(
+  init1 <- list(tau=runif(1), tau_u0=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1))
+)
+
+# Specify model in JAGS
+mod_io <- jags.model("3_level_two_predictors.txt", 
+                     data = dir_jags,
+                     inits = dir_inits,
+                     n.chains=2)
+
+# Burn
+update(mod_io, n.iter=40000)
+
+# Draw samples
+params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10", "gamma_01")
+# Run the chain
+resm3 <- coda.samples(mod_io, variable.names = params, n.iter=200000, thin = 5)
+
+# MAP values
+MAPm3 <- apply(do.call(rbind.data.frame, resm3), 2, mean)
+
+# All variance estimates > 0 so most likely significant
+DICm3 <- dic.samples(mod_io, thin=5, n.iter=20000)
+```
+
+
+```{r model4 random coef}
+# Initial values
+dir_inits <- list(
+  init1 <- list(tau=runif(1), tau_u0=runif(1), tau_u1=runif(1), tau_u2=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1), tau_u1=runif(1), tau_u2=runif(1))
+)
+
+# Specify model in JAGS
+mod_io <- jags.model("4_random_coefficients.txt", 
+                     data = dir_jags,
+                     inits = dir_inits,
+                     n.chains=2)
+
+# Burn
+update(mod_io, n.iter=40000)
+
+# Draw samples
+params <- c("sigma_e", "sigma_u0", "sigma_u1", "sigma_u2",
+            "gamma_00", "gamma_10", "gamma_20", "gamma_01")
+# Run the chain
+resm4 <- coda.samples(mod_io, variable.names = params, n.iter=200000, thin = 5)
+
+# MAP values
+MAPm4 <- apply(do.call(rbind.data.frame, resm4), 2, mean)
+
+# All variance estimates > 0 so most likely significant
+DICm4 <- dic.samples(mod_io, thin=5, n.iter=20000)
+```
+
+```{r model5 cross-level}
+# Initial values
+dir_inits <- list(
+  init1 <- list(tau=runif(1), tau_u0=runif(1), tau_u1=runif(1), tau_u2=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1), tau_u1=runif(1), tau_u2=runif(1))
+)
+
+# Specify model in JAGS
+mod_io <- jags.model("5_cross_level_interaction.txt", 
+                     data = dir_jags,
+                     inits = dir_inits,
+                     n.chains=2)
+
+# Burn
+update(mod_io, n.iter=40000)
+
+# Draw samples
+params <- c("sigma_e", "sigma_u0", "sigma_u1", "sigma_u2",
+            "gamma_00", "gamma_10", "gamma_20", "gamma_01", "gamma_21", "gamma_11")
+# Run the chain
+resm5 <- coda.samples(mod_io, variable.names = params, n.iter=200000, thin = 5)
+
+# MAP values
+MAPm5 <- apply(do.call(rbind.data.frame, resm5), 2, mean)
+
+# All variance estimates > 0 so most likely significant
+DICm5 <- dic.samples(mod_io, thin=5, n.iter=20000)
+```
+
+# References
+
+Lynch, S. M. (2007). Introduction to applied Bayesian statistics and estimation for social scientists. Springer Science & Business Media. Chapter 9.2
+
+Aarts, E. (2019). Introduction to multilevel analysis and the basic two-level regression model, week 1 notes [powerpoint presentation]. *Introduction to Multilevel Analysis*, Utrecht University.

@@ -1,0 +1,27 @@
+# Intercept-only model for JAGS
+
+model {
+
+	# Priors (sector)
+	tau_u0 ~ dgamma(.01, .01)
+  # Hyperprior for mean
+  gamma_00 ~ dnorm(0, 1.0E-4) # N(m, s2inv)
+  # For each sector
+	for (j in 1:k){
+		b0[j] ~ dnorm(gamma_00, tau_u0) # random intercept for every sector
+	}
+
+  # Priors
+  # Individual precision
+	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect (variance within sectors)
+  # For each individual
+	for (i in 1:n) {
+		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
+		mu[i] <- b0[sector[i]] # Linear combination for each person
+	}
+
+  # Invert gamma
+  sigma_e <- 1 / sqrt(tau)
+  sigma_u0 <- 1 / sqrt(tau_u0)
+
+}
