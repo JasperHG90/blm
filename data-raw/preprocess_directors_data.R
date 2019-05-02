@@ -4,6 +4,8 @@
 rm(list=ls())
 # Subset
 library(dplyr)
+library(tidyr)
+library(purrr)
 directors <- read.csv2("testing/FinalData.csv") %>%
   # Select only independent directors
   filter(isED == 0) %>%
@@ -12,15 +14,18 @@ directors <- read.csv2("testing/FinalData.csv") %>%
   # Remove NA
   filter(!is.na(Recent_Comp_Thous),
          !is.na(Age)) %>%
-  # Filter small sectors
-  filter(!Sector %in% c("Money Center Banks", "Property & Casualty Insurance")) %>%
-  # Filter sectors and add re-factor
-  #filter(Sector %in% c("Financial", "Services", "Basic Materials")) %>%
+  # Keep these sectors
+  filter(Sector %in% c("Basic Materials","Services", "Financial")) %>%
+  # Refactor
+  mutate(Sector = factor(as.character(Sector),
+                         levels = c("Financial", "Services",
+                                    "Basic Materials"))) %>%
+  # Mutate into proper data types
   mutate(Sector = factor(as.character(Sector)),
          Industry = factor(as.character(Industry)),
                          #levels = c("Financial", "Services", "Basic Materials")),
          Male = factor(isM, levels=c(0,1)),
-         Company = as.character(Company)) %>%
+         Company = as.factor(as.character(Company))) %>%
   select(-isM) %>%
   rename(Compensation = Recent_Comp_Thous)
 

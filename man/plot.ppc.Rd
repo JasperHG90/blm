@@ -26,3 +26,6 @@ fit <- fit \%>\%
 plot(fit \%>\% get_value('ppc'), 'normality')
 
 }
+\seealso{
+
+}

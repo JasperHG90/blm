@@ -4,12 +4,14 @@
 \alias{evaluate_ppc}
 \title{Set up posterior predictive checks}
 \usage{
-evaluate_ppc(x, p = 1)
+evaluate_ppc(x, return_all = TRUE, p = 1)
 }
 \arguments{
 \item{x}{blm object}
 
-\item{p}{proportion of samples used to compute posterior predictive checks. Defaults to p=1}
+\item{return_all}{logical. If TRUE, then the function will return the discrepancy statistics for the simulated and observed data.}
+
+\item{p}{proportion of samples used to compute posterior predictive checks. Defaults to p=1.}
 }
 \value{
 prints summary of the ppc to the R console

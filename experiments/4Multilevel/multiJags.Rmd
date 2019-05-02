@@ -20,6 +20,7 @@ knitr::opts_chunk$set(fig.pos="H", fig.width = 7, fig.height = 4, echo = TRUE,
 ```
 
 ```{r load data}
+rm(list=ls())
 # Get the directors data
 library(blm)
 data("directors")
@@ -31,29 +32,29 @@ directors <- directors %>%
   mutate(Compensation = log(Compensation)) %>%
   # Subtract mean from Age variable
   mutate(Age = Age - mean(Age),
+         Gend = as.numeric(Male)-1,
          Male = as.numeric(Male) - mean(as.numeric(Male)))
   
 # Jags data
-dir_jags <- with(directors, list(# Outcome for individuals
+dir_jags <- with(directors, list(# Outcome for individuals (level 1)
                                  compensation = Compensation,
                                  # Age of individuals
                                  age=Age,
                                  # Gender of individuals
                                  gender=Male,
-                                 # Sector-level variables
-                                 sector=as.numeric(as.factor(directors$Company)),   
-                                 # Avg. outcome per sector
-                                 avg_compensation = unname(tapply(directors$Compensation, 
-                                                                  directors$Company, mean)),
+                                 # Sector-level variables (level 3)
+                                 sector=as.numeric(as.factor(Company)),
+                                 avgAge=unname(tapply(Age, Company, mean)),
+                                 avgMale=unname(tapply(Gend, Company, function(x) sum(x)/length(x))),
                                  # Group totals
                                  # Number of individuals
-                                 n=nrow(directors),     
+                                 n=nrow(directors),  
                                  # Number of sectors
-                                 k=length(unique(directors$Company)),
+                                 k=length(unique(Company)),
                                  # Number of individual-level predictors
-                                 p1=2, # 2 predictors 
-                                 # Number of sector-level predictors
-                                 p2=1)) 
+                                 p1=2,
+                                 # Number of company-level predictors
+                                 p2=2))
 ```
 
 ```{r simulated data, eval=FALSE, include=FALSE}
@@ -143,7 +144,7 @@ $$
 \beta_{0j} 
 &\sim N(\gamma_{00}, \sigma^2_{u_0}) \\
 \gamma_{00} 
-&\sim N(m, s^2) \\
+&\sim N(m_{00}, s_{00}^2) \\
 \sigma^2_{u_0} 
 &\sim IG(\alpha_{2_0}, \beta_{2_0}) \\
 \sigma^2_e
@@ -151,44 +152,50 @@ $$
 \end{aligned}
 $$
 
-ONLY USE THE LEVEL-3 VARIABLE TO MAKE LIFE EASIER IN JAGS!
-
 To run the model in JAGS, we construct the following code
 
 ```{r model 1 intercept-only model, eval=TRUE}
 library(rjags)
 library(tidyr)
 
-# Initial values
-dir_inits <- list(
-  init1 <- list(tau=runif(1), tau_u0=runif(1)),
-  init2 <- list(tau=runif(1), tau_u0=runif(1))
-)
+if(!"model1.rds" %in% list.files("experiments/4Multilevel")) {
+  
+  # Initial values
+  dir_inits <- list(
+    init1 <- list(tau=runif(1), tau_u0=runif(1)),
+    init2 <- list(tau=runif(1), tau_u0=runif(1))
+  )
+  
+  # Specify model in JAGS
+  mod_io <- jags.model("1_intercept_only.txt", 
+                       data = dir_jags,
+                       inits = dir_inits,
+                       n.chains=2)
+  
+  # Burn
+  update(mod_io, n.iter=60000)
+  
+  # Draw samples
+  params <- c("sigma_e", "sigma_u0", "gamma_00")
+  # Run the chain
+  resm1 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
+  
+  # DIC
+  DICm1 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD")
 
-# Specify model in JAGS
-mod_io <- jags.model("1_intercept_only.txt", 
-                     data = dir_jags,
-                     inits = dir_inits,
-                     n.chains=2)
-
-# Burn
-update(mod_io, n.iter=40000)
-
-# Draw samples
-params <- c("sigma_e", "sigma_u0", "gamma_00")
-# Run the chain
-resm1 <- coda.samples(mod_io, variable.names = params, n.iter=200000, thin = 5)
+} else {
+  
+  resm1 <- readRDS(file="model1.rds")
+  DICm1 <- readRDS(file="model1_DIC.rds")
+  
+}
 
 # MAP values
 MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
 
 # Variance explained
-vl2 <- MAPm1[3]^2 / sum(MAPm1[-1]^2) #99.2%
-vl1 <- 1-vl2
-
-# Variance estimate of level 2 >0
-
-DICm1 <- dic.samples(mod_io, thin=3, n.iter=10000)
+vl2 <- MAPm1[3]^2 / sum(MAPm1[-1]^2) # 57.4%
+vl1 <- 1-vl2 # 42.6%
 ```
 
 The values returned by JAGS allows us to calculate the *intraclass correlation coefficient*, defined as:
@@ -197,18 +204,90 @@ $$
 \rho=\frac{\sigma^2_{u_0}}{\sigma^2_e + \sigma^2_{u_0}}
 $$
 
-In the case of the directors data, the ICC equals `r unname(round(vl2, digits=2))`. This means:
+In the case of the directors data, the ICC equals `r unname(round(vl2, digits=3))`. This means:
 
-1. That roughly $27\%$ of the variance can be found at the level 2 (sector) variable.
-2. That the expected correlation of two randomly picked directors in a given sector is $.27$.
+1. That roughly $57.3\%$ of the variance can be found at the level 2 (company) variable.
+2. That the expected correlation of two randomly picked directors in a given company is $\hat{r}=.573$.
 
-Finally, we note that $0$ is not included in the credible interval of $\sigma^2_{u_0}$, which leads us to the conclusion that a multilevel model is appropriate. $(95\% \ \ CCI=[.086, 1.11])$.
+Finally, we note that $0$ is not included in the credible interval of $\sigma^2_{u_0}$, which leads us to the conclusion that a multilevel model is appropriate. $(95\% \ \ \text{CCI}=[.321, .503])$.
 
 ## Level 1 variables
 
-The second-level
+The second-level model is specified using the following mixed-model equation:
 
-```{r model2 level 1 predictors}
+$$
+\begin{aligned}
+\text{compensation}_{ij} =
+&\gamma_{00} + u_{0j} + \gamma_{10}\cdot \text{Age}_{ij} + \gamma_{20}\cdot \text{Male}_{ij} + e_{ij}
+\end{aligned}
+$$
+
+or, equivalently:
+
+$$
+\begin{aligned}
+\text{compensation}_{ij} 
+&\sim N(\beta_{0j}, \sigma^2_e) \\
+\beta_{0j} 
+&\sim N(\gamma_{00}, \sigma^2_{u_0}) \\
+\gamma_{00} 
+&\sim N(m_{00}, s_{00}^2) \\
+\gamma_{10}
+&\sim N(m_{10}, s_{10}^2) \\
+\gamma_{20}
+&\sim N(m_{20}, s_{20}^2) \\
+\sigma^2_{u_0} 
+&\sim IG(\alpha_{2_0}, \beta_{2_0}) \\
+\sigma^2_e
+&\sim IG(\alpha_{1}, \beta_{1})
+\end{aligned}
+$$
+
+```{r model2a level 1 predictors}
+# Initial values
+dir_inits <- list(
+  init1 <- list(tau=runif(1), tau_u0=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1))
+)
+
+if(!"model1.rds" %in% list.files("experiments/4Multilevel")) {
+
+  # Specify model in JAGS
+  mod_io <- jags.model("2a_level_one_predictors.txt", 
+                       data = dir_jags,
+                       inits = dir_inits,
+                       n.chains=2)
+  
+  # Burn
+  update(mod_io, n.iter=60000)
+  
+  # Draw samples
+  params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10", "gamma_20")
+  # Run the chain
+  resm2 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
+  
+  # Save model
+  saveRDS(resm2, "model2a.rds")
+  
+  # DIC
+  DICm2 <- dic.samples(mod_io, thin=5, n.iter=20000)
+  
+  # Save
+  saverds(DICm2, "model2a_DIC.rds")
+  
+} else {
+  
+  resm2 <- readRDS(file="model2.rds")
+  DICm2 <- readRDS(file="model2_DIC.rds")  
+  
+}
+# MAP values
+MAPm2 <- apply(do.call(rbind.data.frame, resm2), 2, mean)
+```
+
+We remove gender
+
+```{r model2a level 1 predictors}
 # Initial values
 dir_inits <- list(
   init1 <- list(tau=runif(1), tau_u0=runif(1)),
@@ -216,25 +295,24 @@ dir_inits <- list(
 )
 
 # Specify model in JAGS
-mod_io <- jags.model("2_level_one_predictors.txt", 
+mod_io <- jags.model("2b_level_one_predictors.txt", 
                      data = dir_jags,
                      inits = dir_inits,
                      n.chains=2)
 
 # Burn
-update(mod_io, n.iter=40000)
+update(mod_io, n.iter=60000)
 
 # Draw samples
-params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10", "gamma_20")
+params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10")
 # Run the chain
-resm2 <- coda.samples(mod_io, variable.names = params, n.iter=200000, thin = 5)
+resm2b <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
 
 # MAP values
-MAPm2 <- apply(do.call(rbind.data.frame, resm2), 2, mean)
+MAPm2b <- apply(do.call(rbind.data.frame, resm2b), 2, mean)
 
-# All variance estimates > 0 so most likely significant
-DICm2 <- dic.samples(mod_io, thin=5, n.iter=20000)
-
+# DIC
+DICm2b <- dic.samples(mod_io, thin=5, n.iter=10000)
 ```
 
 - Little bit weird: error at level 2 went up? https://www.statmodel.com/download/Level-2%20R-square%20decreasing%20when%20adding%20level1-covariate.pdf
@@ -253,7 +331,36 @@ $$
 R^2_{L2} = \frac{\sigma^2_{u_0|\text{baseline}} - \sigma^2_{u_0|\text{model 1}}}{\sigma^2_{u_0|\text{baseline}}} = \frac{.0936 - .0999}{.0936} = -6.73\%
 $$
 
-## Model 3: adding level 2 variables
+## Adding level-2 predictors
+
+$$
+\begin{aligned}
+\text{compensation}_{ij} =
+&\gamma_{00} + u_{0j} + \gamma_{10}\cdot \text{Age}_{ij} + \gamma_{01} \cdot \text{avgAge}_j + 
+\gamma_{02} \cdot \text{propMale}_j + e_{ij}
+\end{aligned}
+$$
+
+or, equivalently:
+
+$$
+\begin{aligned}
+\text{compensation}_{ij} 
+&\sim N(\beta_{0j}, \sigma^2_e) \\
+\beta_{0j} 
+&\sim N(\gamma_{00}, \sigma^2_{u_0}) \\
+\gamma_{00} 
+&\sim N(m_{00}, s_{00}^2) \\
+\gamma_{10}
+&\sim N(m_{10}, s_{10}^2) \\
+\gamma_{02}
+&\sim N(m_{02}, s_{02}^2) \\
+\sigma^2_{u_0} 
+&\sim IG(\alpha_{2_0}, \beta_{2_0}) \\
+\sigma^2_e
+&\sim IG(\alpha_{1}, \beta_{1})
+\end{aligned}
+$$
 
 ```{r model3 level 2 predictors}
 # Initial values
@@ -269,20 +376,58 @@ mod_io <- jags.model("3_level_two_predictors.txt",
                      n.chains=2)
 
 # Burn
-update(mod_io, n.iter=40000)
+update(mod_io, n.iter=60000)
 
 # Draw samples
-params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10", "gamma_01")
+params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10", "gamma_01", "gamma_02")
 # Run the chain
-resm3 <- coda.samples(mod_io, variable.names = params, n.iter=200000, thin = 5)
+resm3 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 5)
 
 # MAP values
 MAPm3 <- apply(do.call(rbind.data.frame, resm3), 2, mean)
 
-# All variance estimates > 0 so most likely significant
-DICm3 <- dic.samples(mod_io, thin=5, n.iter=20000)
+# DIC
+DICm3 <- dic.samples(mod_io, thin=5, n.iter=10000)
 ```
 
+## Random coefficient model
+
+$$
+\begin{aligned}
+\text{compensation}_{ij} =
+&\gamma_{00} + u_{0j} + \gamma_{10}\cdot \text{Age}_{ij} + \gamma_{20} \cdot \text{Male}_{ij} + 
+u_{1j}\cdot \text{Age}_{ij} + u_{2j} \cdot \text{Male}_{ij} + e_{ij}  
+\end{aligned}
+$$
+
+or, equivalently:
+
+$$
+\begin{aligned}
+\text{compensation}_{ij} 
+&\sim N(\beta_{0j}, \sigma^2_e) \\
+\beta_{0j} 
+&\sim N(\gamma_{00}, \sigma^2_{u_0}) \\
+\beta_{1j} 
+&\sim N(\gamma_{10}, \sigma^2_{u_1}) \\
+\beta_{2j} 
+&\sim N(\gamma_{20}, \sigma^2_{u_2}) \\
+\gamma_{00} 
+&\sim N(m_{00}, s_{00}^2) \\
+\gamma_{10}
+&\sim N(m_{10}, s_{10}^2) \\
+\gamma_{20}
+&\sim N(m_{20}, s_{20}^2) \\
+\sigma^2_{u_0} 
+&\sim IG(\alpha_{2_0}, \beta_{2_0}) \\
+\sigma^2_{u_1} 
+&\sim IG(\alpha_{2_1}, \beta_{2_1}) \\
+\sigma^2_{u_2} 
+&\sim IG(\alpha_{2_2}, \beta_{2_2}) \\
+\sigma^2_e
+&\sim IG(\alpha_{1}, \beta_{1})
+\end{aligned}
+$$
 
 ```{r model4 random coef}
 # Initial values
@@ -298,20 +443,22 @@ mod_io <- jags.model("4_random_coefficients.txt",
                      n.chains=2)
 
 # Burn
-update(mod_io, n.iter=40000)
+update(mod_io, n.iter=60000)
 
 # Draw samples
 params <- c("sigma_e", "sigma_u0", "sigma_u1", "sigma_u2",
-            "gamma_00", "gamma_10", "gamma_20", "gamma_01")
+            "gamma_00", "gamma_10", "gamma_20")
 # Run the chain
-resm4 <- coda.samples(mod_io, variable.names = params, n.iter=200000, thin = 5)
+resm4 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 5)
 
 # MAP values
 MAPm4 <- apply(do.call(rbind.data.frame, resm4), 2, mean)
 
-# All variance estimates > 0 so most likely significant
+# DIC model 4
 DICm4 <- dic.samples(mod_io, thin=5, n.iter=20000)
 ```
+
+## The cross-level interaction
 
 ```{r model5 cross-level}
 # Initial values
@@ -327,19 +474,43 @@ mod_io <- jags.model("5_cross_level_interaction.txt",
                      n.chains=2)
 
 # Burn
-update(mod_io, n.iter=40000)
+update(mod_io, n.iter=60000)
 
 # Draw samples
 params <- c("sigma_e", "sigma_u0", "sigma_u1", "sigma_u2",
-            "gamma_00", "gamma_10", "gamma_20", "gamma_01", "gamma_21", "gamma_11")
+            "gamma_00", "gamma_10", "gamma_20", "gamma_01", "gamma_02",
+            "gamma_21", "gamma_11", "gamma_22", "gamma_12")
 # Run the chain
-resm5 <- coda.samples(mod_io, variable.names = params, n.iter=200000, thin = 5)
+resm5 <- coda.samples(mod_io, variable.names = params, n.iter=800000, thin = 5)
 
 # MAP values
 MAPm5 <- apply(do.call(rbind.data.frame, resm5), 2, mean)
 
 # All variance estimates > 0 so most likely significant
 DICm5 <- dic.samples(mod_io, thin=5, n.iter=20000)
+```
+
+```{r model comparison}
+# Table with DIC values
+DICs <- data.frame(
+  "DIC" = c(sum(DICm1$deviance + DICm1$penalty),
+            sum(DICm2$deviance + DICm2$penalty),
+            sum(DICm3$deviance + DICm3$penalty),
+            sum(DICm4$deviance + DICm4$penalty),
+            sum(DICm5$deviance + DICm5$penalty)),
+  row.names = c("Intercept-only", "Predictors level 1",
+                "Predictors levels 1 + 2", "Random coefficient",
+                "Cross-level interaction")
+)
+# Cat
+knitr::kable(DICs)
+```
+
+
+```{r}
+# Results from model 3
+final_mod <- do.call(rbind.data.frame, resm3)
+
 ```
 
 # References

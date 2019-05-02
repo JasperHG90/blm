@@ -15,6 +15,7 @@ The following documents contain specific information or implementation notes:
 - [Course summary](https://github.com/JasperHG90/blm/blob/master/docs/course_summary.pdf)
 - [Implementation notes Gibbs sampler](https://github.com/JasperHG90/blm/blob/master/docs/conditionalposterior.pdf)
 - [Implementation notes Metropolis-Hastings sampler](https://github.com/JasperHG90/blm/blob/master/docs/MH.pdf)
+- Multilevel analysis of Directors data using JAGS
 
 ## Folder structure
 
@@ -29,6 +30,7 @@ The folder structure is described below. Important files are annotated.
     │   ├── MH.pdf                                  #  - Implementation notes for Metropolis-Hastings sampler
     │   ├── final_assigment.pdf                     #  - Final assignment for the course
     │   ├── course_summary.pdf                      #  - Course summary
+    │   ├── multilevel_jags.pdf                     #  - multilevel analysis of the directors dataset using JAGS
     │   └── ...
     ├── experiments                                 # Various files used to test out new features / run simulations
         └── ...
