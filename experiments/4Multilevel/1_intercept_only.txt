@@ -2,14 +2,30 @@
 
 model {
 
-	# Priors (sector)
-	tau_u0 ~ dgamma(.01, .01)
+  ### Level 3 ==> sectors
+
+  # Priors (sector)
+  tau_v0 ~ dgamma(.01, .01)
   # Hyperprior for mean
-  gamma_00 ~ dnorm(0, 1.0E-4) # N(m, s2inv)
-  # For each sector
-	for (j in 1:k){
-		b0[j] ~ dnorm(gamma_00, tau_u0) # random intercept for every sector
+  zeta_00 ~ dnorm(0, 1.0E-4)
+  # For each sector, create a group mean
+  for (s in 1:z) {
+    v0[s] ~ dnorm(zeta_00, tau_v0)
+  }
+
+  ### Level 2 ==> companies
+
+	# Priors (companies)
+	tau_u0 ~ dgamma(.01, .01)
+  # For each company
+	for (j in 1:k) {
+	  # For each company, draw from normal
+    b0[j] ~ dnorm(mu_comp[j], tau_u0)
+    # Linear combination for company
+	  mu_comp[j] <- v0[sector[j]]
 	}
+
+	### Level 1 ==> individuals
 
   # Priors
   # Individual precision
@@ -17,11 +33,12 @@ model {
   # For each individual
 	for (i in 1:n) {
 		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
-		mu[i] <- b0[sector[i]] # Linear combination for each person
+		mu[i] <- b0[company[i]] # Linear combination for each person
 	}
 
   # Invert gamma
   sigma_e <- 1 / sqrt(tau)
   sigma_u0 <- 1 / sqrt(tau_u0)
+  sigma_v0 <- 1 / sqrt(tau_v0)
 
 }

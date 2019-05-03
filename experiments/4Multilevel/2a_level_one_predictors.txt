@@ -2,30 +2,44 @@
 
 model {
 
-	# Priors (sector)
+  # Priors (sector)
+  tau_v0 ~ dgamma(.01, .01)
+  # Hyperprior for mean
+  zeta_00 ~ dnorm(0, 1.0E-4)
+  # Hyperprior for coefficients
+  zeta_10 ~ dnorm(0, 1.0E-4)
+  #zeta_20 ~ dnorm(0, 1.0E-4)
+  # For each sector, create a group mean
+  for (s in 1:z) {
+    v0[s] ~ dnorm(zeta_00, tau_v0)
+  }
+
+  ### Level 2 ==> companies
+
+	# Priors (companies)
 	tau_u0 ~ dgamma(.01, .01)
-  # Hyperprior for intercept
-  gamma_00 ~ dnorm(0, 1.0E-4) # N(m, s2inv)
-  # Hyperpriors for the coefficients
-  gamma_10 ~ dnorm(0, 1.0E-4)
-  gamma_20 ~ dnorm(0, 1.0E-4)
-  # For each sector
-	for (j in 1:k){
-		b0[j] ~ dnorm(gamma_00, tau_u0) # random intercept for every company
+  # For each company
+	for (j in 1:k) {
+	  # For each company, draw from normal
+    b0[j] ~ dnorm(mu_comp[j], tau_u0)
+    # Linear combination for company
+	  mu_comp[j] <- v0[sector[j]]
 	}
+
+	### Level 1 ==> individuals
 
   # Priors
   # Individual precision
-	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect (variance within sectors)
+	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect
   # For each individual
 	for (i in 1:n) {
 		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
-		# Sector-specific intercept + level-1 variables
-		mu[i] <- b0[sector[i]] + gamma_10*age[i] + gamma_20*gender[i]
+		mu[i] <- b0[company[i]] + zeta_10*age[i] #+ zeta_20*gender[i] # Linear combination for each person
 	}
 
   # Invert gamma
   sigma_e <- 1 / sqrt(tau)
   sigma_u0 <- 1 / sqrt(tau_u0)
+  sigma_v0 <- 1 / sqrt(tau_v0)
 
 }

@@ -19,6 +19,8 @@ knitr::opts_chunk$set(fig.pos="H", fig.width = 7, fig.height = 4, echo = TRUE,
                       fig.align="center", warning = FALSE, message = FALSE, eval=TRUE)
 ```
 
+The **directors** dataset that is included with the `blm` library has a natural hierarchical structure with individuals nested in companies nested in industries nested in sectors. In this document, we will construct a multilevel model in JAGS using sectors, companies and individuals. Given that the data do not conform to the assumptions we need for a linear mixed-effect model, we will not run a full multilevel model (i.e. containing cross-level)
+
 ```{r load data}
 rm(list=ls())
 # Get the directors data
@@ -33,28 +35,53 @@ directors <- directors %>%
   # Subtract mean from Age variable
   mutate(Age = Age - mean(Age),
          Gend = as.numeric(Male)-1,
-         Male = as.numeric(Male) - mean(as.numeric(Male)))
+         Male = as.numeric(Male) - mean(as.numeric(Male))) %>%
+  # Sort data (makes it easier later)
+  arrange(Sector)
   
 # Jags data
-dir_jags <- with(directors, list(# Outcome for individuals (level 1)
+dir_jags <- with(directors, list(## Outcome for individuals (level 1)
+  
                                  compensation = Compensation,
                                  # Age of individuals
                                  age=Age,
                                  # Gender of individuals
                                  gender=Male,
-                                 # Sector-level variables (level 3)
-                                 sector=as.numeric(as.factor(Company)),
+                                 # The sector that each individual belongs to
+                                 sector_ind = as.numeric(as.factor(Sector)),
+                                 
+                                 ## Company-level variables (level 2)
+                                 
+                                 # Company indicator
+                                 company=as.numeric(as.factor(Company)),
+                                 # Average age of directors for each company
                                  avgAge=unname(tapply(Age, Company, mean)),
+                                 # Proportion of males for each company
                                  avgMale=unname(tapply(Gend, Company, function(x) sum(x)/length(x))),
-                                 # Group totals
+                                 
+                                 ## Sector-level variables (level 3)
+                                 
+                                 # The sector that every company belongs to
+                                 sector=directors %>% group_by(Company) %>% slice(1) %>%  
+                                   ungroup() %>% select(Sector) %>% pull() %>% as.numeric(),
+                                 
+                                 ## Group totals
+                                 
                                  # Number of individuals
                                  n=nrow(directors),  
-                                 # Number of sectors
+                                 # Number of companies
                                  k=length(unique(Company)),
+                                 # Number of sectors
+                                 z=length(unique(Sector)),
+                                 
+                                 ## Number of predictors
+                                 
                                  # Number of individual-level predictors
                                  p1=2,
                                  # Number of company-level predictors
-                                 p2=2))
+                                 p2=2,
+                                 # Number of sector-level predictors
+                                 p3=0))
 ```
 
 ```{r simulated data, eval=FALSE, include=FALSE}
@@ -103,11 +130,10 @@ dir_jags <- with(directors, list(compensation = Compensation, age=Age, company=C
 
 ```
 
-The **directors** dataset that is included with the `blm` library has a natural hierarchical structure with individuals nested in companies nested in industries nested in sectors. In this document, we will construct a multilevel model in JAGS using companies and individuals. 
-
 ```{r, eval=TRUE, fig.cap="Within and between variance of director compensation across companies"}
 library(ggplot2)
-ggplot(directors, aes(x=Company, y=Compensation, color=Company)) +
+library(forcats)
+ggplot(directors, aes(x=fct_reorder(Company, as.numeric(Sector)), y=Compensation, color=Sector)) +
   geom_point() +
   geom_boxplot() +
   geom_hline(yintercept = mean(directors$Compensation)) +
@@ -158,12 +184,12 @@ To run the model in JAGS, we construct the following code
 library(rjags)
 library(tidyr)
 
-if(!"model1.rds" %in% list.files("experiments/4Multilevel")) {
+if(!"model1.rds" %in% list.files()) {
   
   # Initial values
   dir_inits <- list(
-    init1 <- list(tau=runif(1), tau_u0=runif(1)),
-    init2 <- list(tau=runif(1), tau_u0=runif(1))
+    init1 <- list(tau=runif(1), tau_u0=runif(1), tau_v0=runif(1)),
+    init2 <- list(tau=runif(1), tau_u0=runif(1), tau_v0=runif(1))
   )
   
   # Specify model in JAGS
@@ -176,12 +202,18 @@ if(!"model1.rds" %in% list.files("experiments/4Multilevel")) {
   update(mod_io, n.iter=60000)
   
   # Draw samples
-  params <- c("sigma_e", "sigma_u0", "gamma_00")
+  params <- c("sigma_e", "sigma_u0", "sigma_v0", "zeta_00")
   # Run the chain
   resm1 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
   
+  # Save model
+  saveRDS(resm1, "model1.rds")
+
   # DIC
   DICm1 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD")
+  
+  # Save
+  saveRDS(DICm1, "model1_DIC.rds")
 
 } else {
   
@@ -194,14 +226,15 @@ if(!"model1.rds" %in% list.files("experiments/4Multilevel")) {
 MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
 
 # Variance explained
-vl2 <- MAPm1[3]^2 / sum(MAPm1[-1]^2) # 57.4%
-vl1 <- 1-vl2 # 42.6%
+vl3 <- MAPm1[3]^2 / sum(MAPm1[-4]^2) # 57.4%
+vl2 <- MAPm1[2]^2 / sum(MAPm1[-4]^2)
+vl1 <- 1-vl2 - vl3 # 42.6%
 ```
 
 The values returned by JAGS allows us to calculate the *intraclass correlation coefficient*, defined as:
 
 $$
-\rho=\frac{\sigma^2_{u_0}}{\sigma^2_e + \sigma^2_{u_0}}
+\rho=\frac{\sigma^2_{u_0}}{\sigma^2_e + \sigma^2_{u_0} + \sigma^2_{v_0}}
 $$
 
 In the case of the directors data, the ICC equals `r unname(round(vl2, digits=3))`. This means:
@@ -246,11 +279,11 @@ $$
 ```{r model2a level 1 predictors}
 # Initial values
 dir_inits <- list(
-  init1 <- list(tau=runif(1), tau_u0=runif(1)),
-  init2 <- list(tau=runif(1), tau_u0=runif(1))
+  init1 <- list(tau=runif(1), tau_u0=runif(1), tau_v0=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1), tau_v0=runif(1))
 )
 
-if(!"model1.rds" %in% list.files("experiments/4Multilevel")) {
+if(!"model2.rds" %in% list.files()) {
 
   # Specify model in JAGS
   mod_io <- jags.model("2a_level_one_predictors.txt", 
@@ -262,7 +295,7 @@ if(!"model1.rds" %in% list.files("experiments/4Multilevel")) {
   update(mod_io, n.iter=60000)
   
   # Draw samples
-  params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10", "gamma_20")
+  params <- c("sigma_e", "sigma_u0", "sigma_v0", "zeta_00", "zeta_10")
   # Run the chain
   resm2 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
   
@@ -270,15 +303,15 @@ if(!"model1.rds" %in% list.files("experiments/4Multilevel")) {
   saveRDS(resm2, "model2a.rds")
   
   # DIC
-  DICm2 <- dic.samples(mod_io, thin=5, n.iter=20000)
+  DICm2 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD")
   
   # Save
-  saverds(DICm2, "model2a_DIC.rds")
+  saveRDS(DICm2, "model2a_DIC.rds")
   
 } else {
   
-  resm2 <- readRDS(file="model2.rds")
-  DICm2 <- readRDS(file="model2_DIC.rds")  
+  resm2 <- readRDS(file="model2a.rds")
+  DICm2 <- readRDS(file="model2a_DIC.rds")  
   
 }
 # MAP values
@@ -287,33 +320,6 @@ MAPm2 <- apply(do.call(rbind.data.frame, resm2), 2, mean)
 
 We remove gender
 
-```{r model2a level 1 predictors}
-# Initial values
-dir_inits <- list(
-  init1 <- list(tau=runif(1), tau_u0=runif(1)),
-  init2 <- list(tau=runif(1), tau_u0=runif(1))
-)
-
-# Specify model in JAGS
-mod_io <- jags.model("2b_level_one_predictors.txt", 
-                     data = dir_jags,
-                     inits = dir_inits,
-                     n.chains=2)
-
-# Burn
-update(mod_io, n.iter=60000)
-
-# Draw samples
-params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10")
-# Run the chain
-resm2b <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
-
-# MAP values
-MAPm2b <- apply(do.call(rbind.data.frame, resm2b), 2, mean)
-
-# DIC
-DICm2b <- dic.samples(mod_io, thin=5, n.iter=10000)
-```
 
 - Little bit weird: error at level 2 went up? https://www.statmodel.com/download/Level-2%20R-square%20decreasing%20when%20adding%20level1-covariate.pdf
 
@@ -365,30 +371,47 @@ $$
 ```{r model3 level 2 predictors}
 # Initial values
 dir_inits <- list(
-  init1 <- list(tau=runif(1), tau_u0=runif(1)),
-  init2 <- list(tau=runif(1), tau_u0=runif(1))
+  init1 <- list(tau=runif(1), tau_u0=runif(1), tau_v0=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1), tau_v0=runif(1))
 )
 
-# Specify model in JAGS
-mod_io <- jags.model("3_level_two_predictors.txt", 
-                     data = dir_jags,
-                     inits = dir_inits,
-                     n.chains=2)
+if(!"model3.rds" %in% list.files()) {
 
-# Burn
-update(mod_io, n.iter=60000)
+  # Specify model in JAGS
+  mod_io <- jags.model("3_level_two_predictors.txt", 
+                       data = dir_jags,
+                       inits = dir_inits,
+                       n.chains=2)
+  
+  # Burn
+  update(mod_io, n.iter=60000)
+  
+  # Draw samples
+  params <- c("sigma_e", "sigma_u0", "sigma_v0", "zeta_00", "zeta_10", "zeta_01")
+  # Run the chain
+  resm3 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 5)
+  
+  # DIC
+  DICm3 <- dic.samples(mod_io, thin=5, n.iter=10000)
+  
+  # Save model
+  saveRDS(resm3, "model3.rds")
+  
+  # Save
+  saveRDS(DICm3, "model3_DIC.rds")
 
-# Draw samples
-params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10", "gamma_01", "gamma_02")
-# Run the chain
-resm3 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 5)
+  
+} else {
+  
+  
+  
+}
 
 # MAP values
 MAPm3 <- apply(do.call(rbind.data.frame, resm3), 2, mean)
-
-# DIC
-DICm3 <- dic.samples(mod_io, thin=5, n.iter=10000)
 ```
+
+Given that the level-2 variables are not significant (and that the model fit seems to worsen), we will not continue to build JAGS models from this point onwards. In fact, the best-fitting model we can conjure up is the intercept-only model (given that the model containing age is not explaining much of the variance). 
 
 ## Random coefficient model
 
