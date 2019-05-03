@@ -264,37 +264,98 @@ dirmod2 %>%
   evaluate_model_fit() # ==> DIC is 487.895 with 6 parameters ==> fit is better than model 1
 ```
 
-```{r model 3 (by company)}
-dirmod3 <- blm("Compensation ~ Company + Age + Male",
-                data=directors) 
+From figure XX and the posterior predictive checks, we observe that the data are not independent. That is, directors who are in the same board tend to are more similar to each other than directors from other boards. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards. Indeed, the results of the random effects model shows that the intra-class correlation coefficient $\rho$ equals $57\%$, meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$. 
 
-# Retrieve parameter names
-dirmod3 %>% get_parameter_names()
+```{r MLM intercept-only model}
+# Jags data
+dir_jags <- with(directors, list(## Outcome for individuals (level 1)
+  
+                                 compensation = Compensation,
+                                 # Age of individuals
+                                 age=Age,
+                                 # Gender of individuals
+                                 gender=Male,
+                                 
+                                 ## Company-level variables (level 2)
+                                 
+                                 # Company indicator
+                                 company=as.numeric(as.factor(Company)),
+                                 
+                                 ## Group totals
+                                 
+                                 # Number of individuals
+                                 n=nrow(directors),  
+                                 # Number of companies
+                                 k=length(unique(Company))))
 
-# Update the model specification
-dirmod3 <- dirmod3 %>%
-  # Need to delete posterior when we change settings
-  # (only has an effect if posterior already present)
-  delete_posterior() %>%
-  # Set an informative prior on the coefficients
-  # Males are expected to have 17% pay increase over women
-  #set_prior("b53", mu = .17, sd=0.01) %>%
-  # Update sampling settings
-  set_sampling_options(chains = 2, iterations = 10000,
-                       burn = 3000, thinning=1) %>%
-  # Set initial values
-  # If we draw from the priors the starting values will be too large
-  # This is an issue for MH because it takes many more iterations to converge
-  set_initial_values(chain_1 = list("b" = runif(54, 1, 10), "sigma"= 1),
-                     chain_2 = list("b" = runif(54, 1, 10), "sigma"=2)) %>%
-  # Sample the posterior distribution
-  sample_posterior()
+# Intercept-only model
+io_mod <- "model {
 
-# Run PPC
-dirmod3 <- dirmod3 %>%
-  evaluate_ppc(p=0.5)
+  ### Level 2 ==> companies
 
+	# Priors (companies)
+	tau_u0 ~ dgamma(.01, .01)
+	# Hyperprior for mean
+  gamma_00 ~ dnorm(0, 1.0E-4)
+  # For each company
+	for (j in 1:k) {
+	  # For each company, draw from normal
+    b0[j] ~ dnorm(gamma_00, tau_u0)
+	}
+
+	### Level 1 ==> individuals
+
+  # Priors
+  # Individual precision
+	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect (variance within sectors)
+  # For each individual
+	for (i in 1:n) {
+		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
+		mu[i] <- b0[company[i]] # Linear combination for each person
+	}
+
+  # Invert gamma
+  sigma_e <- 1 / sqrt(tau)
+  sigma_u0 <- 1 / sqrt(tau_u0)
+
+}"
+
+# Run the model in JAGS
+# Initial values
+dir_inits <- list(
+  init1 <- list(tau=runif(1), tau_u0=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1))
+)
+
+# Specify model in JAGS
+mod_io <- jags.model(textConnection(io_mod), 
+                     data = dir_jags,
+                     inits = dir_inits,
+                     n.chains=2)
+
+# Burn
+update(mod_io, n.iter=60000)
+
+# Draw samples
+params <- c("sigma_e", "sigma_u0", "gamma_00")
+# Run the chain
+resm1 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
+
+# Convergence?
+plot(resm1)
+
+# DIC
+DICm1 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD")
+
+# MAP values
+MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
+
+# Variance explained
+vl2 <- MAPm1[3]^2 / sum(MAPm1[-1]^2) # 57.4%
+vl1 <- 1-vl2  # 42.6%%
 ```
+
+
 
 ```{r model results (including model fit), eval=FALSE, results='asis'}
 # Calculate 95% CCI
@@ -390,81 +451,6 @@ Residual Std. Error & .516 & .501 \\
 plot(predict(dirmod2), resid(dirmod2))
 ```
 
-```{r ppc simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The color indicates the severity of the violation; the green bars indicate mild violation, blue indicates medium violation and red indicates severe violation. The script used to generate the data and run the simulations may be found here.", fig.width=5, fig.height=3}
-
-# Convenience function to flatten array
-flatten_array <- function(x) {
-  
-  # To list and return
-  lapply(1:dim(x)[3], function(y) {
-    ss <- x[,,y]
-    colnames(ss) <- c("normality", "heteroskedasticity", "independence")
-    # To df
-    ss <- as.data.frame(ss)
-    # Return
-    return(ss)
-  })
-  
-}
-
-# Read data
-normal <- readRDS("data/ppc_normal_data.rds")
-finsim <- readRDS("data/final.rds")
-heterosked <- finsim$heterosked$results %>% 
-  flatten_array() %>%
-  bind_rows(.id="severity") %>%
-  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
-indep <- finsim$indep$results %>% 
-  flatten_array() %>%
-  bind_rows(.id="severity") %>%
-  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
-
-# PPC heteroskedasticity, no violation
-p1 <- ggplot(data.frame(x=normal[,2]), aes(x=x)) +
-  geom_histogram(color="black", fill="lightgrey") +
-  scale_x_continuous(limits=c(0,1)) + 
-  theme_blm(text_size = 10) +
-  theme(axis.title.x = element_blank(),
-        axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        axis.text.x = element_blank()) +
-  labs(title = "(a) PPC heteroskedasticity", subtitle="      no violations")
-# PPC independence, no violation
-p2 <- ggplot(data.frame(x=normal[,3]), aes(x=x)) +
-  geom_histogram(color="black", fill="lightgrey") +
-  scale_x_continuous(limits=c(0,1)) + 
-  theme_blm(text_size = 10) +
-  theme(axis.title.x = element_blank(),
-        axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        axis.text.x = element_blank()) +
-  labs(title = "(b) PPC independence", subtitle="      no violations")
-# PPC heteroskedasticity, assumption violated
-p3 <- ggplot(heterosked, aes(x=heteroskedasticity, fill=severity)) +
-  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
-  theme_blm(text_size = 10) + 
-  scale_fill_brewer(palette = "Set1", direction=-1) +
-  scale_x_continuous(limits=c(-0.02,1)) +
-  theme(axis.title.x = element_blank(),
-      axis.title.y = element_blank(),
-      axis.text.y = element_blank(),
-      legend.position = "none") +
-  labs(title = "(c) PPC heteroskedasticity", subtitle="      assumption violated")
-# PPC independence, violated
-p4 <- ggplot(indep, aes(x=independence, fill=severity)) +
-  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
-  scale_fill_brewer(palette = "Set1", direction=-1) +
-  scale_x_continuous(limits=c(-0.02,1)) +
-  theme_blm(text_size = 10) +
-    theme(axis.title.x = element_blank(),
-        axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        legend.position = "none") +
-  labs(title = "(d) PPC independence", subtitle="      assumption violated")
-
-# Merge plots
-grid.arrange(p1, p2, p3, p4)
-```
 
 ```{r r-squared plot, fig.cap="Bayesian R-squared value for model 1 (left) and model 2 (right). The proportion of cases in which the R-squared value of model 2 exceeds that of model 1 is .99", fig.height=2, fig.width=5}
 # Plot r-squared
@@ -616,3 +602,86 @@ ggarrange(priorvar, postvar, posteriorshift, tab, ncol=2, nrow=2, common.legend=
 
 The effect of changing the prior variance can be summarized using a posterior shrinking factor (CITE BETANCOURT) and posterior z-score. The shrinking factor shows us the factor by which the variance of the posterior distribution shrinks or expands compared to the prior variance. The posterior z-score tells us the direction and magnitude by which the posterior mean shifts compared to the prior mean; if we are confident in the precision of our domain knowledge (resulting in small prior variance), the resulting posterior weights this information strongly and we end up with a posterior mean that lies closer to the prior mean (represented by the z-score). However, given that we have small variance, and if this is not corroborated by the data, then the shrinkage factor will be large. 
 
+## Other material
+
+```{r ppc simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The color indicates the severity of the violation; the green bars indicate mild violation, blue indicates medium violation and red indicates severe violation. The script used to generate the data and run the simulations may be found here.", fig.width=5, fig.height=3}
+
+# Convenience function to flatten array
+flatten_array <- function(x) {
+  
+  # To list and return
+  lapply(1:dim(x)[3], function(y) {
+    ss <- x[,,y]
+    colnames(ss) <- c("normality", "heteroskedasticity", "independence")
+    # To df
+    ss <- as.data.frame(ss)
+    # Return
+    return(ss)
+  })
+  
+}
+
+# Read data
+normal <- readRDS("data/ppc_normal_data.rds")
+finsim <- readRDS("data/final.rds")
+heterosked <- finsim$heterosked$results %>% 
+  flatten_array() %>%
+  bind_rows(.id="severity") %>%
+  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
+indep <- finsim$indep$results %>% 
+  flatten_array() %>%
+  bind_rows(.id="severity") %>%
+  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
+
+# PPC heteroskedasticity, no violation
+p1 <- ggplot(data.frame(x=normal[,2]), aes(x=x)) +
+  geom_histogram(color="black", fill="lightgrey") +
+  scale_x_continuous(limits=c(0,1)) + 
+  theme_blm(text_size = 10) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_blank()) +
+  labs(title = "(a) PPC heteroskedasticity", subtitle="      no violations")
+# PPC independence, no violation
+p2 <- ggplot(data.frame(x=normal[,3]), aes(x=x)) +
+  geom_histogram(color="black", fill="lightgrey") +
+  scale_x_continuous(limits=c(0,1)) + 
+  theme_blm(text_size = 10) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_blank()) +
+  labs(title = "(b) PPC independence", subtitle="      no violations")
+# PPC heteroskedasticity, assumption violated
+p3 <- ggplot(heterosked, aes(x=heteroskedasticity, fill=severity)) +
+  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
+  theme_blm(text_size = 10) + 
+  scale_fill_brewer(palette = "Set1", direction=-1) +
+  scale_x_continuous(limits=c(-0.02,1)) +
+  theme(axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.text.y = element_blank(),
+      legend.position = "none") +
+  labs(title = "(c) PPC heteroskedasticity", subtitle="      assumption violated")
+# PPC independence, violated
+p4 <- ggplot(indep, aes(x=independence, fill=severity)) +
+  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
+  scale_fill_brewer(palette = "Set1", direction=-1) +
+  scale_x_continuous(limits=c(-0.02,1)) +
+  theme_blm(text_size = 10) +
+    theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        legend.position = "none") +
+  labs(title = "(d) PPC independence", subtitle="      assumption violated")
+
+# Merge plots
+grid.arrange(p1, p2, p3, p4)
+```
+
+# References
+
+Lynch, S. M. (2007). Introduction to applied Bayesian statistics and estimation for social scientists. Springer Science & Business Media. Chapter 9.2
+
+Aarts, E. (2019). Introduction to multilevel analysis and the basic two-level regression model, week 1 notes [powerpoint presentation]. *Introduction to Multilevel Analysis*, Utrecht University.

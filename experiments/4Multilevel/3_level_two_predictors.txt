@@ -2,30 +2,18 @@
 
 model {
 
-  ### Level 3 ==> sectors
-
-  # Priors (sector)
-  tau_v0 ~ dgamma(.01, .01)
-  # Hyperprior for mean
-  zeta_00 ~ dnorm(0, 1.0E-4)
-  # Hyperprior for coefficients
-  zeta_10 ~ dnorm(0, 1.0E-4)
-  zeta_01 ~ dnorm(0, 1.0E-4)
-  # For each sector, create a group mean
-  for (s in 1:z) {
-    v0[s] ~ dnorm(zeta_00, tau_v0)
-  }
-
   ### Level 2 ==> companies
 
 	# Priors (companies)
 	tau_u0 ~ dgamma(.01, .01)
+	# Hyperprior for mean
+  gamma_00 ~ dnorm(0, 1.0E-4)
+  gamma_10 ~ dnorm(0, 1.0E-4)
+  gamma_02 ~ dnorm(0, 1.0E-4)
   # For each company
 	for (j in 1:k) {
 	  # For each company, draw from normal
-    b0[j] ~ dnorm(mu_comp[j], tau_u0)
-    # Linear combination for company
-	  mu_comp[j] <- v0[sector[j]]
+    b0[j] ~ dnorm(gamma_00, tau_u0)
 	}
 
 	### Level 1 ==> individuals
@@ -36,15 +24,12 @@ model {
   # For each individual
 	for (i in 1:n) {
 		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
-		# Linear combination for each person
-		mu[i] <- b0[company[i]] +                                               # Intercept
-		         zeta_10*age[i] +                                               # Level 1 variables
-		         zeta_01*avgAge[sector_ind[i]]                                  # Level 2 variables
+		mu[i] <- b0[company[i]] + # Intercept
+		         gamma_10*age[i] + # Level 1 variables
+		         gamma_02*avgMale[company[i]] # Level 2 variables
 	}
 
   # Invert gamma
   sigma_e <- 1 / sqrt(tau)
   sigma_u0 <- 1 / sqrt(tau_u0)
-  sigma_v0 <- 1 / sqrt(tau_v0)
-
 }

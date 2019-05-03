@@ -19,7 +19,7 @@ knitr::opts_chunk$set(fig.pos="H", fig.width = 7, fig.height = 4, echo = TRUE,
                       fig.align="center", warning = FALSE, message = FALSE, eval=TRUE)
 ```
 
-The **directors** dataset that is included with the `blm` library has a natural hierarchical structure with individuals nested in companies nested in industries nested in sectors. In this document, we will construct a multilevel model in JAGS using sectors, companies and individuals. Given that the data do not conform to the assumptions we need for a linear mixed-effect model, we will not run a full multilevel model (i.e. containing cross-level)
+The **directors** dataset that is included with the `blm` library has a natural hierarchical structure with individuals nested in companies nested in industries nested in sectors. In this document, we will construct a multilevel model in JAGS using companies and individuals. Given that the data do not conform to the assumptions we need for a linear mixed-effect model, we will not run a full multilevel model (i.e. containing cross-level)
 
 ```{r load data}
 rm(list=ls())
@@ -47,8 +47,6 @@ dir_jags <- with(directors, list(## Outcome for individuals (level 1)
                                  age=Age,
                                  # Gender of individuals
                                  gender=Male,
-                                 # The sector that each individual belongs to
-                                 sector_ind = as.numeric(as.factor(Sector)),
                                  
                                  ## Company-level variables (level 2)
                                  
@@ -59,29 +57,19 @@ dir_jags <- with(directors, list(## Outcome for individuals (level 1)
                                  # Proportion of males for each company
                                  avgMale=unname(tapply(Gend, Company, function(x) sum(x)/length(x))),
                                  
-                                 ## Sector-level variables (level 3)
-                                 
-                                 # The sector that every company belongs to
-                                 sector=directors %>% group_by(Company) %>% slice(1) %>%  
-                                   ungroup() %>% select(Sector) %>% pull() %>% as.numeric(),
-                                 
                                  ## Group totals
                                  
                                  # Number of individuals
                                  n=nrow(directors),  
                                  # Number of companies
                                  k=length(unique(Company)),
-                                 # Number of sectors
-                                 z=length(unique(Sector)),
                                  
                                  ## Number of predictors
                                  
                                  # Number of individual-level predictors
                                  p1=2,
                                  # Number of company-level predictors
-                                 p2=2,
-                                 # Number of sector-level predictors
-                                 p3=0))
+                                 p2=2))
 ```
 
 ```{r simulated data, eval=FALSE, include=FALSE}
@@ -133,7 +121,7 @@ dir_jags <- with(directors, list(compensation = Compensation, age=Age, company=C
 ```{r, eval=TRUE, fig.cap="Within and between variance of director compensation across companies"}
 library(ggplot2)
 library(forcats)
-ggplot(directors, aes(x=fct_reorder(Company, as.numeric(Sector)), y=Compensation, color=Sector)) +
+f1a <- ggplot(directors, aes(x=fct_reorder(Company, as.numeric(Sector)), y=Compensation, color=Sector)) +
   geom_point() +
   geom_boxplot() +
   geom_hline(yintercept = mean(directors$Compensation)) +
@@ -142,30 +130,36 @@ ggplot(directors, aes(x=fct_reorder(Company, as.numeric(Sector)), y=Compensation
   scale_y_continuous(name = "Compensation (logged)") +
   theme(legend.position="none",
         axis.text.x = element_blank())
+
+f1b <- ggplot(directors, aes(x=Age, y=Compensation, color=Company)) +
+  geom_point() +
+  theme_blm() +
+  theme(legend.position="none") +
+  geom_smooth(method="lm", se=FALSE)
+
+library(gridExtra)
+grid.arrange(f1a, f1b, ncol=2)
 ```
 
-From figure 1, it should be clear that the compensation variable across companies is not exactly normally distributed, but we will ignore that for now.
+From figure 1(a) and 1(b), it should be clear that the compensation variable across companies is not exactly normally distributed, but we will ignore that for now. Tere appears to be variance in the intercepts for each company and some evidence for variance in the slopes.
 
 ## The intercept-only model
 
-The intercept-only model for the directors data is given by the following equations:
+The intercept-only model for the directors data is given by the following mixed-model equation:
 
-\begin{align}
-\text{compensation}_{ij} = 
-& \beta_{0j} + e_{ij} \tag{1} \\ 
-\beta_{0j} =
-& \gamma_{00} + u_{0j} \\
-\text{compensation}_{ij} =
-& \gamma_{00} + u_{0j} + e_{ij}
-\end{align}
+$$
+\begin{aligned}
+\text{compensation}_{ijk} = \gamma_{00} + u_{0j} + e_{ij}  
+\end{aligned}
+$$
 
-In words, this means we expect that a director's compensation is dependent on a grand mean over all sectors ($\gamma_{00}$) with some error term that captures the variation across sectors ($u_{0j}$) and an error term that captures variation across directors ($e_{ij}$).
+In words, this means we expect that a director's compensation is dependent on a grand mean over all companies ($\gamma_{00}$) with some error term that captures the variation across companies ($u_{0j}$) and an error term that captures variation across directors ($e_{ij}$).
 
 Alternatively, we can specify the model as follows:
 
 $$
 \begin{aligned}
-\text{compensation}_{ij} 
+\text{compensation}_{ijk} 
 &\sim N(\beta_{0j}, \sigma^2_e) \\
 \beta_{0j} 
 &\sim N(\gamma_{00}, \sigma^2_{u_0}) \\
@@ -174,7 +168,7 @@ $$
 \sigma^2_{u_0} 
 &\sim IG(\alpha_{2_0}, \beta_{2_0}) \\
 \sigma^2_e
-&\sim IG(\alpha_{1}, \beta_{1})
+&\sim IG(\alpha_{1_0}, \beta_{1_0})
 \end{aligned}
 $$
 
@@ -188,8 +182,8 @@ if(!"model1.rds" %in% list.files()) {
   
   # Initial values
   dir_inits <- list(
-    init1 <- list(tau=runif(1), tau_u0=runif(1), tau_v0=runif(1)),
-    init2 <- list(tau=runif(1), tau_u0=runif(1), tau_v0=runif(1))
+    init1 <- list(tau=runif(1), tau_u0=runif(1)),
+    init2 <- list(tau=runif(1), tau_u0=runif(1))
   )
   
   # Specify model in JAGS
@@ -202,7 +196,7 @@ if(!"model1.rds" %in% list.files()) {
   update(mod_io, n.iter=60000)
   
   # Draw samples
-  params <- c("sigma_e", "sigma_u0", "sigma_v0", "zeta_00")
+  params <- c("sigma_e", "sigma_u0", "gamma_00")
   # Run the chain
   resm1 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
   
@@ -226,21 +220,22 @@ if(!"model1.rds" %in% list.files()) {
 MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
 
 # Variance explained
-vl3 <- MAPm1[3]^2 / sum(MAPm1[-4]^2) # 57.4%
-vl2 <- MAPm1[2]^2 / sum(MAPm1[-4]^2)
-vl1 <- 1-vl2 - vl3 # 42.6%
+vl2 <- MAPm1[3]^2 / sum(MAPm1[-1]^2)
+vl1 <- 1-vl2  # 42.6%
 ```
 
 The values returned by JAGS allows us to calculate the *intraclass correlation coefficient*, defined as:
 
 $$
-\rho=\frac{\sigma^2_{u_0}}{\sigma^2_e + \sigma^2_{u_0} + \sigma^2_{v_0}}
+\rho=\frac{\sigma^2_{u_0}}{\sigma^2_e + \sigma^2_{u_0}}
 $$
 
-In the case of the directors data, the ICC equals `r unname(round(vl2, digits=3))`. This means:
+We interpret it as follows:
 
-1. That roughly $57.3\%$ of the variance can be found at the level 2 (company) variable.
-2. That the expected correlation of two randomly picked directors in a given company is $\hat{r}=.573$.
+1. Roughly $57.3\%$ of the variance can be found at the level 2 (company) variable.
+2. The expected correlation of two randomly picked directors in a given company is $\hat{r}=.573$.
+
+In the case of the directors data, the majority of the variance comes from variation between companies. Consequently, $42.6$\% of the variance is within-group variance and a result of variance among individuals.
 
 Finally, we note that $0$ is not included in the credible interval of $\sigma^2_{u_0}$, which leads us to the conclusion that a multilevel model is appropriate. $(95\% \ \ \text{CCI}=[.321, .503])$.
 
@@ -259,31 +254,33 @@ or, equivalently:
 
 $$
 \begin{aligned}
-\text{compensation}_{ij} 
-&\sim N(\beta_{0j}, \sigma^2_e) \\
+\text{compensation}_{ijk} 
+&\sim N(\beta_{0j} + \gamma_{10} \cdot \text{Age}_{ij} + \gamma_{20} \cdot \text{Gender}_{ij}, \sigma^2_e) \\
 \beta_{0j} 
 &\sim N(\gamma_{00}, \sigma^2_{u_0}) \\
 \gamma_{00} 
 &\sim N(m_{00}, s_{00}^2) \\
-\gamma_{10}
+\gamma_{10} 
 &\sim N(m_{10}, s_{10}^2) \\
-\gamma_{20}
+\gamma_{20} 
 &\sim N(m_{20}, s_{20}^2) \\
 \sigma^2_{u_0} 
 &\sim IG(\alpha_{2_0}, \beta_{2_0}) \\
 \sigma^2_e
-&\sim IG(\alpha_{1}, \beta_{1})
+&\sim IG(\alpha_{1_0}, \beta_{1_0})
 \end{aligned}
 $$
+
+This model is implemented as follows (gender is removed here because its $95$\% CCI contains $0$).
 
 ```{r model2a level 1 predictors}
 # Initial values
 dir_inits <- list(
-  init1 <- list(tau=runif(1), tau_u0=runif(1), tau_v0=runif(1)),
-  init2 <- list(tau=runif(1), tau_u0=runif(1), tau_v0=runif(1))
+  init1 <- list(tau=runif(1), tau_u0=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1))
 )
 
-if(!"model2.rds" %in% list.files()) {
+if(!"model2a.rds" %in% list.files()) {
 
   # Specify model in JAGS
   mod_io <- jags.model("2a_level_one_predictors.txt", 
@@ -295,7 +292,7 @@ if(!"model2.rds" %in% list.files()) {
   update(mod_io, n.iter=60000)
   
   # Draw samples
-  params <- c("sigma_e", "sigma_u0", "sigma_v0", "zeta_00", "zeta_10")
+  params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10")
   # Run the chain
   resm2 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
   
@@ -316,25 +313,24 @@ if(!"model2.rds" %in% list.files()) {
 }
 # MAP values
 MAPm2 <- apply(do.call(rbind.data.frame, resm2), 2, mean)
+
+# Variance explained
+ve_l1 <- ((MAPm1[2] - MAPm2[3]) / MAPm1[2]) * 100
+ve_l2 <- ((MAPm1[3] - MAPm2[4]) / MAPm1[3]) * 100
 ```
-
-We remove gender
-
-
-- Little bit weird: error at level 2 went up? https://www.statmodel.com/download/Level-2%20R-square%20decreasing%20when%20adding%20level1-covariate.pdf
 
 Explained variance at each level:
 
 1. Level 1
 
 $$
-R^2_{L1} = \frac{\sigma^2_{e|\text{baseline}} - \sigma^2_{e|\text{model 1}}}{\sigma^2_{e|\text{baseline}}} = \frac{.2553 - .2504}{.2553} = 1.91\%
+R^2_{L1} = \frac{\sigma^2_{e|\text{baseline}} - \sigma^2_{e|\text{model 1}}}{\sigma^2_{e|\text{baseline}}} = 1.34\%
 $$
 
 2. Level 2
 
 $$
-R^2_{L2} = \frac{\sigma^2_{u_0|\text{baseline}} - \sigma^2_{u_0|\text{model 1}}}{\sigma^2_{u_0|\text{baseline}}} = \frac{.0936 - .0999}{.0936} = -6.73\%
+R^2_{L2} = \frac{\sigma^2_{u_0|\text{baseline}} - \sigma^2_{u_0|\text{model 1}}}{\sigma^2_{u_0|\text{baseline}}} = 0.76\%
 $$
 
 ## Adding level-2 predictors
@@ -342,8 +338,7 @@ $$
 $$
 \begin{aligned}
 \text{compensation}_{ij} =
-&\gamma_{00} + u_{0j} + \gamma_{10}\cdot \text{Age}_{ij} + \gamma_{01} \cdot \text{avgAge}_j + 
-\gamma_{02} \cdot \text{propMale}_j + e_{ij}
+&\gamma_{00} + u_{0j} + \gamma_{10}\cdot \text{Age}_{ij} + \gamma_{01} \cdot \text{avgAge}_j + \gamma_{02} \cdot \text{avgMale}_j + e_{ij}
 \end{aligned}
 $$
 
@@ -352,27 +347,31 @@ or, equivalently:
 $$
 \begin{aligned}
 \text{compensation}_{ij} 
-&\sim N(\beta_{0j}, \sigma^2_e) \\
+&\sim N(\beta_{0j} + \gamma_{10}\cdot \text{Age}_{ij} + \gamma_{01} \cdot \text{avgAge}_j + \gamma_{02} \cdot \text{avgMale}_j, \sigma^2_e) \\
 \beta_{0j} 
 &\sim N(\gamma_{00}, \sigma^2_{u_0}) \\
 \gamma_{00} 
 &\sim N(m_{00}, s_{00}^2) \\
-\gamma_{10}
+\gamma_{10} 
 &\sim N(m_{10}, s_{10}^2) \\
-\gamma_{02}
+\gamma_{01} 
+&\sim N(m_{01}, s_{01}^2) \\
+\gamma_{02} 
 &\sim N(m_{02}, s_{02}^2) \\
 \sigma^2_{u_0} 
 &\sim IG(\alpha_{2_0}, \beta_{2_0}) \\
 \sigma^2_e
-&\sim IG(\alpha_{1}, \beta_{1})
+&\sim IG(\alpha_{1_0}, \beta_{1_0})
 \end{aligned}
 $$
+
+This model is implemented as follows
 
 ```{r model3 level 2 predictors}
 # Initial values
 dir_inits <- list(
-  init1 <- list(tau=runif(1), tau_u0=runif(1), tau_v0=runif(1)),
-  init2 <- list(tau=runif(1), tau_u0=runif(1), tau_v0=runif(1))
+  init1 <- list(tau=runif(1), tau_u0=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1))
 )
 
 if(!"model3.rds" %in% list.files()) {
@@ -387,12 +386,12 @@ if(!"model3.rds" %in% list.files()) {
   update(mod_io, n.iter=60000)
   
   # Draw samples
-  params <- c("sigma_e", "sigma_u0", "sigma_v0", "zeta_00", "zeta_10", "zeta_01")
+  params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10", "gamma_02")
   # Run the chain
   resm3 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 5)
   
   # DIC
-  DICm3 <- dic.samples(mod_io, thin=5, n.iter=10000)
+  DICm3 <- dic.samples(mod_io, thin=5, n.iter=20000)
   
   # Save model
   saveRDS(resm3, "model3.rds")
@@ -403,15 +402,24 @@ if(!"model3.rds" %in% list.files()) {
   
 } else {
   
-  
+  # Load
+  resm3 <- readRDS("model3.rds")
+  DICm3 <- readRDS("model3_DIC.rds")
   
 }
 
 # MAP values
 MAPm3 <- apply(do.call(rbind.data.frame, resm3), 2, mean)
+
+# Variance explained at level 2
+ve2 <- ((MAPm1[3] - MAPm3[5]) / MAPm1[3]) * 100
 ```
 
-Given that the level-2 variables are not significant (and that the model fit seems to worsen), we will not continue to build JAGS models from this point onwards. In fact, the best-fitting model we can conjure up is the intercept-only model (given that the model containing age is not explaining much of the variance). 
+The variable 'AvgAge' is removed from the model since its $95$\% CCI contains $0$. By adding the level 2 variables, the reduction in level-2 variance becomes:
+
+$$
+R^2_{L2} = \frac{\sigma^2_{u_0|\text{baseline}} - \sigma^2_{u_0|\text{model 2}}}{\sigma^2_{u_0|\text{baseline}}} = 3.71\%
+$$
 
 ## Random coefficient model
 
@@ -419,7 +427,7 @@ $$
 \begin{aligned}
 \text{compensation}_{ij} =
 &\gamma_{00} + u_{0j} + \gamma_{10}\cdot \text{Age}_{ij} + \gamma_{20} \cdot \text{Male}_{ij} + 
-u_{1j}\cdot \text{Age}_{ij} + u_{2j} \cdot \text{Male}_{ij} + e_{ij}  
+u_{1j}\cdot \text{Age}_{ij} + u_{2j} \cdot \text{Male}_{ij} + \gamma_{02} \cdot \text{avgMale}_j + e_{ij}  
 \end{aligned}
 $$
 
@@ -428,7 +436,7 @@ or, equivalently:
 $$
 \begin{aligned}
 \text{compensation}_{ij} 
-&\sim N(\beta_{0j}, \sigma^2_e) \\
+&\sim N(\beta_{0j} + \beta_{1j} \cdot \text{Age}_{ij} + \beta_{2j} \cdot \text{gender}_{ij} +  \gamma_{02} \cdot \text{avgMale}_j, \sigma^2_e) \\
 \beta_{0j} 
 &\sim N(\gamma_{00}, \sigma^2_{u_0}) \\
 \beta_{1j} 
@@ -437,10 +445,12 @@ $$
 &\sim N(\gamma_{20}, \sigma^2_{u_2}) \\
 \gamma_{00} 
 &\sim N(m_{00}, s_{00}^2) \\
-\gamma_{10}
-&\sim N(m_{10}, s_{10}^2) \\
-\gamma_{20}
-&\sim N(m_{20}, s_{20}^2) \\
+\gamma_{10} 
+&\sim N(m_{00}, s_{00}^2) \\
+\gamma_{20} 
+&\sim N(m_{01}, s_{01}^2) \\
+\gamma_{02} 
+&\sim N(m_{02}, s_{02}^2) \\
 \sigma^2_{u_0} 
 &\sim IG(\alpha_{2_0}, \beta_{2_0}) \\
 \sigma^2_{u_1} 
@@ -448,9 +458,11 @@ $$
 \sigma^2_{u_2} 
 &\sim IG(\alpha_{2_2}, \beta_{2_2}) \\
 \sigma^2_e
-&\sim IG(\alpha_{1}, \beta_{1})
+&\sim IG(\alpha_{1_0}, \beta_{1_0})
 \end{aligned}
 $$
+
+We can run this model as follows
 
 ```{r model4 random coef}
 # Initial values
@@ -459,29 +471,104 @@ dir_inits <- list(
   init2 <- list(tau=runif(1), tau_u0=runif(1), tau_u1=runif(1), tau_u2=runif(1))
 )
 
-# Specify model in JAGS
-mod_io <- jags.model("4_random_coefficients.txt", 
-                     data = dir_jags,
-                     inits = dir_inits,
-                     n.chains=2)
+if(!"model4.rds" %in% list.files()) {
 
-# Burn
-update(mod_io, n.iter=60000)
+  # Specify model in JAGS
+  mod_io <- jags.model("4_random_coefficients.txt", 
+                       data = dir_jags,
+                       inits = dir_inits,
+                       n.chains=2)
+  
+  # Burn
+  update(mod_io, n.iter=60000)
+  
+  # Draw samples
+  params <- c("sigma_e", "sigma_u0", "sigma_u1", "sigma_u2",
+              "gamma_00", "gamma_10", "gamma_20", "gamma_02")
+  # Run the chain
+  resm4 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
+  
+  # DIC model 4
+  DICm4 <- dic.samples(mod_io, thin=5, n.iter=20000)
+  
+  # Save model
+  saveRDS(resm4, "model4.rds")
+  
+  # Save
+  saveRDS(DICm4, "model4_DIC.rds")
+  
+} else {
+  
+  # Load
+  resm4 <- readRDS("model4.rds")
+  DICm4 <- readRDS("model4_DIC.rds")
 
-# Draw samples
-params <- c("sigma_e", "sigma_u0", "sigma_u1", "sigma_u2",
-            "gamma_00", "gamma_10", "gamma_20")
-# Run the chain
-resm4 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 5)
+}
 
 # MAP values
 MAPm4 <- apply(do.call(rbind.data.frame, resm4), 2, mean)
-
-# DIC model 4
-DICm4 <- dic.samples(mod_io, thin=5, n.iter=20000)
 ```
 
+The model fit is worsening but we do observe that the variance components do not contain $0$ in their $95\%$ CCI. This fact also means that we need to keep the main effects in the model.
+
 ## The cross-level interaction
+
+Finally, we run the full multilevel model containing a cross-level interaction:
+
+$$
+\begin{aligned}
+\text{compensation}_{ij} =
+&\gamma_{00} + u_{0j} + \\
+&\gamma_{10}\cdot \text{Age}_{ij} + \gamma_{11}\cdot \text{Age}_{ij} \cdot \text{avgAge}_j + \gamma_{12}\cdot \text{Age}_{ij} \cdot \text{avgMale}_j + \\
+&\gamma_{20} \cdot \text{Male}_{ij} + \gamma_{21} \cdot \text{Male}_{ij} \cdot \text{avgAge}_j + \gamma_{22} \cdot \text{Male}_{ij} \cdot \text{avgMale}_j + \\
+&u_{1j}\cdot \text{Age}_{ij} + u_{2j} \cdot \text{Male}_{ij} + \\
+&\gamma_{01} \cdot \text{avgAge}_j + \gamma_{02} \cdot \text{avgMale}_j + \\
+&e_{ij}  
+\end{aligned}
+$$
+
+or, equivalently:
+
+$$
+\begin{aligned}
+\text{compensation}_{ij} 
+&\sim N(\beta_{0j} + \beta_{1j} \cdot \text{Age}_{ij} + \beta_{2j} \cdot \text{gender}_{ij} +  \gamma_{02} \cdot \text{avgMale}_j + \gamma_{11}\cdot \text{Age}_{ij} \cdot \text{avgAge}_j +  \\
+& \ \ \ \ \ \ \ \ \ \ \gamma_{01} \cdot \text{avgAge}_j  \gamma_{12}\cdot \text{Age}_{ij} \cdot \text{avgMale}_j + \gamma_{21} \cdot \text{Male}_{ij} \cdot \text{avgAge}_j + \\
+& \ \ \ \ \ \ \ \ \ \ \gamma_{22} \cdot \text{Male}_{ij} \cdot \text{avgMale}_j, \sigma^2_e) \\
+\beta_{0j} 
+&\sim N(\gamma_{00}, \sigma^2_{u_0}) \\
+\beta_{1j} 
+&\sim N(\gamma_{10}, \sigma^2_{u_1}) \\
+\beta_{2j} 
+&\sim N(\gamma_{20}, \sigma^2_{u_2}) \\
+\gamma_{00} 
+&\sim N(m_{00}, s_{00}^2) \\
+\gamma_{10} 
+&\sim N(m_{00}, s_{00}^2) \\
+\gamma_{20} 
+&\sim N(m_{01}, s_{01}^2) \\
+\gamma_{01} 
+&\sim N(m_{01}, s_{01}^2) \\
+\gamma_{02} 
+&\sim N(m_{02}, s_{02}^2) \\
+\gamma_{11} 
+&\sim N(m_{11}, s_{11}^2) \\
+\gamma_{12} 
+&\sim N(m_{12}, s_{12}^2) \\
+\gamma_{21} 
+&\sim N(m_{21}, s_{21}^2) \\
+\gamma_{22} 
+&\sim N(m_{22}, s_{22}^2) \\
+\sigma^2_{u_0} 
+&\sim IG(\alpha_{2_0}, \beta_{2_0}) \\
+\sigma^2_{u_1} 
+&\sim IG(\alpha_{2_1}, \beta_{2_1}) \\
+\sigma^2_{u_2} 
+&\sim IG(\alpha_{2_2}, \beta_{2_2}) \\
+\sigma^2_e
+&\sim IG(\alpha_{1_0}, \beta_{1_0})
+\end{aligned}
+$$
 
 ```{r model5 cross-level}
 # Initial values
@@ -490,28 +577,64 @@ dir_inits <- list(
   init2 <- list(tau=runif(1), tau_u0=runif(1), tau_u1=runif(1), tau_u2=runif(1))
 )
 
-# Specify model in JAGS
-mod_io <- jags.model("5_cross_level_interaction.txt", 
-                     data = dir_jags,
-                     inits = dir_inits,
-                     n.chains=2)
+if(!"model5.rds" %in% list.files()) {
+  # Specify model in JAGS
+  mod_io <- jags.model("5_cross_level_interaction.txt", 
+                       data = dir_jags,
+                       inits = dir_inits,
+                       n.chains=2)
+  
+  # Burn
+  update(mod_io, n.iter=60000)
+  
+  # Draw samples
+  params <- c("sigma_e", "sigma_u0", "sigma_u1", "sigma_u2",
+              "gamma_00", "gamma_10", "gamma_20", "gamma_01", "gamma_02",
+              "gamma_21", "gamma_11", "gamma_22", "gamma_12")
+  # Run the chain
+  resm5 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
+  
+  # All variance estimates > 0 so most likely significant
+  DICm5 <- dic.samples(mod_io, thin=5, n.iter=20000)
+  
+  # Save model
+  saveRDS(resm5, "model5.rds")
+  
+  # Save
+  saveRDS(DICm5, "model5_DIC.rds")
 
-# Burn
-update(mod_io, n.iter=60000)
-
-# Draw samples
-params <- c("sigma_e", "sigma_u0", "sigma_u1", "sigma_u2",
-            "gamma_00", "gamma_10", "gamma_20", "gamma_01", "gamma_02",
-            "gamma_21", "gamma_11", "gamma_22", "gamma_12")
-# Run the chain
-resm5 <- coda.samples(mod_io, variable.names = params, n.iter=800000, thin = 5)
+} else {
+  
+  resm5 <- readRDS("model5.rds")
+  DICm5 <- readRDS("model5_DIC.rds")
+  
+}
 
 # MAP values
 MAPm5 <- apply(do.call(rbind.data.frame, resm5), 2, mean)
 
-# All variance estimates > 0 so most likely significant
-DICm5 <- dic.samples(mod_io, thin=5, n.iter=20000)
+# SLope variance explained
+s1 <- (MAPm4[7] - MAPm5[12]) / MAPm4[7]
+s2 <- (MAPm4[8] - MAPm5[13]) / MAPm4[8]
 ```
+
+We can now estimate how much variance of the slopes we are explaining
+
+1. Level 1
+
+$$
+R^2_{\text{Slope},L1} = \frac{\sigma^2_{u_{1j}|\text{baseline}} - \sigma^2_{u_{1j}|\text{model 1}}}{\sigma^2_{u_{1j}|\text{baseline}}} = -1.8\%
+$$
+
+2. Level 2
+
+$$
+R^2_{\text{Slope},L1} = \frac{\sigma^2_{u_{2j}|\text{baseline}} - \sigma^2_{u_{2j}|\text{model 1}}}{\sigma^2_{u_{2j}|\text{baseline}}} = 4\%
+$$
+
+We are explaining some of the variance in the gender slope but none of the variance in the age slope.
+
+## Model comparison
 
 ```{r model comparison}
 # Table with DIC values
@@ -521,19 +644,28 @@ DICs <- data.frame(
             sum(DICm3$deviance + DICm3$penalty),
             sum(DICm4$deviance + DICm4$penalty),
             sum(DICm5$deviance + DICm5$penalty)),
-  row.names = c("Intercept-only", "Predictors level 1",
-                "Predictors levels 1 + 2", "Random coefficient",
+  "pD" = c(sum(DICm1$penalty), 
+           sum(DICm2$penalty), 
+           sum(DICm3$penalty),
+           sum(DICm4$penalty), 
+           sum(DICm5$penalty)),
+  row.names = c("Intercept-only", 
+                "Predictors level 1",
+                "Predictors levels 1 + 2", 
+                "Random coefficient",
                 "Cross-level interaction")
 )
 # Cat
 knitr::kable(DICs)
 ```
 
+As we can see from the results, we are not explaining a lot of the variance in our data. Based on the ICC, it's definitely worth doing a multilevel analysis, but we clearly need better predictors at both levels. 
+
+With respect to the final model, we cannot really distinguish between models 2 (level 1 variables) and 3 (level 1 and 2 variables) when looking at model fit. However, we usually prefer more parsimonious models so our final model is model 2.
 
 ```{r}
 # Results from model 3
-final_mod <- do.call(rbind.data.frame, resm3)
-
+final_mod <- do.call(rbind.data.frame, resm2)
 ```
 
 # References

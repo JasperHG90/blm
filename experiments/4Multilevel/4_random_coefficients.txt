@@ -2,30 +2,36 @@
 
 model {
 
-	# Priors (sector)
+  ### Level 2 ==> companies
+
+	# Priors (companies)
 	tau_u0 ~ dgamma(.01, .01)
 	tau_u1 ~ dgamma(.01, .01)
 	tau_u2 ~ dgamma(.01, .01)
-  # Hyperprior for intercept
-  gamma_00 ~ dnorm(0, 1.0E-4) # N(m, s2inv)
-  # Hyperpriors for the coefficients
+	# Hyperprior for mean
+  gamma_00 ~ dnorm(0, 1.0E-4)
   gamma_10 ~ dnorm(0, 1.0E-4)
   gamma_20 ~ dnorm(0, 1.0E-4)
-  # For each sector
-	for (j in 1:k){
-		b0[j] ~ dnorm(gamma_00, tau_u0) # random intercept for every company
-		b1[j] ~ dnorm(gamma_10, tau_u1) # random slope for age
-		b2[j] ~ dnorm(gamma_20, tau_u2) # random slope for gender
+  gamma_02 ~ dnorm(0, 1.0E-4)
+  # For each company
+	for (j in 1:k) {
+	  # For each company, draw from normal
+    b0[j] ~ dnorm(gamma_00, tau_u0)
+    b1[j] ~ dnorm(gamma_10, tau_u1)
+    b2[j] ~ dnorm(gamma_20, tau_u2)
 	}
+
+	### Level 1 ==> individuals
 
   # Priors
   # Individual precision
-	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect (variance within sectors)
+	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect
   # For each individual
 	for (i in 1:n) {
 		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
-		# Sector-specific intercept + random coefficient for level 1 variables + level 2 variables
-		mu[i] <- b0[sector[i]] + b1[sector[i]]*age[i] + b2[sector[i]]*gender[i]
+		mu[i] <- b0[company[i]] +                                       # Intercept
+		         b1[company[i]] * age[i] + b2[company[i]] * gender[i] + # Level 1 variables + random slope
+		         gamma_02*avgMale[company[i]]                           # Level 2 variables
 	}
 
   # Invert gamma
