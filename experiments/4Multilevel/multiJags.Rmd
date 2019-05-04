@@ -19,7 +19,7 @@ knitr::opts_chunk$set(fig.pos="H", fig.width = 7, fig.height = 4, echo = TRUE,
                       fig.align="center", warning = FALSE, message = FALSE, eval=TRUE)
 ```
 
-The **directors** dataset that is included with the `blm` library has a natural hierarchical structure with individuals nested in companies nested in industries nested in sectors. In this document, we will construct a multilevel model in JAGS using companies and individuals. Given that the data do not conform to the assumptions we need for a linear mixed-effect model, we will not run a full multilevel model (i.e. containing cross-level)
+The **directors** dataset that is included with the `blm` library has a natural hierarchical structure with individuals nested in companies nested in industries nested in sectors. In this document, we will construct a multilevel model in JAGS using companies and individuals. 
 
 ```{r load data}
 rm(list=ls())

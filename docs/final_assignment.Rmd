@@ -264,7 +264,7 @@ dirmod2 %>%
   evaluate_model_fit() # ==> DIC is 487.895 with 6 parameters ==> fit is better than model 1
 ```
 
-From figure XX and the posterior predictive checks, we observe that the data are not independent. That is, directors who are in the same board tend to are more similar to each other than directors from other boards. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards. Indeed, the results of the random effects model shows that the intra-class correlation coefficient $\rho$ equals $57\%$, meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$. 
+From figure XX and the posterior predictive checks, we observe that the data are not independent. That is, directors who are in the same board tend to are more similar to each other than directors from other boards. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards. Indeed, the results of the random effects model shows that the intra-class correlation coefficient $\rho$ equals $57\%$, meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The results of running all different stages of a multilevel model are presented in another document.] 
 
 ```{r MLM intercept-only model}
 # Jags data
@@ -350,12 +350,113 @@ DICm1 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD")
 # MAP values
 MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
 
-# Variance explained
-vl2 <- MAPm1[3]^2 / sum(MAPm1[-1]^2) # 57.4%
-vl1 <- 1-vl2  # 42.6%%
+# Coerce to matrix
+resmat <- do.call(rbind, resm1)
+
+# New matrix with same dims
+ve <- matrix(0, ncol=1, nrow=nrow(resmat))
+
+# FOr each row
+# Posterior distribution of variance explained
+for(i in seq_along(1:nrow(resmat))) {
+  ve[i,] <- c(resmat[i,3]^2 / sum(resmat[i,-1]^2))
+}
+
+quantile(ve, c(0.025, .25, .5, .75, .975))
+# VE between .45 and .69
 ```
 
+The final random effects model is presented in table YY. This model corresponds to the following equation.
 
+$$
+\begin{aligned}
+\text{compensation}_{ij} =
+&\gamma_{00} + u_{0j} + \gamma_{10}\cdot \text{Age}_{ij} + e_{ij}
+\end{aligned}
+$$
+
+Where $\gamma_{00}$ is the overall intercept and $u_{0j}$ is a company-specific error term. Notice that the fit of this model is much better than that of the previous models, indicating that the multilevel approach seems appropriate.
+
+```{r MLM level-1 predictors}
+# Initial values
+dir_inits <- list(
+  init1 <- list(tau=runif(1), tau_u0=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1))
+)
+
+# Model
+mlm_2 <- "model {
+
+  ### Level 2 ==> companies
+
+	# Priors (companies)
+	tau_u0 ~ dgamma(.01, .01)
+	# Hyperprior for mean
+  gamma_00 ~ dnorm(0, 1.0E-4)
+  gamma_10 ~ dnorm(0, 1.0E-4)
+  # For each company
+	for (j in 1:k) {
+	  # For each company, draw from normal
+    b0[j] ~ dnorm(gamma_00, tau_u0)
+	}
+
+	### Level 1 ==> individuals
+
+  # Priors
+  # Individual precision
+	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect
+  # For each individual
+	for (i in 1:n) {
+		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
+		mu[i] <- b0[company[i]] + # Intercept
+		         gamma_10*age[i] #+ gamma_20*gender[i] # Level 1 variables
+	}
+
+  # Invert gamma
+  sigma_e <- 1 / sqrt(tau)
+  sigma_u0 <- 1 / sqrt(tau_u0)
+
+}"
+
+# Specify model in JAGS
+mod_io <- jags.model(textConnection(mlm_2), 
+                     data = dir_jags,
+                     inits = dir_inits,
+                     n.chains=2)
+
+# Burn
+update(mod_io, n.iter=60000)
+
+# Draw samples
+params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10")
+# Run the chain
+resm2 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
+
+# DIC
+DICm2 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD")
+
+# Calculate variance explained
+# MAP values for model 1
+MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
+
+# Coerce to matrix
+resmat <- do.call(rbind, resm2)
+
+# New matrix with same dims
+ve_2 <- matrix(0, ncol=2, nrow=nrow(resmat))
+
+# FOr each row
+# Posterior distribution of variance explained (pseudo R-squared)
+for(i in seq_along(1:nrow(resmat))) {
+  ve_2[i,] <- c( ((MAPm1[2] - resmat[i,3]) / MAPm1[2]), # Level 1
+               ((MAPm1[3] - resmat[i,4]) / MAPm1[3])) # Level 2
+}
+
+# Map values
+MAPve <- apply(ve_2, 2, mean) * 100
+```
+
+Given that the variable age only explains some $1.3$\% of the variance on level $1$ and $.8$\% of the variance on level $2$, the conclusion is that we do not have the right predictors 
 
 ```{r model results (including model fit), eval=FALSE, results='asis'}
 # Calculate 95% CCI
@@ -422,28 +523,31 @@ cat(
 \begin{table}[!htbp] \centering 
   \caption{Model results } 
   \label{} 
-\begin{tabular}{@{\extracolsep{5pt}}lcc} 
+\begin{tabular}{@{\extracolsep{5pt}}lccc} 
 \\[-1.8ex]\hline 
 \hline \\[-1.8ex] 
- & \multicolumn{2}{c}{\textit{Dependent variable:}} \\ 
+ & \multicolumn{3}{c}{\textit{Dependent variable:}} \\ 
 \cline{2-3} 
-\\[-1.8ex] & \multicolumn{2}{c}{Compensation} \\ 
-\\[-1.8ex] & (1) & (2)\\ 
+\\[-1.8ex] & \multicolumn{3}{c}{Compensation} \\ 
+\\[-1.8ex] & (1) & (2) & (3)\\ 
 \hline \\[-1.8ex] 
-Constant & 4.991  (4.936, 5.046) & 4.821 (4.732, 4.910) \\ 
-SectorBasic Materials &  & .225 (.079, .370) \\ 
-SectorServices &  & .292 (.169, .414) \\ 
-Male & .065 ($-$.085, .215) & .153 (.095, .209) \\ 
-Age & .008 (0.000, .017) & .009 (.001, .017) \\ 
+Constant & 4.991  (4.936, 5.046) & 4.821 (4.732, 4.910) & 4.991 (4.877, 5.110) \\ 
+SectorBasic Materials &  & .225 (.079, .370) &  \\ 
+SectorServices &  & .292 (.169, .414) &  \\ 
+Male & .065 ($-$.085, .215) & .153 (.095, .209) & \\ 
+Age & .008 (0.000, .017) & .009 (.001, .017) & 0.001 (.0035, .0155) \\ 
 \hline \\[-1.8ex] 
-Observations & 336 & 336 \\ 
-Par. & 4 & 6 \\ 
-DIC & 508 & 488 \\ 
-R$^{2}$ & .021 & .098 \\ 
-Residual Std. Error & .516 & .501 \\ 
+Intercept variance & & & .3992\\
+\hline \\[-1.8ex] 
+Observations & 336 & 336 & 336 \\
+Companies & & & 52 \\
+Par. & 4 & 6 & 47 \\ 
+DIC & 508 & 488 & 289 \\ 
+R$^{2}$ & .021 & .098 & \\ 
+Residual Std. Error & .516 & .501 & .3423 \\ 
 \hline 
 \hline \\[-1.8ex] 
-\textit{Note:}  & \multicolumn{2}{r}{Baseline is sector 'Financials'} \\
+\textit{Note:}  & \multicolumn{3}{r}{Baseline is sector 'Financials'} \\
 \end{tabular} 
 \end{table}
 
