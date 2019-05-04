@@ -36,10 +36,15 @@ initialize_chain_values <- function(priors) {
 # Helper function that calls the Julia MC sampler
 mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, samplers) {
 
-  #browser()
-
   # Unroll initial values
   w <- initial_values$w
+  # If intercept-only model, then w is a scalar. Coerce to array
+  # JuliaCall screws this up in conversion!!!
+  if(is.vector(w)) {
+    w <- matrix(w, ncol=1, nrow=1)
+
+  }
+
   sigma <- initial_values$sigma
 
   # Call MCMC sampler in Julia

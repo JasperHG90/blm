@@ -14,7 +14,7 @@ Course: Introduction to Bayesian Statistics
 PART I: MCMC sampler in in Julia
 =#
 
-function MCMC_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
+function MCMC_sampler(X::Array{Float64}, y::Array{Float64}, w,
                        sigma::Float64, iterations::Int, thinning::Int, priors,
                        samplers)
 
@@ -37,6 +37,14 @@ function MCMC_sampler(X::Array{Float64}, y::Array{Float64}, w::Array{Float64},
         - Lynch, S. M. (2007). Introduction to applied Bayesian statistics and estimation for social scientists. Springer Science & Business Media.
         - Gelman, A., Stern, H. S., Carlin, J. B., Dunson, D. B., Vehtari, A., & Rubin, D. B. (2013). Bayesian data analysis. Chapman and Hall/CRC.
     =#
+
+    # Check if w is an Array as required by this function.
+    # This is an issue of conversion between julia & R
+    if isa(w,AbstractArray) == false
+
+        w = [w]
+
+    end;
 
     # Open up results for accepted draws
     accepted = zeros(size(X)[2] + 1)
@@ -624,7 +632,7 @@ function logLikelihood(y::Array{Float64}, pred_y::Array{Float64}, sd::Float64)
   end;
 
 # Compute DIC
-function DIC(X::Array{Float64}, y::Array{Float64}, w::Array{Float64}, sigma::Float64, posterior::Array{Float64})
+function DIC(X::Array{Float64}, y::Array{Float64}, w, sigma::Float64, posterior::Array{Float64})
 
   #=
   Compute the Deviance Information Criterion (DIC)
@@ -639,6 +647,14 @@ function DIC(X::Array{Float64}, y::Array{Float64}, w::Array{Float64}, sigma::Flo
     - Eff. P: estimate of the effective number of parameters
     - LL : summed log likelihood
   =#
+
+  # Check if w is an Array as required by this function.
+  # This is an issue of conversion between julia & R
+  if isa(w,AbstractArray) == false
+
+      w = [w]
+
+  end;
 
   # Linear combinations
   predy = X * w

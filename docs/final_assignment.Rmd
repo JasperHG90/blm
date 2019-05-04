@@ -48,6 +48,7 @@ directors <- directors %>%
 # Load models 
 # i.e. prevent R from re-running the models the entire time when knitting the doc (this takes a long time).
 # Instead, run code line-by-line if you need to.
+dirmod0 <- readRDS("model0.rds")
 dirmod1 <- readRDS("model1.rds")
 dirmod2 <- readRDS("model2.rds")
 resm2 <- readRDS("model3.rds")
@@ -84,14 +85,37 @@ $$
 Model 2 is given by the following equation:
 
 $$
-
 \begin{aligned}
 \hat{\log(\text{compensation}_i)} = 
-&\beta_0 + \beta_{1} \text{age}_i + \beta_2\text{male}_i + \\
-&\beta_3\text{SectorServices}_i + \\
-&\beta_4\text{SectorBasicMaterials}_i + \epsilon_i
+&\beta_0 + \beta_{1} \text{age}_i + \beta_2\text{male}_i + \beta_3\text{SectorServices}_i + \beta_4\text{SectorBasicMaterials}_i + \epsilon_i
 \end{aligned}
 $$
+
+```{r model0, include=FALSE}
+# The Null or intercept-only model
+dirmod0 <- blm("Compensation ~ 1",
+                    data=directors) %>%
+  # Set sampling options
+  set_sampling_options(chains = 2, iterations = 20000,
+                       burn = 2000, thinning=3) %>%
+  # Set initial values
+  set_initial_values(chain_1 = list("b" = c(3), "sigma" = 1),
+                     chain_2 = list("b" = c(2), "sigma" = 2)) %>%
+  # Sample
+  sample_posterior() 
+
+# Check convergence
+plot(dirmod0, "history") # Ok
+plot(dirmod0, "autocorrelation") # Ok
+plot(dirmod0, "density") # Ok
+
+# Diagnostics
+dirmod0 %>% evaluate_convergence_diagnostics() # Ok
+
+# DIC
+summary(dirmod0)
+saveRDS(dirmod0, "model0.rds")
+```
 
 ```{r model1, include = FALSE}
 ## Run two linear models with blm.
@@ -300,7 +324,26 @@ dirmod2 %>%
   summary()# ==> DIC is 487.895 with 6 parameters ==> fit is better than model 1
 ```
 
-```{r PPC results, eval=FALSE, fig.width=7, fig.height=2, fig.cap="Observed and simulated correlation coefficients for model 1 (left) and model 2 (right). The figure shows that the observed residuals (in red) are much more correlated than is reasonable under the model (represented by the blue, simulated values).", eval=TRUE}
+```{r bayes factors}
+# Bayes factor where we compare NULL model against the alternative
+
+# M1
+bf1 <- BF(BIC_blm(dirmod0$input$n, dirmod0$DIC$DIC$`Eff. P`, dirmod0$DIC$DIC$LL),
+          BIC_blm(dirmod1$input$n, dirmod1$DIC$DIC$`Eff. P`, dirmod1$DIC$DIC$LL))
+bf1
+
+# M2
+bf2 <- BF(BIC_blm(dirmod0$input$n, dirmod0$DIC$DIC$`Eff. P`, dirmod0$DIC$DIC$LL),
+          BIC_blm(dirmod2$input$n, dirmod2$DIC$DIC$`Eff. P`, dirmod2$DIC$DIC$LL))
+bf2
+
+# Multilevel model
+bf3 <- BF(BIC_blm(dirmod0$input$n, dirmod0$DIC$DIC$`Eff. P`, dirmod0$DIC$DIC$LL),
+          BIC_blm(dirmod2$input$n, 47, -116.5))
+bf3
+```
+
+```{r PPC results, eval=FALSE, fig.width=7, fig.height=2, fig.cap="Observed and simulated correlation coefficients for model 1 (left) and model 2 (right). The figure shows that the observed residuals (in red) are much more correlated than is reasonable under the model (represented by the blue, simulated values)."}
 # Collect ppc results
 ppc1 <- do.call(cbind.data.frame, dirmod1$ppc$results)
 ppc2 <- do.call(cbind.data.frame, dirmod2$ppc$results)
@@ -636,9 +679,23 @@ grid.arrange(p1, p2, p3, ncol=3)
 
 - Interpretation of random variables
 - Same rules for probability, but different approach
+
+--> Probability of the null hypothesis (p 161, 162 Berger & Benny). "Flipping" of the hypothesis 
+
 - Can answer the same questions, but Bayesian more flexible
 - Endless transformations on posterior distribution
+
+- Frequentists obscure the interpretation process, Bayesian obscure the posterior distribution collection process
+
+Evidence of the the idea that we (humans) are not to be trusted when it comes to the interpretation of numbers abounds in the literature of behavioral economics. [CITE KAHNEMAN].
+
+Frequentist statistics obscures the interpretation of critical statistics to the point where students learn the heuristics ('p-value is significant') before truly understanding what that heuristic means. Conversely, Bayesian statistics provides an intuitive interpretation of statistical results but obfuscates the estimation method by using the arcane process of Markov Chain Monte Carlo (MCMC) sampling. 
+
 - Incorporating domain knowledge
+
+In frequentist statistical inference, evidence may originate only from the data. This is not the case in Bayesian statistical inference, where inferences are based on a mix of domain expertise (*prior*/*belief*) and evidence from the data. 
+
+The claim that the Frequentist approach is more objective would hold only in a universe where the data collection process is guaranteed to be objective. This is a tenuous assumption at best in social science data (how else would we get by that memorable phrase 'lies, damned lies and statistics'?); the way in which we collect data is fraught with subjective decisions during data collection, manipulation and analysis [CITE]. Hence, many authors have argued that data, in and of itself, is not objective [CITE], and the critique leveled at Bayesians boils down to the practice of incorporating domain knowledge *explicitly* through the use of a prior. It does, however, raise the question of the extent to which the use of priors influence the analysis. This is illustrated in figure XX below in the case of the directors data. Here, we show the result of increasing the certainty of our prior belief (translates to smaller variance).
 
 ```{r calculate prior variance effect}
 # Posterior shrinkage
@@ -752,6 +809,8 @@ ggarrange(priorvar, postvar, ncol=2, common.legend=TRUE, legend="top")
 ```
 
 The effect of changing the prior variance can be summarized using a posterior shrinking factor (CITE BETANCOURT) and posterior z-score. The shrinking factor shows us the factor by which the variance of the posterior distribution shrinks or expands compared to the prior variance. The posterior z-score tells us the direction and magnitude by which the posterior mean shifts compared to the prior mean; if we are confident in the precision of our domain knowledge (resulting in small prior variance), the resulting posterior weights this information strongly and we end up with a posterior mean that lies closer to the prior mean (represented by the z-score). However, given that we have small variance, and if this is not corroborated by the data, then the shrinkage factor will be large. 
+
+If we carry this argument to its logical endpoint, it follows that we would next arrive at a means to compare these posteriors relative to each other. This, in essence, is the Bayes Factor.
 
 ## Other material
 
