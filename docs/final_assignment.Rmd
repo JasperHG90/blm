@@ -7,12 +7,15 @@ output:
     number_sections: false
 header-includes:
  \usepackage{float}
+ \restylefloat{table}
  \usepackage{setspace}
  \usepackage{xcolor}
- \definecolor{mypurple}{rgb}{146,76,239}
+ \usepackage[font={small}]{caption}
  \singlespacing
  \floatplacement{figure}{H}
 ---
+<!-- Set font size -->
+\fontsize{11}{22}
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(fig.pos="H", fig.width = 7, fig.height = 4, echo = FALSE, 
@@ -31,6 +34,9 @@ library(gridExtra)
 data("directors")
 
 # Preprocess directors data
+# This is a subset of the original (proprietary) dataset
+# 5 sectors have not been included due to bimodality in the data. 
+# See the folder 'data-raw' for the script used to create the directors data.
 library(dplyr)
 directors <- directors %>%
   # Log compensation
@@ -39,7 +45,12 @@ directors <- directors %>%
   mutate(Age = Age - mean(Age),
          Male = as.numeric(Male) - mean(as.numeric(Male)))
 
-# Define a convenience function. Basically, take nice output from a stargazer latex regression table & modify it for blm models.
+# Load models 
+# i.e. prevent R from re-running the models the entire time when knitting the doc (this takes a long time).
+# Instead, run code line-by-line if you need to.
+dirmod1 <- readRDS("model1.rds")
+dirmod2 <- readRDS("model2.rds")
+resm2 <- readRDS("model3.rds")
 ```
 
 ```{r julia setup}
@@ -49,13 +60,41 @@ blm_setup()
 
 # Introduction
 
+Problem statement, literature & hypotheses
+
+# Methods & Results
+
+Table XX below shows the descriptive statistics for each variable. The outcome variable **compensation** is given in thousands of Great British pounds and has been log-transformed.
+
+```{r descriptive statistics, eval=TRUE, results='asis'}
+out <- capture.output(stargazer::stargazer(directors, summary=TRUE, median=TRUE))
+cat(paste0(out[-1:-3], "\n"))
+```
+
+Model 1 is given by the following equation:
+
 $$
 \tag{1}
-\hat{\log(\text{compensation}_i)} = \beta_0 + \beta_{1} \text{age}_i + \beta_2\text{male}_i + \beta_3\text{SectorServices}_i + \beta_4\text{SectorBasicMaterials}_i + \epsilon_i
+\begin{aligned}
+\hat{\log(\text{compensation}_i)} = 
+&\beta_0 + \beta_{1} \text{age}_i + \beta_2\text{male}_i + \epsilon_i
+\end{aligned}
+$$
+
+Model 2 is given by the following equation:
+
+$$
+
+\begin{aligned}
+\hat{\log(\text{compensation}_i)} = 
+&\beta_0 + \beta_{1} \text{age}_i + \beta_2\text{male}_i + \\
+&\beta_3\text{SectorServices}_i + \\
+&\beta_4\text{SectorBasicMaterials}_i + \epsilon_i
+\end{aligned}
 $$
 
 ```{r model1, include = FALSE}
-## Run two models.
+## Run two linear models with blm.
 
 # Model 1: only age and male dummy ==> baseline model -----
 
@@ -71,25 +110,30 @@ dirmod1 <- blm("Compensation ~ Age + Male",
                      chain_2 = list("b" = c(-5, 0, 7), "sigma" = 2)) %>%
   # Sample
   sample_posterior() %>%
-  # Compute posterior predictive checks (using a random sample of 20% of the data)
-  evaluate_ppc(p=0.2)
-# Sanity check for coefficients
+  # Compute posterior predictive checks (using a random sample of 50% of the data)
+  evaluate_ppc(p=0.5)
+
+# Sanity check for coefficients ==> compare to linear model
 coef(dirmod1)
-coef(lm("Compensation ~ Age + Male", data=directors)) # Sanity check
+coef(lm("Compensation ~ Age + Male", data=directors))
+
 # Inspect convergence
 dirmod1 %>%
-  evaluate_convergence_diagnostics() # OK
+  evaluate_convergence_diagnostics() # OK (GR statistic)
 
 # Plots
-plot(dirmod1, "history")
-plot(dirmod1, "density")
+plot(dirmod1, "history") # Ok
+plot(dirmod1, "density") # OK
 plot(dirmod1, "autocorrelation") # OK
 
 # Summary
 summary(dirmod1)
+# DIC = 508
+# R2 = low (approx 2.5%)
 # ==> neither male nor age is a predictor of logged compensation (CCI contains 0)
 
-# Plot
+# Plot R-squared 
+# See: https://www.tandfonline.com/doi/abs/10.1080/00031305.2018.1549100?casa_token=eO-_tpyCd3wAAAAA:w9MZzAbhBb6HM-2iOPyvD2Y2veCac-HA6oDUc2drJEicqA8hXZ5IlzZUbmwtsdCWAbFzPi7kMJX1lw for thoughts on the R2 method.
 dirmod1 %>% 
   get_value("rsq") %>%
   plot()
@@ -97,32 +141,35 @@ dirmod1 %>%
 # Summary of ppc
 dirmod1 %>%
   get_value("ppc") %>%
-  summary() # Vio;lating independence
+  summary() # Violating independence. Others OK.
 
 # Plot results of the ppc
-p1 <- plot(dirmod1 %>% 
+## NOTE: it's best to execute these plots in the console
+plot(dirmod1 %>% 
             get_value("ppc"), 
-          "normality") # Two-sided test ==> violation 
-p2 <- plot(dirmod1 %>% 
+          "normality") %>%
+      plot() # Two-sided test ==> violation 
+plot(dirmod1 %>% 
             get_value("ppc"), 
-          "heteroskedasticity") # One-sided test ==> violation (data are more heteroskedastic)
-p3 <- plot(dirmod1 %>%
+          "heteroskedasticity") %>%
+      plot() # One-sided test ==> violation (data are more heteroskedastic)
+plot(dirmod1 %>%
             get_value("ppc"), 
-          "independence") # Two-sided test ==> violation (data are correlated)
+          "independence") %>%
+      plot() # Two-sided test ==> violation (data are muchos correlated)
 
-# Plot
-grid.arrange(p1, p2, p3, ncol=3)
-```
-
-```{r ppc results}
+# Get the average correlation in the residuals
 dirmod1 %>%
   get_value("ppc") %>%
   get_value("data") %>%
   .$independence %>%
   apply(2, mean)
-```
 
-From the PPC plots, we see that the data are violating the assumption of independence as the MAP of the correlation coefficient for the observed data indicates a strong positive correlation $(\hat{r}_{\text{MAP, PPC}} = .466)$.
+# Soooo, the average correlation in the observed data is +-.46
+
+# Save this model
+saveRDS(dirmod1, "model1.rds")
+```
 
 ```{r model2, include = FALSE}
 # Model 2: Age, gender and sector -----
@@ -143,14 +190,14 @@ dirmod2 <- dirmod2 %>%
   # (only has an effect if posterior already present)
   delete_posterior() %>%
   # Set an informative prior on the coefficients
-  # Male (b4) is speculated to have 17% pay increase over women
+  # Males (b4) are speculated to have 17% pay increase over women
   set_prior("b4", mu = .17, sd=0.01) %>%
-  # Change the sampler of Age to metropolis hastings
+  # Change the sampler of Age to metropolis hastings (random walk)
   # Lambda parameter controls the variance of the (normal) proposal distribution
   set_sampler("b3", type="MH", lambda=0.01) %>%
   # Update sampling settings
-  set_sampling_options(chains = 2, iterations = 60000,
-                       burn = 15000, thinning=4) %>%
+  set_sampling_options(chains = 2, iterations = 80000,
+                       burn = 15000, thinning=5) %>%
   # Set initial values
   # If we draw from the priors the starting values will be too large
   # This is an issue for MH because it takes many more iterations to converge
@@ -159,45 +206,25 @@ dirmod2 <- dirmod2 %>%
   # Sample the posterior distribution
   sample_posterior()
 
-# Compute a z-score difference from the posterior to the prior
-# Idea: how much does the posterior shift when confronted with new data?
-#        calculate on the scale of the posterior
-thprior <- rnorm(1, mean=dirmod2$priors$b4$mu, sd=dirmod2$priors$b4$sd)
-ps <- get_posterior_samples(dirmod2) 
-pmu <- apply(ps, 2, mean)
-psd <- apply(ps, 2, sd)
-z <- abs((pmu["Male"] - thprior) / psd["Male"])
-
 # Evaluate the accepted draws
 dirmod2 %>% 
   evaluate_accepted_draws() # ~ 40-45%
 
 # Look at burn-in diagnostics
 dirmod2 %>% 
-  evaluate_convergence_diagnostics()
-
-# Check history plot
-plot(dirmod2, "history") # Burn-in is not high enough
-
-# Update burn-in size & draw more samples from the posterior
-#dirmod2 <- dirmod2 %>%
-#  set_sampling_options(burn = 12000) %>%
-#  update_posterior(iterations = 20000)
-
-# Evaluate the accepted draws
-dirmod2 %>% evaluate_accepted_draws() # ~ 30%
+  evaluate_convergence_diagnostics() # GR: chains have converged
 
 # Check history
 plot(dirmod2, "history") # This seems OK
 # Check autocorrelation
-plot(dirmod2, "autocorrelation") # Not a problem
+plot(dirmod2, "autocorrelation") # Little bit, but not unexpected given MH sampler. At any rate, not too big so not really an issue.
 
 # Evaluate the effect of MH on the effective sample size
 dirmod2 %>% 
-  evaluate_effective_sample_size() 
+  evaluate_effective_sample_size() # OK
 
 # View densities
-plot(dirmod2, "density")
+plot(dirmod2, "density") # OK
 
 # Summary
 summary(dirmod2)
@@ -206,16 +233,24 @@ summary(dirmod2)
 # ==> Both sectors increase compensation for directors
 
 # R-squared value
-
+# Compute a z-score difference from the posterior to the prior
+# Idea: how much does the posterior shift when confronted with new data?
+#        calculate on the scale of the posterior
+thprior <- rnorm(1, mean=dirmod2$priors$b4$mu, sd=dirmod2$priors$b4$sd)
+ps <- get_posterior_samples(dirmod2) 
+pmu <- apply(ps, 2, mean)
+psd <- apply(ps, 2, sd)
+z <- abs((pmu["Male"] - thprior) / psd["Male"])
+shrink <- psd[5] / .01 # Factor of 6 ==> this means that the posterior variance is 6 times larger than the prior variance.
 
 # Plot
-plot(m2r2$rsq)
-median(m2r2$rsq$rsquared) # R-squared ~ .089 ==> sometimes returns 0.5 but only after updating using update_posterior() ????
-quantile(m2r2$rsq$rsquared, c(0.025, 0.25, 0.5, 0.75, 0.975)) # 95% CCI [.46, .54]
+plot(dirmod2$rsq)
+median(dirmod2$rsq$rsquared) # R-squared ~ .089
+quantile(dirmod2$rsq$rsquared, c(0.025, 0.25, 0.5, 0.75, 0.975)) # 95% CCI [.045, .15]
 
 # Posterior predictive checks
-m2ppc <- dirmod2 %>%
-  evaluate_ppc(return_samples=TRUE)
+dirmod2 <- dirmod2 %>%
+  evaluate_ppc(p=.5)
 
 # Residual plot
 errs <- data.frame(
@@ -252,21 +287,43 @@ p2 <- ggplot(rc, aes(x=reorder(comp, -abs(cor)), y=cor)) +
 library(gridExtra)
 grid.arrange(p1, p2, ncol=2)
 # Summary
-summary(m2ppc$ppc)
-p <- plot(m2ppc$ppc, "normality") ; plot(p) # Two-sided test ==> violation ==> less skewed compared to model 1
-p <- plot(m2ppc$ppc, "heteroskedasticity") ; plot(p) # One-sided test ==> violation (data are more heteroskedastic) ==> more extreme than model 1
-p <- plot(m2ppc$ppc, "independence") ; plot(p) # Two-sided test ==> violation (data are correlated) ==> less extreme than model 1 so we're better taking into account group effects
+summary(dirmod2$ppc)
+p <- plot(dirmod2$ppc, "normality") ; plot(p) # Two-sided test ==> violation ==> less skewed compared to model 1
+p <- plot(dirmod2$ppc, "heteroskedasticity") ; plot(p) # One-sided test ==> violation (data are more heteroskedastic) ==> more extreme than model 1
+p <- plot(dirmod2$ppc, "independence") ; plot(p) # Two-sided test ==> violation (data are correlated) ==> less extreme than model 1 so we're better taking into account group effects
 
 ## Autocorrelation ==> not strange. Board members of the same COMPANY are more alike than board members of other company. Hence the correlation in the errors.
 
 # Model fit
 dirmod2 %>%
-  evaluate_model_fit() # ==> DIC is 487.895 with 6 parameters ==> fit is better than model 1
+  get_value("DIC") %>%
+  summary()# ==> DIC is 487.895 with 6 parameters ==> fit is better than model 1
 ```
 
-From figure XX and the posterior predictive checks, we observe that the data are not independent. That is, directors who are in the same board tend to are more similar to each other than directors from other boards. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards. Indeed, the results of the random effects model shows that the intra-class correlation coefficient $\rho$ equals $57\%$, meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The results of running all different stages of a multilevel model are presented in another document.] 
+```{r PPC results, eval=FALSE, fig.width=7, fig.height=2, fig.cap="Observed and simulated correlation coefficients for model 1 (left) and model 2 (right). The figure shows that the observed residuals (in red) are much more correlated than is reasonable under the model (represented by the blue, simulated values).", eval=TRUE}
+# Collect ppc results
+ppc1 <- do.call(cbind.data.frame, dirmod1$ppc$results)
+ppc2 <- do.call(cbind.data.frame, dirmod2$ppc$results)
+
+# Bind rows
+ppc_results <- round(rbind(ppc1, ppc2), digits=4)
+row.names(ppc_results) <- c("Model 1", "Model 2")
+
+# Plot ppc independence for both models
+ppcindp_m1 <- plot(dirmod1 %>%
+                    get_value("ppc"), 
+                  "independence")
+ppcindp_m2 <- plot(dirmod2 %>%
+                    get_value("ppc"), 
+                  "independence") 
+
+grid.arrange(ppcindp_m1, ppcindp_m2, ncol=2)
+```
+
+From figure XX and the posterior predictive checks (table XY), we observe that the data are not independent $(\hat{r}_{\text{PPC, Model1}} = .466)$. That is, directors who are in the same board tend to are more similar to each other than directors from other boards. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards. Indeed, the results of the random effects model shows that the intra-class correlation coefficient $\rho$ equals $57\%$, meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The results of running all different stages of a multilevel model are presented in another document.] 
 
 ```{r MLM intercept-only model}
+library(rjags)
 # Jags data
 dir_jags <- with(directors, list(## Outcome for individuals (level 1)
   
@@ -307,7 +364,7 @@ io_mod <- "model {
 
   # Priors
   # Individual precision
-	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect (variance within sectors)
+	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect (variance within companies)
   # For each individual
 	for (i in 1:n) {
 		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
@@ -342,7 +399,7 @@ params <- c("sigma_e", "sigma_u0", "gamma_00")
 resm1 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
 
 # Convergence?
-plot(resm1)
+#plot(resm1)
 
 # DIC
 DICm1 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD")
@@ -369,13 +426,14 @@ quantile(ve, c(0.025, .25, .5, .75, .975))
 The final random effects model is presented in table YY. This model corresponds to the following equation.
 
 $$
+\tag{3}
 \begin{aligned}
 \text{compensation}_{ij} =
 &\gamma_{00} + u_{0j} + \gamma_{10}\cdot \text{Age}_{ij} + e_{ij}
 \end{aligned}
 $$
 
-Where $\gamma_{00}$ is the overall intercept and $u_{0j}$ is a company-specific error term. Notice that the fit of this model is much better than that of the previous models, indicating that the multilevel approach seems appropriate.
+Where $\gamma_{00}$ is the overall intercept and $u_{0j}$ is a company-specific error term. Notice that the fit of this model is much better than that of the previous models, indicating that the multilevel approach seems appropriate. The marginal and conditional R-squared values [CITE] are $R^2_{\text{M}} = .0056; \ 95\% \ \text{CCI}=[.0008, .015]$ and $R^2_{\text{C}} = .5398; \ 95\% \ \text{CCI}=[.4807, .6]$ respectively. This indicates that the fixed part of the model (age) explains almost no variation in the data, but the fixed and random parts together explain some $54\%$ of the total variation. Hence, we must conclude that we do not have the right variables at either level 1 or 2 that would help us explain the heterogeneity in comepnsation among directors.
 
 ```{r MLM level-1 predictors}
 # Initial values
@@ -438,116 +496,50 @@ DICm2 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD")
 # Calculate variance explained
 # MAP values for model 1
 MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
-
-# Coerce to matrix
-resmat <- do.call(rbind, resm2)
-
-# New matrix with same dims
-ve_2 <- matrix(0, ncol=2, nrow=nrow(resmat))
-
-# FOr each row
-# Posterior distribution of variance explained (pseudo R-squared)
-for(i in seq_along(1:nrow(resmat))) {
-  ve_2[i,] <- c( ((MAPm1[2] - resmat[i,3]) / MAPm1[2]), # Level 1
-               ((MAPm1[3] - resmat[i,4]) / MAPm1[3])) # Level 2
-}
+MAPm2 <- apply(do.call(rbind.data.frame, resm2), 2, mean)
 
 # Map values
-MAPve <- apply(ve_2, 2, mean) * 100
+MAPve <- apply(ve_2, 2, median)
 ```
 
-Given that the variable age only explains some $1.3$\% of the variance on level $1$ and $.8$\% of the variance on level $2$, the conclusion is that we do not have the right predictors 
-
-```{r model results (including model fit), eval=FALSE, results='asis'}
-# Calculate 95% CCI
-CCI1 <- t(apply(get_posterior_samples(dirmod1), 2, quantile, c(0.025, 0.25, 0.5, 0.75, 0.975))[c(1, 5),]) %>% r
-ound(., digits=3)
-CCI2 <- t(apply(get_posterior_samples(dirmod2), 2, quantile, c(0.025, 0.25, 0.5, 0.75, 0.975))[c(1, 5),]) %>% 
-  round(., digits=3)
-
-# Call stargazer
-# ==> we use to linear models with the same variables and replace the coefficients / confidence intervals with those of the blm models
-s <- capture.output(
-        stargazer::stargazer(lm("Compensation ~ Age + Male", data=directors), 
-                             lm("Compensation ~ Age + Male + Sector", data=directors),
-                           #title = "Results for BLM models", #dep.var.caption = "Compensation",
-                           dep.var.labels = "Compensation",
-                           type = "latex",
-                          # Replace coefficients
-                           coef = list(coef(dirmod1), coef(dirmod2)), 
-                           ci = TRUE,
-                           ci.custom = list(CCI1, CCI2),
-                          # Replace se 
-                           #se = list(get_posterior_samples(dirmod1) %>% apply(2, sd),
-                          #           get_posterior_samples(dirmod2) %>% apply(2, sd)),
-                          
-                          # Turn these settings off / on
-                          p.auto = FALSE, 
-                          df=FALSE, 
-                          t.auto=FALSE, 
-                          intercept.top = TRUE,
-                          intercept.bottom = FALSE,
-                          header=FALSE,
-                          initial.zero = FALSE,
-                          keep.stat = c("n", "rsq", "ser"),
-                          order = c(1, 5, 4, 3, 2),
-                          report = c("cvs"),
-                          single.row = FALSE,
-                          add.lines = list(c("DIC", 508, 488),
-                                           c("Par.",4, 6)))
-        )
-
-# Remove line 34
-# s <- s[-26]
-# # Change standard error
-# s[23] <- paste0("Residual standard deviation & ", 
-#                 round(mean(get_posterior_samples(dirmod1)[,4]), digits=3),
-#                 " & ",
-#                 round(mean(get_posterior_samples(dirmod2)[,6]), digits=3),
-#                 " \\\\ ")
-# # Change R2
-# s[22] <- paste0("R$^{2}$ & ", 
-#                 round(median(m1r2$rsquared), digits=3),
-#                 " & ",
-#                 round(median(m2r2$rsquared), digits=3),
-#                 "\\\\ ")
-
-# Print table
-cat(
-  paste0(
-    s, collapse = "\n"
-  )
-)
-``` 
-
-\begin{table}[!htbp] \centering 
+\begin{table}[H] \centering 
   \caption{Model results } 
   \label{} 
 \begin{tabular}{@{\extracolsep{5pt}}lccc} 
 \\[-1.8ex]\hline 
 \hline \\[-1.8ex] 
  & \multicolumn{3}{c}{\textit{Dependent variable:}} \\ 
-\cline{2-3} 
-\\[-1.8ex] & \multicolumn{3}{c}{Compensation} \\ 
+\cline{2-4} 
+\\[-1.8ex] & \multicolumn{3}{c}{Compensation (logged)} \\ 
 \\[-1.8ex] & (1) & (2) & (3)\\ 
+\\[-1.8ex] & Linear & Linear & Linear mixed effects \\
+\\[-1.8ex] & (blm) & (blm) & (JAGS) \\
 \hline \\[-1.8ex] 
+\textit{(a) Fixed} & & & \\
 Constant & 4.991  (4.936, 5.046) & 4.821 (4.732, 4.910) & 4.991 (4.877, 5.110) \\ 
 SectorBasic Materials &  & .225 (.079, .370) &  \\ 
 SectorServices &  & .292 (.169, .414) &  \\ 
 Male & .065 ($-$.085, .215) & .153 (.095, .209) & \\ 
 Age & .008 (0.000, .017) & .009 (.001, .017) & 0.001 (.0035, .0155) \\ 
 \hline \\[-1.8ex] 
-Intercept variance & & & .3992\\
+\textit{(b) Random} & & & \\
+$\sigma^2_e$ & .516 & .501 & .3423 \\
+$\sigma^2_{u0}$ & & & .3992\\
 \hline \\[-1.8ex] 
+\textit{(c) Model Fit} \\
 Observations & 336 & 336 & 336 \\
 Companies & & & 52 \\
-Par. & 4 & 6 & 47 \\ 
-DIC & 508 & 488 & 289 \\ 
-R$^{2}$ & .021 & .098 & \\ 
-Residual Std. Error & .516 & .501 & .3423 \\ 
+DIC & 508 & 488 & 280 \\ 
+Penalty. & 4 & 6 & 47 \\ 
+R$^{2}$ & .021 & .098 & .0056 (M), .5362 (C) \\ 
+\hline \\[-1.8ex] 
+\textit{(d) Post. Pred. Checks} & & & \\
+Normality & .3609 & .3534 &  \\
+Homoskedasticity & .3261 & .607 & \\
+Independence & 0 & 0 & \\
 \hline 
 \hline \\[-1.8ex] 
-\textit{Note:}  & \multicolumn{3}{r}{Baseline is sector 'Financials'} \\
+\textit{Note:}  & \multicolumn{3}{r}{Baseline is sector 'Financials' for models (1) and (2)} \\
 \end{tabular} 
 \end{table}
 
@@ -555,21 +547,100 @@ Residual Std. Error & .516 & .501 & .3423 \\
 plot(predict(dirmod2), resid(dirmod2))
 ```
 
+```{r calculate variance explained for mixed model, eval=TRUE}
+# Calculate R^2
+# See: https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.2041-210x.2012.00261.x
 
-```{r r-squared plot, fig.cap="Bayesian R-squared value for model 1 (left) and model 2 (right). The proportion of cases in which the R-squared value of model 2 exceeds that of model 1 is .99", fig.height=2, fig.width=5}
+# Function to calculate marginal & conditional R^2
+# @param X design matrix containing fixed part of the model
+# @param w coefficient matrix
+# @e_1 random part of level 1
+# @e_2 random part of level 2
+MLM_R2 <- function(X, w, e_1, e_2) {
+  
+  # Component 1: fixed effect
+  e_f <- var(X %*% w)
+
+  # Compute marginal & conditional R^2
+  mar <- (e_f) / (e_f + e_1 + e_2) # Variance explained by fixed factors (marginal R^2)
+  con <- (e_f + e_2) / (e_f + e_1 + e_2) # Variance explained by fixed and random factors (conditional R^2)
+  
+  # Return
+  return(
+    c(mar, con)
+  )
+  
+}
+
+# Coerce to matrix
+resmat <- do.call(rbind, resm2)
+
+# New matrix with same dims
+ve_2 <- matrix(0, ncol=2, nrow=nrow(resmat))
+
+# X for fixed effect
+X <- matrix(directors$Age, ncol=1)
+
+# FOr each row
+# Posterior distribution of variance explained (pseudo R-squared)
+for(i in seq_along(1:nrow(resmat))) {
+  ve_2[i,] <- MLM_R2(X, 
+                 resmat[i,2],
+                 resmat[i,3],
+                 resmat[i,4])
+}
+```
+
+```{r r-squared plot, fig.cap="Bayesian R-squared value for model 1 (a) and model 2 (b). The proportion of cases in which the R-squared value of model 2 exceeds that of model 1 is .99. Figure (c) shows the marginal (blue) and conditional (red) R-squared values for the posterior distribution. The marginal R-squared indicates the amount of variance explained by the fixed part of the model; the conditional R-squared indicates the amount of variance explained by the fixed and random part of the model.", fig.height=2, fig.width=7, eval=TRUE}
+library(latex2exp)
+library(ggplot2)
 # Plot r-squared
 p1 <- dirmod1 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
-  theme(axis.title = element_blank())
+  theme(axis.title = element_blank(),
+        axis.text.y = element_blank(),
+        plot.subtitle = element_blank()) +
+  labs(title = latex2exp::TeX("\\textbf{(a) Bayesian $R^2$ posterior (model 1)}"))
+# Model 2
 p2 <- dirmod2 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
-  theme(axis.title = element_blank())
+  theme(axis.title = element_blank(),
+        axis.text.y = element_blank(),
+        plot.subtitle = element_blank()) +
+  labs(title = latex2exp::TeX("\\textbf{(b) Bayesian $R^2$ posterior (model 2)}"))
+# Model 3 (multilevel)
+veg <- ve_2 %>%
+  as.data.frame() %>%
+  rename("MR2" = V1, "CR2" = V2) %>%
+  #select(CR2) %>%
+  tidyr::gather(type, rsq)
+# Plot
+p3 <-  ggplot(veg, aes(x=rsq, fill=type)) +
+    geom_histogram(alpha=.4, color="black") +
+    theme_blm(text_size=8) +
+    scale_fill_brewer(palette="Set1") +
+    geom_vline(xintercept=veg %>% filter(type=="MR2") %>% 
+                 select(rsq) %>% pull() %>% 
+                 median(), linetype="dashed") +
+    geom_vline(xintercept=veg %>% filter(type=="CR2") %>% 
+                 select(rsq) %>% pull() %>% 
+                 median(), linetype="dashed") +
+    theme(axis.title = element_blank(),
+          axis.text.y = element_blank(),
+          legend.position = "none") +
+    labs(title = latex2exp::TeX("\\textbf{(c) Marginal and Conditional $R^2$ posterior}"))
 
 # Grid
-grid.arrange(p1, p2, ncol=2)
+grid.arrange(p1, p2, p3, ncol=3)
 ```
 
 ## Differences in Bayesian and Frequentist inference
 
-```{r effect of prior variance, fig.height=4, fig.width=5, fig.cap="Effect of adjusting the prior variance of the coefficient for variable Male (a) on the posterior distribution (b). The mean is set at M=.17 which represents a 17% increase in compensation for males versus females. Reducing the prior variance represents increased certainty about the estimate of our domain knowledge and weights the information from the data more strongly compared to domain knowledge (c) and (d)."}
+- Interpretation of random variables
+- Same rules for probability, but different approach
+- Can answer the same questions, but Bayesian more flexible
+- Endless transformations on posterior distribution
+- Incorporating domain knowledge
+
+```{r calculate prior variance effect}
 # Posterior shrinkage
 dirmod3 <- blm("Compensation ~ Sector + Age + Male",
                 data=directors) %>%
@@ -599,6 +670,13 @@ dirmod3 <- dirmod3 %>%
   set_prior("b4", mu = .17, sd=0.1) %>%
   update_posterior(iterations=20000)
 
+# Save
+saveRDS(dirmod3, "model_effects_prior.rds")
+```
+
+```{r effect of prior variance, fig.height=2, fig.width=7, fig.cap="Effect of adjusting the prior variance of the coefficient for variable Male (a) on the posterior distribution (b). The mean is set at M=.17 which represents a 17 percent increase in compensation for males versus females. Reducing the prior variance represents increased certainty about the estimate of our domain knowledge and weights the information from the data less strongly compared to domain knowledge. The dashed lines indicate the value of the posterior means.", eval=TRUE}
+
+dirmod3 <- readRDS("model_effects_prior.rds")
 # Retrieve posterior samples for male variable, burn and label by prior variance 
 library(purrr)
 pd <- get_value(dirmod3, "posterior") %>%
@@ -634,6 +712,9 @@ ps1 <- pd_sd$psd[1]^2 / as.numeric(levels(pd_sd$Prior)[1])^2 # 841
 ps2 <- pd_sd$psd[2]^2 / as.numeric(levels(pd_sd$Prior)[2])^2 # 35
 ps3 <- pd_sd$psd[3]^2 / as.numeric(levels(pd_sd$Prior)[3])^2 # 0.53
 
+# Posterior means
+pms <- round(pd_sd$pmn, digits=3)
+
 library(ggplot2)
 library(ggpubr)
 priorvar <- ggplot(data.frame(
@@ -644,7 +725,7 @@ priorvar <- ggplot(data.frame(
   ),
   aes(x=Male, fill=Prior)) +
   geom_histogram(alpha=0.4, position="identity", color="black") +
-  theme_blm() +
+  theme_blm(text_size = 9) +
   theme(axis.title = element_blank(),
         axis.text.y=element_blank()) +
   scale_fill_brewer(palette = "Set1",
@@ -654,61 +735,27 @@ priorvar <- ggplot(data.frame(
 # Posterior distribution
 postvar <- ggplot(pd, aes(x=Male, fill=Prior)) +
   geom_histogram(alpha=0.4, position="identity", color="black") +
-  theme_blm() +
+  theme_blm(text_size = 9) +
   theme(axis.title = element_blank(),
         axis.text.y=element_blank()) +
+  geom_vline(xintercept = pms[1], color=RColorBrewer::brewer.pal(3, "Set1")[1], 
+             linetype="dashed", size=1.2) +
+  geom_vline(xintercept = pms[2], color=RColorBrewer::brewer.pal(3, "Set1")[2], 
+             linetype="dashed", size=1.2) +
+  geom_vline(xintercept = pms[3], color=RColorBrewer::brewer.pal(3, "Set1")[3], 
+             linetype="dashed", size=1.2) +
   scale_fill_brewer(palette = "Set1") +
   labs(title= "(b) Posterior distribution")
 
-# Shift
-closeup <- data.frame(
-  "value" = c(pd$Male[pd$Prior == "0.01"],rnorm(32000, mean=.17, sd=.01)),
-  "type" = c(rep("posterior", 32000), rep("prior", 32000))
-)
-library(latex2exp)
-posteriorshift <- ggplot(closeup, aes(x=value, group=type, fill=type)) +
-  geom_histogram(alpha=0.1, position="identity", color="black") +
-  # Error bar for prior
-  geom_errorbarh(aes(xmin=unname(quantile(closeup$value[closeup$type == "prior"], 0.025)),
-                     xmax=unname(quantile(closeup$value[closeup$type == "prior"], 0.975)),
-                     y = -600)) +
-  annotate(geom="text", x=.13, y=-600, label=TeX("$95% CCI (prior)$"), hjust=.5) +
-  # Error bar for posterior
-  geom_errorbarh(aes(xmin=unname(quantile(closeup$value[closeup$type == "posterior"], 0.025)),
-                     xmax=unname(quantile(closeup$value[closeup$type == "posterior"], 0.975)),
-                     y = -1500)) +
-  annotate(geom="text", x=pd_sd$pmn[2], y=-2200, label=TeX("$95% CCI (posterior)$")) +
-  # Line for prior
-  geom_segment(aes(x=.17,xend=.17, y=0, yend=19400), linetype="dashed", color="black",
-             size = 0.35) +
-  annotate(geom="text", x=.19, y=20000, label=TeX("$\\mu_{prior}$")) +
-  # Line for posterior
-  geom_segment(aes(x=pd_sd$pmn[2],xend=pd_sd$pmn[2], y=0, yend=19400), linetype="dashed", color="black",
-             size = 0.35) +
-  annotate(geom="text", x=pd_sd$pmn[2]-.05, y=20000, label=TeX("$\\mu_{posterior}$")) +
-  theme_blm() +
-  theme(axis.title = element_blank(),
-      axis.text.y=element_blank(),
-      legend.position = "none") +
-  labs(title = "(c) Prior/posterior comparison",
-       subtitle = "For prior with variance 0.01")
-  
-# Text table
-tab <- ggtexttable(round(data.frame(
-  "prior_var" = c(0.001, 0.01, 0.1),
-  "z_score" = c(z1, z2, z3),
-  "shrinkage" = c(ps1, ps2, ps3)
-), digits=3), rows=NULL, theme=ttheme("minimal"))
-
 # Arrange plots with common legend
-ggarrange(priorvar, postvar, posteriorshift, tab, ncol=2, nrow=2, common.legend=TRUE, legend="top")
+ggarrange(priorvar, postvar, ncol=2, common.legend=TRUE, legend="top")
 ```
 
 The effect of changing the prior variance can be summarized using a posterior shrinking factor (CITE BETANCOURT) and posterior z-score. The shrinking factor shows us the factor by which the variance of the posterior distribution shrinks or expands compared to the prior variance. The posterior z-score tells us the direction and magnitude by which the posterior mean shifts compared to the prior mean; if we are confident in the precision of our domain knowledge (resulting in small prior variance), the resulting posterior weights this information strongly and we end up with a posterior mean that lies closer to the prior mean (represented by the z-score). However, given that we have small variance, and if this is not corroborated by the data, then the shrinkage factor will be large. 
 
 ## Other material
 
-```{r ppc simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The color indicates the severity of the violation; the green bars indicate mild violation, blue indicates medium violation and red indicates severe violation. The script used to generate the data and run the simulations may be found here.", fig.width=5, fig.height=3}
+```{r ppc simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The color indicates the severity of the violation; the green bars indicate mild violation, blue indicates medium violation and red indicates severe violation. The script used to generate the data and run the simulations may be found here.", fig.width=7, fig.height=3, eval=TRUE}
 
 # Convenience function to flatten array
 flatten_array <- function(x) {
@@ -789,3 +836,5 @@ grid.arrange(p1, p2, p3, p4)
 Lynch, S. M. (2007). Introduction to applied Bayesian statistics and estimation for social scientists. Springer Science & Business Media. Chapter 9.2
 
 Aarts, E. (2019). Introduction to multilevel analysis and the basic two-level regression model, week 1 notes [powerpoint presentation]. *Introduction to Multilevel Analysis*, Utrecht University.
+
+Nakagawa, S., & Schielzeth, H. (2013). A general and simple method for obtaining R2 from generalized linear mixed‐effects models. Methods in Ecology and Evolution, 4(2), 133-142.
