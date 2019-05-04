@@ -4,7 +4,7 @@ library(brms)
 library(lme4)
 library(dplyr)
 
-lmm <- lmer(Compensation ~ (1 | Company),
+lmm <- lmer(Compensation ~ Age + Male + Sector + (1 | Company),
             data=directors, REML=FALSE)
 summary(lmm)
 
