@@ -1,5 +1,88 @@
 # Helper functions
 
+# Exported functions ----
+
+#' Check if a list / object contains a value
+#'
+#' @param x object or list
+#' @param val character value of the name of the object/list element to check
+#'
+#' @examples
+#' x <- list("a"=1, "b"=2)
+#' contains(x, "a")
+#'
+#' @return TRUE if the value is present, FALSE if not.
+#' @export
+contains <- function(x, val) {
+
+  return(val %in% names(x))
+
+}
+
+# Not exported -----
+
+# Autocorrelation plot
+# @param pd posterior samples
+# @param chain chain to show autocorrelation plot for
+autocorrelation_plot <- function(pd, chain) {
+
+  # Get data from posterior
+  qd <- get_value(pd, "samples")[[paste0("chain_", chain)]]
+
+  # Lag data
+  qd <- qd %>%
+    as.data.frame() %>%
+    lapply(., function(x) autocor(x, n=40)) %>%
+    do.call(rbind.data.frame, .)
+
+  # Add variable name
+  qd$id <- stringr::str_replace_all(row.names(qd), "\\.[0-9]{1,2}", "")
+
+  # Plot
+  ggplot2::ggplot(qd, ggplot2::aes(x=lag, y=correlation, group=id)) +
+    ggplot2::geom_bar(stat="identity") +
+    ggplot2::scale_x_continuous(breaks= scales::pretty_breaks()) +
+    ggplot2::scale_y_continuous(limits = c(-1,1)) +
+    theme_blm() +
+    ggplot2::facet_wrap(id ~ .) +
+    ggplot2::labs(title="Autocorrelation plot")
+
+
+}
+
+# History plot
+history_plot <- function(samples) {
+
+  ggplot2::ggplot(samples, ggplot2::aes(x = iteration,
+                                        y=value,
+                                        color=as.factor(chain),
+                                        group = parameter)) +
+    ggplot2::geom_line(alpha=0.4) +
+    ggplot2::scale_color_brewer(palette = "Set1", name = "chain",
+                                labels = paste0("chain ", 1:length(unique(samples$chain)))) +
+    theme_blm() +
+    ggplot2::theme(axis.title = element_blank()) +
+    ggplot2::facet_wrap("parameter ~ .", scales = "free_y",
+                        ncol=2) +
+    ggplot2::labs(title = "Trace plot", subtitle = "each chain is indicated by its own color")
+
+}
+
+# Density plot
+density_plot <- function(samples) {
+
+  ggplot2::ggplot(samples, ggplot2::aes(x=value,
+                                        fill = as.factor(chain))) +
+    ggplot2::geom_density(alpha=0.4) +
+    ggplot2::scale_color_brewer(palette = "Set1", name = "chain",
+                                labels = paste0("chain ", 1:length(unique(samples$chain)))) +
+    theme_blm() +
+    ggplot2::theme(axis.title = element_blank()) +
+    ggplot2::facet_wrap("parameter ~ .", scales = "free") +
+    ggplot2::labs(title = "Posterior densities", subtitle = "each chain is indicated by its own color")
+
+}
+
 # Calculate mode
 calc_mode <- function(x) {
   uniqv <- unique(x)
@@ -130,6 +213,15 @@ DIC <- function(X, y, posterior_samples) {
             r)
   )
 
+}
+
+# Calculate the model BIC
+BIC_blm <- function(n, p, LL) {
+  log(n)*p - 2*LL
+}
+# Calculate the Bayes factor of the model against the null model
+BF <- function(BIC0, BIC1) {
+  exp((BIC0 - BIC1)/2)
 }
 
 # Helper functions for special cat() ----

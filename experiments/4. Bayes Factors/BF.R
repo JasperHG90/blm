@@ -1,4 +1,4 @@
-f1 <- "b0 > b1"
+f1 <- "b0 > b1 > b2"
 f2 <- "b0 < b1"
 f3 <- "b0 >= b1"
 f4 <- "b0 <= b1"
@@ -46,8 +46,19 @@ mscale <- function(x, mu, sd) {
 }
 
 # Simulate data
-pr1 <- rnorm(1000, 11, 3)
-pr2 <- rnorm(1000, 8, .5)
+pr1 <- rnorm(1000, 10, 3)
+pr2 <- rnorm(1000, 9, 3)
+pr3 <- rnorm(1000, 5, 15)
+
+r <- (pr2 > pr3)
+l <- (pr1 > pr2)
+
+t <- (l + r) == 2
+
+c <- mean(t)
+
+for(i in 1:5) print(paste0(pr1[i], ", ", pr2[i], ", ", pr3[i], ", ", t[i]))
+# Lesson: this does not stack! > > >
 
 ## Scale
 mp1 <- mean(pr1)

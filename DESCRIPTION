@@ -23,7 +23,9 @@ Imports:
   stringr,
   ggExtra,
   latex2exp,
-  RColorBrewer
+  RColorBrewer,
+  grDevices,
+  stringr
 Depends:
   magrittr,
   R (>= 3.4.0)

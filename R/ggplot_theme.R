@@ -16,6 +16,8 @@
 #' @importFrom ggplot2 theme
 #' @importFrom ggplot2 element_text
 #' @importFrom ggplot2 element_line
+#' @importFrom ggplot2 rel
+#' @importFrom grDevices rgb
 theme_blm <- function(text_size = 12,
                       line_size = text_size / 170,
                       rect_size = text_size / 170){

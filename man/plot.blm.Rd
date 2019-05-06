@@ -4,13 +4,13 @@
 \alias{plot.blm}
 \title{Plot a blm object}
 \usage{
-\method{plot}{blm}(x, type = c("history", "autocorrelation", "density"),
-  ...)
+\method{plot}{blm}(x, type = c("history", "autocorrelation", "density",
+  "nullmodel"), ...)
 }
 \arguments{
 \item{x}{blm object}
 
-\item{type}{one of 'history' (trace plot), 'autocorrelation' or 'density'}
+\item{type}{one of 'history' (trace plot), 'autocorrelation', 'density' or 'nullmodel'. The latter option plots all plots on one grid for the intercept-only model if it is computed. See also \code{compute_null_model()}}
 
 \item{...}{other options passed for specific plots. Accepted arguments are:
 \describe{

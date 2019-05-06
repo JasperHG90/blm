@@ -119,7 +119,7 @@ summary.blm <- function(x) {
 #' Plot a blm object
 #'
 #' @param x blm object
-#' @param type one of 'history' (trace plot), 'autocorrelation' or 'density'
+#' @param type one of 'history' (trace plot), 'autocorrelation', 'density' or 'nullmodel'. The latter option plots all plots on one grid for the intercept-only model if it is computed. See also \code{compute_null_model()}
 #' @param ... other options passed for specific plots. Accepted arguments are:
 #' \describe{
 #'     \item{chain}{Integer >= 1 specifying which chain to use for autocorrelation plot. If not chosen, chain 1 is automatically used.}
@@ -143,12 +143,33 @@ summary.blm <- function(x) {
 #' @importFrom stringr str_replace_all
 plot.blm <- function(x, type=c("history",
                                "autocorrelation",
-                               "density"),
+                               "density",
+                               "nullmodel"),
                      ...) {
 
   # Check if posterior in blm object
   if(!"posterior" %in% names(x)) {
     stop("Posterior not yet constructed.")
+  }
+
+  # If null model
+  if(type == "nullmodel") {
+
+    # Retrieve null model
+    nullmodel <- get_value(x, "null_model")
+
+    # Plot trace plot
+    p1 <- plot(nullmodel, "history") + theme(legend.position = "none")
+
+    # Plot density plot
+    p2 <- plot(nullmodel, "density") + theme(legend.position = "none")
+
+    # Plot autocorrelation
+    p3 <- plot(nullmodel, "autocorrelation", chain=1)
+
+    # Plot on grid
+    return(grid.arrange(p1, p2, p3, nrow=3))
+
   }
 
   # Retrieve posterior data
@@ -163,10 +184,14 @@ plot.blm <- function(x, type=c("history",
     opts <- list(...)
 
     # If not chain specified and multiple chains, choose chain 1 but raise error
-    if(!"chain" %in% names(opts) & length(get_value(x, "sampling_settings")) > 1) {
+    if(!"chain" %in% names(opts)) {
 
-      warning("Choosing chain 1 for autocorrelation plot. You can choose a different chain by passing 'chain = <number>' to the plot() function.")
+      # Emit warning if chains > 1
+      if(length(get_value(x, "sampling_settings")) > 1) {
+        warning("Choosing chain 1 for autocorrelation plot. You can choose a different chain by passing 'chain = <number>' to the plot() function.")
+      }
 
+      # Choose default
       chain <- 1
 
     } else {
@@ -175,26 +200,8 @@ plot.blm <- function(x, type=c("history",
 
     }
 
-    # Get data from posterior
-    qd <- get_value(pd, "samples")[[paste0("chain_", chain)]]
-
-    # Lag data
-    qd <- qd %>%
-      as.data.frame() %>%
-      lapply(., function(x) autocor(x, n=40)) %>%
-      do.call(rbind.data.frame, .)
-
-    # Add variable name
-    qd$id <- stringr::str_replace_all(row.names(qd), "\\.[0-9]{1,2}", "")
-
-    # Plot
-    ggplot2::ggplot(qd, ggplot2::aes(x=lag, y=correlation, group=id)) +
-      ggplot2::geom_bar(stat="identity") +
-      ggplot2::scale_x_continuous(breaks= scales::pretty_breaks()) +
-      ggplot2::scale_y_continuous(limits = c(-1,1)) +
-      theme_blm() +
-      ggplot2::facet_wrap(id ~ .) +
-      ggplot2::labs(title="Autocorrelation plot")
+    # Call autocor plot
+    autocorrelation_plot(pd, chain)
 
   } else {
 
@@ -222,33 +229,13 @@ plot.blm <- function(x, type=c("history",
 
     if(type == "history") {
 
-      ggplot2::ggplot(samples, ggplot2::aes(x = iteration,
-                                            y=value,
-                                            color=as.factor(chain),
-                                            group = parameter)) +
-        ggplot2::geom_line(alpha=0.4) +
-        ggplot2::scale_color_brewer(palette = "Set1", name = "chain",
-                                    labels = paste0("chain ", 1:length(unique(samples$chain)))) +
-        theme_blm() +
-        ggplot2::theme(axis.title = element_blank()) +
-        ggplot2::facet_wrap("parameter ~ .", scales = "free_y",
-                            ncol=2) +
-        ggplot2::labs(title = "Trace plot", subtitle = "each chain is indicated by its own color")
-
-
-      ## Density plot
+      history_plot(samples)
 
     } else if(type == "density") {
 
-      ggplot2::ggplot(samples, ggplot2::aes(x=value,
-                                            fill = chain)) +
-        ggplot2::geom_density(alpha=0.4) +
-        ggplot2::scale_color_brewer(palette = "Set1", name = "chain",
-                                    labels = paste0("chain ", 1:length(unique(samples$chain)))) +
-        theme_blm() +
-        ggplot2::theme(axis.title = element_blank()) +
-        ggplot2::facet_wrap("parameter ~ .", scales = "free") +
-        ggplot2::labs(title = "Posterior densities", subtitle = "each chain is indicated by its own color")
+      ## Density plot
+
+      density_plot(samples)
 
     } else { ## Unknown! Raise error
 
@@ -566,6 +553,39 @@ set_prior.blm <- function(x, par, ...) {
 
 }
 
+#' @export
+compute_null_model.blm <- function(x, iterations=10000, chains=1, thinning=1, burn = 1000) {
+
+  # Checks
+  iterations <- as.integer(iterations)
+  chains <- as.integer(chains)
+  burn <- as.integer(burn)
+  thinning <- as.integer(thinning)
+
+  # Checks
+  check_sampling_inputs(iterations, chains, thinning, burn)
+
+  # Set up intercept-only model
+  form <- as.character(x$input$formula)
+  # Reconstruct
+  form_null <- paste0(form[2], " ~ 1")
+
+  # Get data
+  dat <- as.data.frame(x$input$y)
+  colnames(dat) <- x$input$variables$DV
+
+  # Construct null model
+  int_only <- blm(form_null, data=dat) %>%
+    set_sampling_options(chains=chains, iterations=iterations,
+                         thinning=thinning, burn=burn)
+
+  # add to object and return
+  x$null_model <- int_only
+  # Return
+  return(x)
+
+}
+
 # SAMPLING -----
 
 # Execute a blm plan
@@ -582,10 +602,15 @@ sample_posterior.blm <- function(x) {
     postsamp(., X, y, get_value(x, "priors")) %>%
     # Add posterior samples to blm object
     set_value(x, "posterior", .) %>%
-    # Calculate model DIC
-    evaluate_model_fit() %>%
     # Calculate R-squared
-    evaluate_R2()
+    evaluate_R2() %>%
+    # Evaluate the null model
+    # (this only happens if the null model is specified using 'compute_null_model()')
+    # (which is good because otherwise we'd get stuck in an infinite loop :-/)
+    # Null model calls null model calls null model calls null model
+    sample_null_model() %>%
+    # Calculate model DIC & Bayes Factor (if null computed)
+    evaluate_model_fit()
 
   # Return blm results
   return(x)
@@ -928,5 +953,64 @@ evaluate_accepted_draws.blm <- function(x) {
   print.listof(
     list("Accepted draws"=acc_b)
   )
+
+}
+
+# Not exported
+
+# Sample the null model if it exists in the data!
+# (this method is not exported)
+sample_null_model.blm <- function(x) {
+
+  # Check if null model in object
+  if(!contains(x, "null_model")) {
+
+    # If not, simply return the object
+    return(x)
+
+  } else {
+
+    # Sample the null
+    nm <- x$null_model %>%
+      sample_posterior()
+
+    # Add to object
+    x$null_model <- nm
+
+    # Return
+    return(x)
+  }
+
+}
+
+# Evaluate model Bayes' Factor
+# Based on Wagemakers (2007)
+# Compare the model against the Null, meaning
+#  H0: intercept-only fits better
+#  HA: model containing predictors fits better
+evaluate_model_BF.blm <- function(x) {
+
+  # If the model does not contain a null model ...
+  if(!contains(x, "null_model")) {
+
+    return(x)
+
+  } else {
+
+    nm <- get_value(x, "null_model")
+
+    # Compute the bayes factor
+    mod_BF <- BF(
+      BIC_blm(nm$input$n, nm$DIC$DIC$`Eff. P`, nm$DIC$DIC$LL),
+      BIC_blm(x$input$n, x$DIC$DIC$`Eff. P`, x$DIC$DIC$LL)
+    )
+
+    # Add to model
+    x$mod_BF <- mod_BF
+
+    # Return
+    return(x)
+
+  }
 
 }

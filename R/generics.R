@@ -146,6 +146,29 @@ get_posterior_samples <- function(x) {
   UseMethod("get_posterior_samples", x)
 }
 
+#' Compute the intercept-only model for comparison purposes
+#'
+#' @param x blm object
+#' @param iterations number of iterations used to sample the model
+#' @param chains number of separate chains used to sample the model
+#' @param thinning thinning parameter
+#' @param burn number of examples to burn
+#'
+#' @examples
+#' data("directors")
+#' fit <- blm("Compensation ~ Age", data=directors) %>%
+#'    compute_null_model(iterations=10000, burn=1000) %>%
+#'    sample_posterior()
+#' # Plot the null model
+#' plot(fit, "nullmodel")
+#'
+#' @return blm object containing instructions on how to sample the null model
+#'
+#' @export
+compute_null_model <- function(x, iterations=10000, chains=1, thinning=1,  burn=1000) {
+  UseMethod("compute_null_model", x)
+}
+
 #' Set up posterior predictive checks
 #'
 #' @param x blm object
@@ -309,6 +332,11 @@ burnin_diagnostic <- function(x, ...) {
 # Calculate effective sample size (posterior object)
 effss <- function(x, ...) {
   UseMethod("effss", x)
+}
+
+# Sample the null model
+sample_null_model <- function(x) {
+  UseMethod("sample_null_model", x)
 }
 
 # ---------- Functions for priors ---------------
