@@ -11,8 +11,7 @@ print.blm <- function(x) {
     crayon::bold("Bayesian Linear Model (BLM) object:\n\n"),
     "Data:\n",
     "\tPredictors: ", x$input$m - 1, "\n",
-    "\tOutcome: ", x$input$variables$DV, "\n",
-    "\tCentered: ", x$input$center, "\n\n"
+    "\tOutcome: ", x$input$variables$DV, "\n\n"
   )
 
   # Cat to console
@@ -106,12 +105,23 @@ summary.blm <- function(x) {
   print.listof(list("95% credible interval" = CIV))
   cat("---------------------\n\n")
 
-  # Cat model DIC
-  summary(get_value(x, "DIC"))
-
   # If R-squared, cat value
   if("rsq" %in% names(x)) {
     summary(get_value(x, "rsq"))
+  }
+
+  # If bayes factor, cat value
+  if(contains(x, "model_BF")) {
+    # Cat model DIC
+    summary(get_value(x, "DIC"),
+            x %>%
+              get_value("null_model") %>%
+              get_value("DIC"))
+    summary(get_value(x, "model_BF"))
+    cat("(BF > 1 is evidence for the user-defined model against the intercept-only model)")
+  } else {
+    # Cat model DIC
+    summary(get_value(x, "DIC"))
   }
 
 }
@@ -139,6 +149,7 @@ summary.blm <- function(x) {
 #' @importFrom ggplot2 scale_color_brewer
 #' @importFrom ggplot2 labs
 #' @importFrom tidyr gather
+#' @importFrom gridExtra grid.arrange
 #' @importFrom scales pretty_breaks
 #' @importFrom stringr str_replace_all
 plot.blm <- function(x, type=c("history",
@@ -607,10 +618,12 @@ sample_posterior.blm <- function(x) {
     # Evaluate the null model
     # (this only happens if the null model is specified using 'compute_null_model()')
     # (which is good because otherwise we'd get stuck in an infinite loop :-/)
-    # Null model calls null model calls null model calls null model
+    # Null model calls null model calls null model calls null model ......
     sample_null_model() %>%
-    # Calculate model DIC & Bayes Factor (if null computed)
-    evaluate_model_fit()
+    # Calculate model DIC
+    evaluate_model_fit() %>%
+    # Calculate model bayes factor (if null model is sampled)
+    evaluate_model_BF()
 
   # Return blm results
   return(x)
@@ -656,7 +669,9 @@ update_posterior.blm <- function(x, iterations = 1000) {
     # Calculate model DIC
     evaluate_model_fit() %>%
     # Calculate R-squared
-    evaluate_R2()
+    evaluate_R2() %>%
+    # Calculate model bayes factor (if null computed)
+    evaluate_model_BF()
 
   # Update number of iterations on the sample
   x <- get_value(x, "sampling_settings") %>%
@@ -956,6 +971,58 @@ evaluate_accepted_draws.blm <- function(x) {
 
 }
 
+# Evaluate model Bayes' Factor
+# Based on Wagemakers (2007)
+# Compare the model against the Null, meaning
+#  H0: intercept-only fits better
+#  HA: model containing predictors fits better
+#' @export
+evaluate_model_BF.blm <- function(x) {
+
+  # If the model does not contain a null model ...
+  if(!contains(x, "null_model")) {
+
+    return(x)
+
+  } else {
+
+    nm <- get_value(x, "null_model")
+
+    # To list
+    mod_BF <- list(
+      "inputs" = list(
+        "model0" = list(
+          "n" = nm$input$n,
+          "p" = nm$DIC$DIC$`Eff. P`,
+          "Neg. LL" = nm$DIC$DIC$LL,
+          "BIC" = BIC_blm(nm$input$n, round(nm$DIC$DIC$`Eff. P`), nm$DIC$DIC$LL)
+          ),
+        "model1" = list(
+          "n" = x$input$n,
+          "p" = x$DIC$DIC$`Eff. P`,
+          "Neg. LL" = x$DIC$DIC$LL,
+          "BIC" = BIC_blm(x$input$n, round(x$DIC$DIC$`Eff. P`), x$DIC$DIC$LL)
+        )
+      )
+    )
+
+    # Add bf
+    mod_BF$BF <- BF(mod_BF$inputs$model0$BIC,
+                    mod_BF$inputs$model1$BIC)
+
+    # Add structure
+    class(mod_BF) <- "BF"
+
+    # Add to model
+    x$model_BF <- mod_BF
+
+    # Return
+    return(x)
+
+  }
+
+}
+
 # Not exported
 
 # Sample the null model if it exists in the data!
@@ -979,38 +1046,6 @@ sample_null_model.blm <- function(x) {
 
     # Return
     return(x)
-  }
-
-}
-
-# Evaluate model Bayes' Factor
-# Based on Wagemakers (2007)
-# Compare the model against the Null, meaning
-#  H0: intercept-only fits better
-#  HA: model containing predictors fits better
-evaluate_model_BF.blm <- function(x) {
-
-  # If the model does not contain a null model ...
-  if(!contains(x, "null_model")) {
-
-    return(x)
-
-  } else {
-
-    nm <- get_value(x, "null_model")
-
-    # Compute the bayes factor
-    mod_BF <- BF(
-      BIC_blm(nm$input$n, nm$DIC$DIC$`Eff. P`, nm$DIC$DIC$LL),
-      BIC_blm(x$input$n, x$DIC$DIC$`Eff. P`, x$DIC$DIC$LL)
-    )
-
-    # Add to model
-    x$mod_BF <- mod_BF
-
-    # Return
-    return(x)
-
   }
 
 }

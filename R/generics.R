@@ -339,6 +339,32 @@ sample_null_model <- function(x) {
   UseMethod("sample_null_model", x)
 }
 
+#' Evaluate the model Bayes Factor
+#'
+#' The model Bayes Factor computes the evidence of the model versus the evidence found in the intercept-only model. To compute the model Bayes Factor, the user needs to explicitly state that they want to compute the null model (see examples). This Bayes Factor value is approximated using Wagemakers' approximation (see below for citation).
+#'
+#' @seealso Wagenmakers, E. J. (2007). A practical solution to the pervasive problems of p values. Psychonomic bulletin & review, 14(5), 779-804.
+#'
+#' @examples
+#' # Load the directors data
+#' data("directors")
+#' # Fit a blm model
+#' fit <- blm("Compensation ~ Age", data=directors) %>%
+#'    # Compute the null model next to the desired model
+#'    compute_null_model() %>%
+#'    # Sample posterior data
+#'    sample_posterior()
+#' # Check the convergence of the null model
+#' plot(fit, "nullmodel")
+#' # The Bayes Factor is in the summary
+#' summary(fit)
+#'
+#' @return blm object with additional slot called 'model_BF' containing Bayes Factor information
+#' @export
+evaluate_model_BF <- function(x) {
+  UseMethod("evaluate_model_BF", x)
+}
+
 # ---------- Functions for priors ---------------
 
 #' Draw a value from a prior distribution

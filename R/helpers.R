@@ -61,7 +61,7 @@ history_plot <- function(samples) {
     ggplot2::scale_color_brewer(palette = "Set1", name = "chain",
                                 labels = paste0("chain ", 1:length(unique(samples$chain)))) +
     theme_blm() +
-    ggplot2::theme(axis.title = element_blank()) +
+    ggplot2::theme(axis.title = ggplot2::element_blank()) +
     ggplot2::facet_wrap("parameter ~ .", scales = "free_y",
                         ncol=2) +
     ggplot2::labs(title = "Trace plot", subtitle = "each chain is indicated by its own color")
@@ -77,7 +77,7 @@ density_plot <- function(samples) {
     ggplot2::scale_color_brewer(palette = "Set1", name = "chain",
                                 labels = paste0("chain ", 1:length(unique(samples$chain)))) +
     theme_blm() +
-    ggplot2::theme(axis.title = element_blank()) +
+    ggplot2::theme(axis.title = ggplot2::element_blank()) +
     ggplot2::facet_wrap("parameter ~ .", scales = "free") +
     ggplot2::labs(title = "Posterior densities", subtitle = "each chain is indicated by its own color")
 
@@ -219,7 +219,9 @@ DIC <- function(X, y, posterior_samples) {
 BIC_blm <- function(n, p, LL) {
   log(n)*p - 2*LL
 }
+
 # Calculate the Bayes factor of the model against the null model
+# See Wagemakers 2007
 BF <- function(BIC0, BIC1) {
   exp((BIC0 - BIC1)/2)
 }

@@ -1,10 +1,20 @@
 ## Methods for miscellaneous classes
 
 # Summary method for DIC
+#' @param ... DIC of the intercept-only model (if available)
 #' @export
-summary.DIC <- function(x) {
+summary.DIC <- function(x, ...) {
 
   names(x) <- "Model fit"
+
+  # Get opts
+  opts <- list(...)
+  # If element in opts
+  if(length(opts) > 0) {
+    x[[1]] <- rbind(opts[[1]][[1]], x[[1]])
+    row.names(x[[1]]) <- c("Null model", "User model")
+  }
+
   print.listof(x)
 
 }
@@ -21,6 +31,21 @@ summary.R2 <- function(x) {
 
   # Print
   print.listof(list("Model R-squared" = tab))
+
+}
+
+# Summary method for Model Bayes Factor
+#' @export
+summary.BF <- function(x) {
+
+  printBF <- list(
+    "Wagemakers' Approx. Bayes Factor" = data.frame(
+      "BF" = round(x$BF, digits=4)
+    )
+  )
+
+  # Print
+  print.listof(printBF)
 
 }
 
