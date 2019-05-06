@@ -995,13 +995,13 @@ evaluate_model_BF.blm <- function(x) {
           "n" = nm$input$n,
           "p" = nm$DIC$DIC$`Eff. P`,
           "Neg. LL" = nm$DIC$DIC$LL,
-          "BIC" = BIC_blm(nm$input$n, round(nm$DIC$DIC$`Eff. P`), nm$DIC$DIC$LL)
+          "BIC" = BIC_blm(nm$input$n, round(nm$DIC$DIC$`Eff. P`, digits=2), nm$DIC$DIC$LL)
           ),
         "model1" = list(
           "n" = x$input$n,
           "p" = x$DIC$DIC$`Eff. P`,
           "Neg. LL" = x$DIC$DIC$LL,
-          "BIC" = BIC_blm(x$input$n, round(x$DIC$DIC$`Eff. P`), x$DIC$DIC$LL)
+          "BIC" = BIC_blm(x$input$n, round(x$DIC$DIC$`Eff. P`, digits=2), x$DIC$DIC$LL)
         )
       )
     )

@@ -28,5 +28,5 @@ summary(fit)
 
 }
 \seealso{
-Wagenmakers, E. J. (2007). A practical solution to the pervasive problems of p values. Psychonomic bulletin & review, 14(5), 779-804.
+Wagenmakers, E. J. (2007). A practical solution to the pervasive problems of p values. Psychonomic bulletin & review, 14(5), pp. 796-799.
 }

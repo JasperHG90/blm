@@ -343,7 +343,7 @@ sample_null_model <- function(x) {
 #'
 #' The model Bayes Factor computes the evidence of the model versus the evidence found in the intercept-only model. To compute the model Bayes Factor, the user needs to explicitly state that they want to compute the null model (see examples). This Bayes Factor value is approximated using Wagemakers' approximation (see below for citation).
 #'
-#' @seealso Wagenmakers, E. J. (2007). A practical solution to the pervasive problems of p values. Psychonomic bulletin & review, 14(5), 779-804.
+#' @seealso Wagenmakers, E. J. (2007). A practical solution to the pervasive problems of p values. Psychonomic bulletin & review, 14(5), pp. 796-799.
 #'
 #' @examples
 #' # Load the directors data

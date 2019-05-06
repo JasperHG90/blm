@@ -1,6 +1,8 @@
 ## Methods for miscellaneous classes
 
-# Summary method for DIC
+#' Summary method for DIC
+#'
+#' @param x DIC object from blm library
 #' @param ... DIC of the intercept-only model (if available)
 #' @export
 summary.DIC <- function(x, ...) {

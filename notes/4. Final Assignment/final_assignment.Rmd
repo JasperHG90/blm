@@ -33,6 +33,9 @@ library(gridExtra)
 # Get the directors data
 data("directors")
 
+# Keep for later
+dirs <- directors
+
 # Preprocess directors data
 # This is a subset of the original (proprietary) dataset
 # 5 sectors have not been included due to bimodality in the data. 
@@ -48,10 +51,9 @@ directors <- directors %>%
 # Load models 
 # i.e. prevent R from re-running the models the entire time when knitting the doc (this takes a long time).
 # Instead, run code line-by-line if you need to.
-dirmod0 <- readRDS("model0.rds")
-dirmod1 <- readRDS("model1.rds")
-dirmod2 <- readRDS("model2.rds")
-resm2 <- readRDS("model3.rds")
+dirmod1 <- readRDS("models/model1.rds")
+dirmod2 <- readRDS("models/model2.rds")
+resm2 <- readRDS("models/model3.rds")
 ```
 
 ```{r julia setup}
@@ -67,8 +69,8 @@ Problem statement, literature & hypotheses
 
 Table XX below shows the descriptive statistics for each variable. The outcome variable **compensation** is given in thousands of Great British pounds and has been log-transformed.
 
-```{r descriptive statistics, eval=TRUE, results='asis'}
-out <- capture.output(stargazer::stargazer(directors, summary=TRUE, median=TRUE))
+```{r descriptive statistics, eval=FALSE, results='asis'}
+out <- capture.output(stargazer::stargazer(dirs, summary=TRUE, median=TRUE))
 cat(paste0(out[-1:-3], "\n"))
 ```
 
@@ -91,32 +93,6 @@ $$
 \end{aligned}
 $$
 
-```{r model0, include=FALSE}
-# The Null or intercept-only model
-dirmod0 <- blm("Compensation ~ 1",
-                    data=directors) %>%
-  # Set sampling options
-  set_sampling_options(chains = 2, iterations = 20000,
-                       burn = 2000, thinning=3) %>%
-  # Set initial values
-  set_initial_values(chain_1 = list("b" = c(3), "sigma" = 1),
-                     chain_2 = list("b" = c(2), "sigma" = 2)) %>%
-  # Sample
-  sample_posterior() 
-
-# Check convergence
-plot(dirmod0, "history") # Ok
-plot(dirmod0, "autocorrelation") # Ok
-plot(dirmod0, "density") # Ok
-
-# Diagnostics
-dirmod0 %>% evaluate_convergence_diagnostics() # Ok
-
-# DIC
-summary(dirmod0)
-saveRDS(dirmod0, "model0.rds")
-```
-
 ```{r model1, include = FALSE}
 ## Run two linear models with blm.
 
@@ -132,6 +108,8 @@ dirmod1 <- blm("Compensation ~ Age + Male",
   # Set initial values
   set_initial_values(chain_1 = list("b" = c(7, -5, 0), "sigma" = 1),
                      chain_2 = list("b" = c(-5, 0, 7), "sigma" = 2)) %>%
+  # Compute null model as well
+  compute_null_model() %>%
   # Sample
   sample_posterior() %>%
   # Compute posterior predictive checks (using a random sample of 50% of the data)
@@ -140,6 +118,9 @@ dirmod1 <- blm("Compensation ~ Age + Male",
 # Sanity check for coefficients ==> compare to linear model
 coef(dirmod1)
 coef(lm("Compensation ~ Age + Male", data=directors))
+
+# Check convergence for intercept-only model
+plot(dirmod1, "nullmodel") # OK
 
 # Inspect convergence
 dirmod1 %>%
@@ -192,7 +173,7 @@ dirmod1 %>%
 # Soooo, the average correlation in the observed data is +-.46
 
 # Save this model
-saveRDS(dirmod1, "model1.rds")
+saveRDS(dirmod1, "models/model1.rds")
 ```
 
 ```{r model2, include = FALSE}
@@ -227,6 +208,8 @@ dirmod2 <- dirmod2 %>%
   # This is an issue for MH because it takes many more iterations to converge
   set_initial_values(chain_1 = list("b" = c(4, 2, 3, 8, 10), "sigma"= 1),
                      chain_2 = list("b" = c(2, 4, 7, 2, 3), "sigma"=2)) %>%
+  # Compute null model
+  compute_null_model() %>%
   # Sample the posterior distribution
   sample_posterior()
 
@@ -322,28 +305,12 @@ p <- plot(dirmod2$ppc, "independence") ; plot(p) # Two-sided test ==> violation 
 dirmod2 %>%
   get_value("DIC") %>%
   summary()# ==> DIC is 487.895 with 6 parameters ==> fit is better than model 1
+
+# Save this model
+saveRDS(dirmod2, "models/model2.rds")
 ```
 
-```{r bayes factors}
-# Bayes factor where we compare NULL model against the alternative
-
-# M1
-bf1 <- BF(BIC_blm(dirmod0$input$n, dirmod0$DIC$DIC$`Eff. P`, dirmod0$DIC$DIC$LL),
-          BIC_blm(dirmod1$input$n, dirmod1$DIC$DIC$`Eff. P`, dirmod1$DIC$DIC$LL))
-bf1
-
-# M2
-bf2 <- BF(BIC_blm(dirmod0$input$n, dirmod0$DIC$DIC$`Eff. P`, dirmod0$DIC$DIC$LL),
-          BIC_blm(dirmod2$input$n, dirmod2$DIC$DIC$`Eff. P`, dirmod2$DIC$DIC$LL))
-bf2
-
-# Multilevel model
-bf3 <- BF(BIC_blm(dirmod0$input$n, dirmod0$DIC$DIC$`Eff. P`, dirmod0$DIC$DIC$LL),
-          BIC_blm(dirmod2$input$n, 47, -116.5))
-bf3
-```
-
-```{r PPC results, eval=FALSE, fig.width=7, fig.height=2, fig.cap="Observed and simulated correlation coefficients for model 1 (left) and model 2 (right). The figure shows that the observed residuals (in red) are much more correlated than is reasonable under the model (represented by the blue, simulated values)."}
+```{r PPC results, eval=TRUE, fig.width=7, fig.height=2, fig.cap="A random subset of observed and simulated correlation coefficients for model 1 (left) and model 2 (right). The figure shows that the observed residuals (in red) are much more correlated than is reasonable under the model (represented by the blue, simulated values)."}
 # Collect ppc results
 ppc1 <- do.call(cbind.data.frame, dirmod1$ppc$results)
 ppc2 <- do.call(cbind.data.frame, dirmod2$ppc$results)
@@ -352,15 +319,52 @@ ppc2 <- do.call(cbind.data.frame, dirmod2$ppc$results)
 ppc_results <- round(rbind(ppc1, ppc2), digits=4)
 row.names(ppc_results) <- c("Model 1", "Model 2")
 
-# Plot ppc independence for both models
-ppcindp_m1 <- plot(dirmod1 %>%
-                    get_value("ppc"), 
-                  "independence")
-ppcindp_m2 <- plot(dirmod2 %>%
-                    get_value("ppc"), 
-                  "independence") 
+# Get values for independence ppc
+indeppc1 <- dirmod1 %>% get_value("ppc") %>%
+  get_value("data") %>% .$independence %>%
+  as.data.frame() %>%
+  tidyr::gather(type, value) %>%
+  mutate(type = ifelse(type == "V1", "Simulated", "Observed"),
+         samp = runif(1:n())) %>%
+  filter(samp <= .15) %>%
+  group_by(type) %>%
+  mutate(index = 1:n()) %>%
+  ggplot(aes(x=index, y=value, color=type)) +
+    geom_point() +
+    theme_blm() +
+    scale_color_brewer(palette = "Set1") +
+    theme(axis.text.x = element_blank(),
+          legend.title = element_text(rel(1.2)),
+          legend.text = element_text(rel(1.2)),
+          axis.title.y = element_text(size=12),
+          axis.title.x = element_blank(),
+          legend.position = "none") +
+    scale_y_continuous(name = latex2exp::latex2exp("Pearson corr. coef.")) +
+  labs(title="(b) Model 2", subtitle = "PPC independence of errors")
 
-grid.arrange(ppcindp_m1, ppcindp_m2, ncol=2)
+# Model 2
+indeppc2 <- dirmod2 %>% get_value("ppc") %>%
+  get_value("data") %>% .$independence %>%
+  as.data.frame() %>%
+  tidyr::gather(type, value) %>%
+  mutate(type = ifelse(type == "V1", "Simulated", "Observed"),
+         samp = runif(1:n())) %>%
+  filter(samp <= .15) %>%
+  group_by(type) %>%
+  mutate(index = 1:n()) %>%
+  ggplot(aes(x=index, y=value, color=type)) +
+    geom_point() +
+    theme_blm() +
+    scale_color_brewer(palette = "Set1") +
+    theme(axis.text.x = element_blank(),
+          axis.title.y = element_blank(),
+          legend.title = element_text(rel(1.2)),
+          legend.text = element_text(rel(1.2)),
+          axis.title.x = element_blank(),
+          legend.position = "none") +
+  labs(title="(b) Model 2", subtitle = "PPC independence of errors")
+
+gridExtra::grid.arrange(indeppc1, indeppc2, ncol=2)
 ```
 
 From figure XX and the posterior predictive checks (table XY), we observe that the data are not independent $(\hat{r}_{\text{PPC, Model1}} = .466)$. That is, directors who are in the same board tend to are more similar to each other than directors from other boards. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards. Indeed, the results of the random effects model shows that the intra-class correlation coefficient $\rho$ equals $57\%$, meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The results of running all different stages of a multilevel model are presented in another document.] 
@@ -546,6 +550,7 @@ MAPve <- apply(ve_2, 2, median)
 ```
 
 \begin{table}[H] \centering 
+\begin{small}
   \caption{Model results } 
   \label{} 
 \begin{tabular}{@{\extracolsep{5pt}}lccc} 
@@ -553,7 +558,7 @@ MAPve <- apply(ve_2, 2, median)
 \hline \\[-1.8ex] 
  & \multicolumn{3}{c}{\textit{Dependent variable:}} \\ 
 \cline{2-4} 
-\\[-1.8ex] & \multicolumn{3}{c}{Compensation (logged)} \\ 
+\\[-1.8ex] & \multicolumn{3}{c}{Compensation (GBR '000, logged)} \\ 
 \\[-1.8ex] & (1) & (2) & (3)\\ 
 \\[-1.8ex] & Linear & Linear & Linear mixed effects \\
 \\[-1.8ex] & (blm) & (blm) & (JAGS) \\
@@ -563,27 +568,29 @@ Constant & 4.991  (4.936, 5.046) & 4.821 (4.732, 4.910) & 4.991 (4.877, 5.110) \
 SectorBasic Materials &  & .225 (.079, .370) &  \\ 
 SectorServices &  & .292 (.169, .414) &  \\ 
 Male & .065 ($-$.085, .215) & .153 (.095, .209) & \\ 
-Age & .008 (0.000, .017) & .009 (.001, .017) & 0.001 (.0035, .0155) \\ 
+Age & .008 (0.000, .017) & .009 (.001, .017) & .001 (.0035, .0155) \\ 
 \hline \\[-1.8ex] 
 \textit{(b) Random} & & & \\
-$\sigma^2_e$ & .516 & .501 & .3423 \\
-$\sigma^2_{u0}$ & & & .3992\\
+$\sigma^2_e$ & .516 & .501 & .342 \\
+$\sigma^2_{u0}$ & & & .399\\
 \hline \\[-1.8ex] 
 \textit{(c) Model Fit} \\
 Observations & 336 & 336 & 336 \\
 Companies & & & 52 \\
 DIC & 508 & 488 & 280 \\ 
 Penalty. & 4 & 6 & 47 \\ 
-R$^{2}$ & .021 & .098 & .0056 (M), .5362 (C) \\ 
+R$^{2}$ & .021 & .098 & .006 (M), .536 (C) \\ 
+BF & .112 & 37.596 & \\
 \hline \\[-1.8ex] 
 \textit{(d) Post. Pred. Checks} & & & \\
-Normality & .3609 & .3534 &  \\
-Homoskedasticity & .3261 & .607 & \\
+Normality & .361 & .353 &  \\
+Homoskedasticity & .326 & .607 & \\
 Independence & 0 & 0 & \\
 \hline 
 \hline \\[-1.8ex] 
 \textit{Note:}  & \multicolumn{3}{r}{Baseline is sector 'Financials' for models (1) and (2)} \\
 \end{tabular} 
+\end{small}
 \end{table}
 
 ```{r classical residuals}
@@ -728,12 +735,12 @@ dirmod3 <- dirmod3 %>%
   update_posterior(iterations=20000)
 
 # Save
-saveRDS(dirmod3, "model_effects_prior.rds")
+saveRDS(dirmod3, "data/model_effects_prior.rds")
 ```
 
 ```{r effect of prior variance, fig.height=2, fig.width=7, fig.cap="Effect of adjusting the prior variance of the coefficient for variable Male (a) on the posterior distribution (b). The mean is set at M=.17 which represents a 17 percent increase in compensation for males versus females. Reducing the prior variance represents increased certainty about the estimate of our domain knowledge and weights the information from the data less strongly compared to domain knowledge. The dashed lines indicate the value of the posterior means.", eval=TRUE}
 
-dirmod3 <- readRDS("model_effects_prior.rds")
+dirmod3 <- readRDS("data/model_effects_prior.rds")
 # Retrieve posterior samples for male variable, burn and label by prior variance 
 library(purrr)
 pd <- get_value(dirmod3, "posterior") %>%
@@ -832,8 +839,8 @@ flatten_array <- function(x) {
 }
 
 # Read data
-normal <- readRDS("data/ppc_normal_data.rds")
-finsim <- readRDS("data/final.rds")
+normal <- readRDS("data/simulations/ppc_normal_data.rds")
+finsim <- readRDS("data/simulations/final.rds")
 heterosked <- finsim$heterosked$results %>% 
   flatten_array() %>%
   bind_rows(.id="severity") %>%
