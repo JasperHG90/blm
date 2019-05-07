@@ -539,3 +539,6 @@ $$
 \frac{1}{\left(\frac{\vec{x}_{j}^T \cdot \vec{x}_j}{\sigma^2} +\frac{1}{\tau_{j,0}^2}\right)}
 $$
 
+# References
+
+ADD
