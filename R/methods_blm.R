@@ -473,6 +473,40 @@ set_sampler.blm <- function(x, par, type = c("Gibbs", "MH"), lambda=0.25) {
 
 }
 
+# Add a hypothesis to a blm object
+#' @export
+set_hypothesis.blm <- function(x, hypothesis_user) {
+
+  # Hypothesis in blm object?
+  if(!contains(x, "hypotheses")) {
+    x <- set_value.blm(x, "hypotheses", list())
+    # Add structure
+    class(x$hypotheses) <- "hypotheses"
+  }
+
+  # Get parameters
+  pars <- names(x$priors)
+  pars <- pars[pars != "sigma"]
+
+  # Does the hypothesis already exist?
+  current_hyps <- lapply(x$hypotheses, function(x) x$hypothesis) %>%
+    unlist()
+  # Simply return
+  if(hypothesis_user %in% current_hyps) {
+    return(x)
+  }
+
+  # Add hypothesis
+  x$hypotheses <- append(x$hypotheses, list(hypothesis(hypothesis_user, pars)))
+
+  # Set names
+  names(x$hypotheses) <- paste0("hypothesis_", 1:length(x$hypotheses))
+
+  # Return
+  return(x)
+
+}
+
 #' @export
 set_initial_values.blm <- function(x, ...) {
 
@@ -711,7 +745,7 @@ get_posterior_samples.blm <- function(x) {
 
 }
 
-# CONVERGENCE -----
+# CONVERGENCE & EVALUATION -----
 
 # Convergence diagnostics
 #' @export
@@ -779,8 +813,6 @@ evaluate_convergence_diagnostics.blm <- function(x) {
   }
 
 }
-
-# EVALUATION ----
 
 # R-squared
 #' @export
@@ -971,6 +1003,78 @@ evaluate_accepted_draws.blm <- function(x) {
 
 }
 
+# Evaluate hypotheses
+#' @export
+evaluate_hypotheses.blm <- function(x) {
+
+  # Error if no hypotheses
+  if(!contains(x, "hypotheses")) {
+    stop("No hypotheses specified.")
+  }
+
+  # Error if no posterior
+  if(!contains(x, "posterior")) {
+    stop("Posterior not yet sampled.")
+  }
+
+  # Otherwise, compute fit / complexity for each hypothesis
+  hypres <- x %>%
+    get_value("hypotheses")
+
+  # Get posterior samples
+  psamp <- x %>%
+    get_posterior_samples()
+  # Drop sigma
+  psamp <- psamp[,-ncol(psamp)]
+
+  # Get priors
+  priors <- x %>%
+    get_value("priors")
+
+  # Set colnames of posterior to parameter names
+  vn <- lapply(priors, function(x) x$varname) %>%
+    unlist() # Always in the same order as posterior
+  colnames(psamp) <- names(vn)
+
+  # SD of y
+  y_sd <- sd(x$input$y)
+
+  # For each hypothesis, evaluate
+  for(hypothesis_i in seq_along(hypres)) {
+
+    # Retrieve hypothesis
+    chyp <- hypres[[hypothesis_i]]
+
+    # Compute complexity
+    c_i <- compute_hypothesis_complexity(chyp, priors, y_sd)
+
+    # Compute fit
+    f_i <- compute_hypothesis_fit(chyp, psamp, y_sd)
+
+    # Compute bayes factor
+    BF_iu <- f_i / c_i
+
+    # Make results
+    hres <- list(
+      "complexity" = c_i,
+      "fit" = f_i,
+      "BF" = BF_iu
+    )
+
+    # Add to hypothesis
+    hypres[[hypothesis_i]]$result <- hres
+
+  }
+
+  # Set value for hypotheses
+  x <- x %>%
+    set_value("hypotheses", hypres)
+
+  # Return
+  return(x)
+
+}
+
 # Evaluate model Bayes' Factor
 # Based on Wagemakers (2007)
 # Compare the model against the Null, meaning
@@ -1023,7 +1127,7 @@ evaluate_model_BF.blm <- function(x) {
 
 }
 
-# Not exported
+# Not exported ----
 
 # Sample the null model if it exists in the data!
 # (this method is not exported)

@@ -2,7 +2,7 @@
 % Please edit documentation in R/classes.R
 \name{posterior}
 \alias{posterior}
-\title{Sets up posterior class}
+\title{Sets up posterior class used to store posterior samples}
 \usage{
 posterior(samples, burn, accepts)
 }
@@ -17,5 +17,5 @@ posterior(samples, burn, accepts)
 list containing matrices of chain values (dims: iterations x coef + 1) of object posterior
 }
 \description{
-Sets up posterior class
+Sets up posterior class used to store posterior samples
 }

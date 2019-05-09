@@ -72,6 +72,40 @@ set_prior <- function(x, ...) {
   UseMethod("set_prior", x)
 }
 
+#' Add a hypothesis to a blm model
+#'
+#' To evaluate informative hypotheses, users may add these using this function. See details for more information.
+#'
+#' @details
+#' This function accepts two kind of hypotheses. The first are 'simple' or single hypotheses, such as:
+#' \itemize{
+#'    \item{a > b}
+#'    \item{a < b}
+#'    \item{a = b}
+#'    \item{a-b < 1}
+#'    \item{2*a > 0}
+#'    \item{...}
+#' }
+#' The second kind are 'complex' or 'multiple' hypotheses which are chained with '&' (AND). Examples are:
+#' \itemize{
+#'    \item{a = 0 & b = 0}
+#'    \item{a < b & b < c}
+#'    \item{a < .1 & a > .1 OR |a| > .1}
+#'    \item{a-b < .1 & a-b > .1 OR |a-b| > .1}
+#'    \item{...}
+#' }
+#'
+#' @param x a blm object
+#' @param hypothesis_user a hypothesis.
+#'
+#' @return a blm object with a new or updated 'hypotheses' object
+#'
+#' @seealso cite Hoitink
+#' @export
+set_hypothesis <- function(x, hypothesis_user) {
+  UseMethod("set_hypothesis", x)
+}
+
 #' Sample the posterior distribution
 #'
 #' @param x blm object
@@ -189,6 +223,16 @@ evaluate_ppc <- function(x, return_all=TRUE, p=1) {
 #' @export
 evaluate_model_fit <- function(x) {
   UseMethod("evaluate_model_fit", x)
+}
+
+#' Evaluate hypotheses specified by the user
+#'
+#' @param x blm object
+#'
+#' @return returns the blm object containing Bayes' Factors
+#' @export
+evaluate_hypotheses <- function(x) {
+  UseMethod("evaluate_hypotheses", x)
 }
 
 #' Print diagnostics

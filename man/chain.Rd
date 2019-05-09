@@ -2,10 +2,10 @@
 % Please edit documentation in R/classes.R
 \name{chain}
 \alias{chain}
-\title{Set up a single chain}
+\title{Set up a single chain to pass onto an MCMC sampler}
 \usage{
 chain(priors, iterations, burn, thinning, vars, samplers, ...)
 }
 \description{
-Set up a single chain
+Set up a single chain to pass onto an MCMC sampler
 }

@@ -13,6 +13,8 @@ blmsim(n = 2000, j = 5, binary = 1, seed = NULL,
 \item{j}{number of variables}
 
 \item{binary}{number of columns with 0/1 outcomes}
+
+\item{seed}{seed for pseudo-random number generator}
 }
 \value{
 list containing true values and data frame with n rows and j columns with simulated data.

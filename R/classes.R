@@ -182,7 +182,7 @@ sampler <- function(chains, iterations, burn, thinning, vars, priors, samplers) 
 
 }
 
-#' Set up a single chain
+#' Set up a single chain to pass onto an MCMC sampler
 chain <- function(priors, iterations, burn, thinning, vars, samplers, ...) {
 
   pts <- list(...)
@@ -212,7 +212,7 @@ chain <- function(priors, iterations, burn, thinning, vars, samplers, ...) {
 
 }
 
-#' Sets up posterior class
+#' Sets up posterior class used to store posterior samples
 #'
 #' @param samples posterior samples drawn using MCMC algorithm
 #' @param burn burn-in samples to be removed
@@ -233,5 +233,35 @@ posterior <- function(samples, burn, accepts) {
 
   # Return
   return(post)
+
+}
+
+#' Pass a hypothesis and parse it. THen return object of class 'hypothesis'
+#'
+#' Hypotheses are used to do Bayesian hypothesis testing using Bayes' Factors
+#'
+#' @param hypothesis_user a hypothesis passed by the user.
+#' @param parameters parameters used in the model (e.g. b0, b1, b2 ...)
+#'
+#' @return object of class 'hypothesis' containing the original hypothesis and its parsed and checked version
+hypothesis <- function(hypothesis_user, parameters) {
+
+  # Parse hypothesis
+  hypothesis_parsed <- parse_hypothesis(hypothesis_user)
+
+  # Check if variable names in data
+  check_hypothesis(hypothesis_parsed, parameters)
+
+  # Results
+  hyp <- list(
+    "hypothesis" = hypothesis_user,
+    "parsed" = hypothesis_parsed
+  )
+
+  # Add structure
+  class(hyp) <- "hypothesis"
+
+  # Return parsed hypothesis
+  return(hyp)
 
 }

@@ -76,12 +76,12 @@ scale_coef <- function(x, y) {
 }
 
 # Priors
-prior_b0 <- rnorm(40000, fit$priors$b0$mu, fit$priors$b0$sd) %>%
-  scale_coef(fit$input$y)
+prior_b0 <- rnorm(40000, priors$b0$mu, priors$b0$sd) %>%
+  scale_coef(.,fit$input$y)
 prior_b1 <- rnorm(40000, fit$priors$b1$mu, fit$priors$b1$sd) %>%
-  scale_coef(fit$input$y)
-prior_b2 <- rnorm(40000, fit$priors$b1$mu, fit$priors$b1$sd) %>%
-  scale_coef(fit$input$y)
+  scale_coef(.,fit$input$y)
+prior_b2 <- rnorm(40000, priors$b2$mu, priors$b2$sd) %>%
+  scale_coef(.,fit$input$y)
 
 # Posteriors
 postsamp <- fit %>%

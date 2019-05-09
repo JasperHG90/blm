@@ -65,6 +65,160 @@ blm_setup()
 
 Problem statement, literature & hypotheses
 
+# Differences in Bayesian and Frequentist inference
+
+https://en.wikipedia.org/wiki/Probability_interpretations
+
+- Interpretation of random variables ==> Bayesian: data fixed but parameters random (what are implication?)
+
+Much of the differences between Frequentist and Bayesian inference stems epistemological differences in their views of probability. In the Frequentist framework, probabilities are looked upon as the limiting value of the number of $k$ successes in a sequence of $n$ trials [CITE/CHANGE/DIRECT QUOTE FROM STACKEX], or:
+
+$$
+\tag{1}
+\begin{aligned}
+p = \lim_{n \to \infty} \frac{k}{n}
+\end{aligned}
+$$
+
+The implications of this definition are that (1) probabilities make sense only in the context of infinite trials, and (2) the probability is *fixed* in the population and our uncertainty about it reduces as we repeatedly take more (or larger) samples. In particular, this definition implies that parameters are fixed [CITE/BACK UP], and that the only source of randomness by which our estimate $\hat{p}$ differs from the true value $p$ comes from the data, which may differ from sample to sample due to e.g. sampling error.
+
+[EPISTEMLOGICAL/ONTOLOGICAL DIFFERENCES]
+
+[ASYMPTOTIC ESTIMATORS ETC.] ==> mathematically Frequentist statistics makes sense.
+
+The Bayesian framework looks upon probabilities as a means of quantifying uncertainty about decisions [CHECK]. Even though the 'true' parameter value may be fixed, we are limited by our knowledge of this value. Hence, the uncertainty by which we make statements about the world changes as we collect more information which is represented by the posterior distribution.
+
+The implication of these different interpretations of probability is illustrated by the difference in interpretation of the confidence interval and the credible interval. When we calculate the confidence interval [REFER TO CENTRAL LIMIT THEOREM/FREQUENCY OF SAMPLING MEANS], the boundaries of the confidence intervals are interpreted as random variables due to sampling error (since they estimate the frequency of sampling means). With a credible interval, we do not have this source of variability, which gives rise to the definition that the parameter is contained by the credible interval with some probability because the parameter space is assumed to be known under the assumptions by which we arrived at the posterior distribution [CHECK].
+
+--> Probability of the null hypothesis (p 161, 162 Berger & Benny). "Flipping" of the hypothesis 
+
+- Endless transformations on posterior distribution
+
+- Frequentists obscure the interpretation process, Bayesian obscure the posterior distribution collection process
+
+Frequentist statistics obscures the interpretation of critical statistics to the point where students learn the heuristics ('p-value is significant') before truly understanding what that heuristic means. Conversely, Bayesian statistics provides an explicit description of a model and its assumptions and has an intuitive interpretation of statistical results. However, the approach obfuscates the estimation method by using the arcane process of Markov Chain Monte Carlo (MCMC) sampling. 
+
+- Incorporating domain knowledge
+
+In frequentist statistical inference, evidence may originate only from the data. This is not the case in Bayesian statistical inference, where inferences are based on a mix of domain expertise (*prior*/*belief*) and evidence from the data. 
+
+The claim that the Frequentist approach is more objective would hold only in a universe where the data collection process is guaranteed to be objective. This is a tenuous assumption at best in social science data (how else would we get by that memorable phrase 'lies, damned lies and statistics'?); the way in which we collect data is fraught with subjective decisions during data collection, manipulation and analysis [CITE]. Data, in and of itself, is not objective [CITE], and the critique leveled at Bayesians boils down to the practice of incorporating domain knowledge *explicitly* through the use of a prior. It does, however, raise the question of the extent to which the use of priors influence the analysis. This is illustrated in figure XX below in the case of the directors data. Here, we show the result of increasing the certainty of our prior belief (translates to smaller variance).
+
+```{r calculate prior variance effect}
+# Posterior shrinkage
+dirmod3 <- blm("Compensation ~ Sector + Age + Male",
+                data=directors) %>%
+  # Need to delete posterior when we change settings
+  # (only has an effect if posterior already present)
+  delete_posterior() %>%
+  # Set an informative prior on the coefficients
+  # Male (b4) is speculated to have 17% pay increase over women
+  set_prior("b4", mu = .17, sd=0.001) %>%
+  # Update sampling settings
+  set_sampling_options(chains = 2, iterations = 20000,
+                       burn = 4000, thinning=3) %>%
+  # Set initial values
+  # If we draw from the priors the starting values will be too large
+  # This is an issue for MH because it takes many more iterations to converge
+  set_initial_values(chain_1 = list("b" = c(4, 2, 3, 8, 10), "sigma"= 1),
+                     chain_2 = list("b" = c(2, 4, 7, 2, 3), "sigma"=2)) %>%
+  # Sample the posterior distribution
+  sample_posterior()
+
+# Change prior and run for another 600000 observations
+dirmod3 <- dirmod3 %>%
+  set_prior("b4", mu = .17, sd=0.01) %>%
+  update_posterior(iterations=20000)
+# Same
+dirmod3 <- dirmod3 %>%
+  set_prior("b4", mu = .17, sd=0.1) %>%
+  update_posterior(iterations=20000)
+
+# Save
+saveRDS(dirmod3, "data/model_effects_prior.rds")
+```
+
+```{r effect of prior variance, fig.height=2, fig.width=7, fig.cap="Effect of adjusting the prior variance of the coefficient for variable Male (a) on the posterior distribution (b). The mean is set at M=.17 which represents a 17 percent increase in compensation for males versus females. Reducing the prior variance represents increased certainty about the estimate of our domain knowledge and weights the information from the data less strongly compared to domain knowledge. The dashed lines indicate the value of the posterior means.", eval=TRUE}
+
+dirmod3 <- readRDS("data/model_effects_prior.rds")
+# Retrieve posterior samples for male variable, burn and label by prior variance 
+library(purrr)
+pd <- get_value(dirmod3, "posterior") %>%
+  get_value("samples") %>%
+  map(function(x) {
+    r1 <- x[4001:20000,"Male"]
+    r2 <- x[24001:40000, "Male"]
+    r3 <- x[44001:60000, "Male"]
+    return(
+      data.frame(
+        "Male" = c(r1, r2, r3),
+        "Prior" = factor(c(rep(1, length(r1)),rep(2, length(r2)), rep(3, length(r3))),
+                         labels = c("0.001", "0.01", "0.1"))
+      )
+    )
+  }) %>%
+  bind_rows()
+
+# Calculate SD by prior
+pd_sd <- pd %>%
+  group_by(Prior) %>%
+  summarize(psd = sd(Male),
+            pmn = mean(Male))
+
+# Posterior z-value
+zscore <- function(mean, sd, theta) (mean - theta) / sd
+z1 <- zscore(pd_sd$pmn[1], pd_sd$psd[1], .17)
+z2 <- zscore(pd_sd$pmn[2], pd_sd$psd[2], .17)
+z3 <- zscore(pd_sd$pmn[3], pd_sd$psd[3], .17)
+
+# Posterior scaling of sd
+ps1 <- pd_sd$psd[1]^2 / as.numeric(levels(pd_sd$Prior)[1])^2 # 841
+ps2 <- pd_sd$psd[2]^2 / as.numeric(levels(pd_sd$Prior)[2])^2 # 35
+ps3 <- pd_sd$psd[3]^2 / as.numeric(levels(pd_sd$Prior)[3])^2 # 0.53
+
+# Posterior means
+pms <- round(pd_sd$pmn, digits=3)
+
+library(ggplot2)
+library(ggpubr)
+priorvar <- ggplot(data.frame(
+  "Male" = c(rnorm(10000, mean=.17, sd=0.001), 
+             rnorm(10000, mean=.17, sd=.01), 
+             rnorm(10000, mean=.17, sd=.1)),
+  "Prior" = factor(c(rep(1, 10000), rep(2, 10000), rep(3, 10000)), labels = c("0.001", "0.01", "0.1"))
+  ),
+  aes(x=Male, fill=Prior)) +
+  geom_histogram(alpha=0.4, position="identity", color="black") +
+  theme_blm(text_size = 9) +
+  theme(axis.title = element_blank(),
+        axis.text.y=element_blank()) +
+  scale_fill_brewer(palette = "Set1",
+                    name="Prior variance") +
+  labs(title = "(a) Prior distribution")
+
+# Posterior distribution
+postvar <- ggplot(pd, aes(x=Male, fill=Prior)) +
+  geom_histogram(alpha=0.4, position="identity", color="black") +
+  theme_blm(text_size = 9) +
+  theme(axis.title = element_blank(),
+        axis.text.y=element_blank()) +
+  geom_vline(xintercept = pms[1], color=RColorBrewer::brewer.pal(3, "Set1")[1], 
+             linetype="dashed", size=1.2) +
+  geom_vline(xintercept = pms[2], color=RColorBrewer::brewer.pal(3, "Set1")[2], 
+             linetype="dashed", size=1.2) +
+  geom_vline(xintercept = pms[3], color=RColorBrewer::brewer.pal(3, "Set1")[3], 
+             linetype="dashed", size=1.2) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(title= "(b) Posterior distribution")
+
+# Arrange plots with common legend
+ggarrange(priorvar, postvar, ncol=2, common.legend=TRUE, legend="top")
+```
+
+The effect of changing the prior variance can be summarized using a posterior shrinking factor (CITE BETANCOURT) and posterior z-score. The shrinking factor shows us the factor by which the variance of the posterior distribution shrinks or expands compared to the prior variance. The posterior z-score tells us the direction and magnitude by which the posterior mean shifts compared to the prior mean; if we are confident in the precision of our domain knowledge (resulting in small prior variance), the resulting posterior weights this information strongly and we end up with a posterior mean that lies closer to the prior mean (represented by the z-score). However, given that we have small variance, and if this is not corroborated by the data, then the shrinkage factor will be large. 
+
+If we carry this argument to its logical endpoint, it follows that we would next arrive at a means to compare these posteriors relative to each other. This, in essence, is the Bayes Factor.
+
 # Methods & Results
 
 Table XX below shows the descriptive statistics for each variable. The outcome variable **compensation** is given in thousands of Great British pounds and has been log-transformed.
@@ -601,6 +755,11 @@ BF & .112 & 37.596 & \\
 Normality & .361 & .353 &  \\
 Homoskedasticity & .326 & .607 & \\
 Independence & 0 & 0 & \\
+\hline \\[-1.8ex] 
+\textit{(e) Bayes' Factors} & & & \\
+$\text{H}_1$ & 4.5 & 5.2 &  \\
+$\text{H}_2$ & 3.4 & 6 & \\
+$\text{H}_2$ & .3 & .2 & \\
 \hline 
 \hline \\[-1.8ex] 
 \textit{Note:}  & \multicolumn{3}{r}{Baseline is sector 'Financials' for models (1) and (2)} \\
@@ -696,144 +855,6 @@ p3 <-  ggplot(veg, aes(x=rsq, fill=type)) +
 # Grid
 grid.arrange(p1, p2, p3, ncol=3)
 ```
-
-## Differences in Bayesian and Frequentist inference
-
-- Interpretation of random variables ==> Bayesian: data fixed but parameters random (what are implication?)
-
-- Same rules for probability, but different approach to testing
-
---> Probability of the null hypothesis (p 161, 162 Berger & Benny). "Flipping" of the hypothesis 
-
-- Can answer the same questions, but Bayesian more flexible
-- Endless transformations on posterior distribution
-
-- Frequentists obscure the interpretation process, Bayesian obscure the posterior distribution collection process
-
-Evidence of the the idea that we (humans) are not to be trusted when it comes to the interpretation of numbers abounds in the literature of behavioral economics. [CITE KAHNEMAN].
-
-Frequentist statistics obscures the interpretation of critical statistics to the point where students learn the heuristics ('p-value is significant') before truly understanding what that heuristic means. Conversely, Bayesian statistics provides an explicit description of a model and its assumptions and has an intuitive interpretation of statistical results. However, the approach obfuscates the estimation method by using the arcane process of Markov Chain Monte Carlo (MCMC) sampling. 
-
-- Incorporating domain knowledge
-
-In frequentist statistical inference, evidence may originate only from the data. This is not the case in Bayesian statistical inference, where inferences are based on a mix of domain expertise (*prior*/*belief*) and evidence from the data. 
-
-The claim that the Frequentist approach is more objective would hold only in a universe where the data collection process is guaranteed to be objective. This is a tenuous assumption at best in social science data (how else would we get by that memorable phrase 'lies, damned lies and statistics'?); the way in which we collect data is fraught with subjective decisions during data collection, manipulation and analysis [CITE]. Hence, many authors have argued that data, in and of itself, is not objective [CITE], and the critique leveled at Bayesians boils down to the practice of incorporating domain knowledge *explicitly* through the use of a prior. It does, however, raise the question of the extent to which the use of priors influence the analysis. This is illustrated in figure XX below in the case of the directors data. Here, we show the result of increasing the certainty of our prior belief (translates to smaller variance).
-
-```{r calculate prior variance effect}
-# Posterior shrinkage
-dirmod3 <- blm("Compensation ~ Sector + Age + Male",
-                data=directors) %>%
-  # Need to delete posterior when we change settings
-  # (only has an effect if posterior already present)
-  delete_posterior() %>%
-  # Set an informative prior on the coefficients
-  # Male (b4) is speculated to have 17% pay increase over women
-  set_prior("b4", mu = .17, sd=0.001) %>%
-  # Update sampling settings
-  set_sampling_options(chains = 2, iterations = 20000,
-                       burn = 4000, thinning=3) %>%
-  # Set initial values
-  # If we draw from the priors the starting values will be too large
-  # This is an issue for MH because it takes many more iterations to converge
-  set_initial_values(chain_1 = list("b" = c(4, 2, 3, 8, 10), "sigma"= 1),
-                     chain_2 = list("b" = c(2, 4, 7, 2, 3), "sigma"=2)) %>%
-  # Sample the posterior distribution
-  sample_posterior()
-
-# Change prior and run for another 600000 observations
-dirmod3 <- dirmod3 %>%
-  set_prior("b4", mu = .17, sd=0.01) %>%
-  update_posterior(iterations=20000)
-# Same
-dirmod3 <- dirmod3 %>%
-  set_prior("b4", mu = .17, sd=0.1) %>%
-  update_posterior(iterations=20000)
-
-# Save
-saveRDS(dirmod3, "data/model_effects_prior.rds")
-```
-
-```{r effect of prior variance, fig.height=2, fig.width=7, fig.cap="Effect of adjusting the prior variance of the coefficient for variable Male (a) on the posterior distribution (b). The mean is set at M=.17 which represents a 17 percent increase in compensation for males versus females. Reducing the prior variance represents increased certainty about the estimate of our domain knowledge and weights the information from the data less strongly compared to domain knowledge. The dashed lines indicate the value of the posterior means.", eval=TRUE}
-
-dirmod3 <- readRDS("data/model_effects_prior.rds")
-# Retrieve posterior samples for male variable, burn and label by prior variance 
-library(purrr)
-pd <- get_value(dirmod3, "posterior") %>%
-  get_value("samples") %>%
-  map(function(x) {
-    r1 <- x[4001:20000,"Male"]
-    r2 <- x[24001:40000, "Male"]
-    r3 <- x[44001:60000, "Male"]
-    return(
-      data.frame(
-        "Male" = c(r1, r2, r3),
-        "Prior" = factor(c(rep(1, length(r1)),rep(2, length(r2)), rep(3, length(r3))),
-                         labels = c("0.001", "0.01", "0.1"))
-      )
-    )
-  }) %>%
-  bind_rows()
-
-# Calculate SD by prior
-pd_sd <- pd %>%
-  group_by(Prior) %>%
-  summarize(psd = sd(Male),
-            pmn = mean(Male))
-
-# Posterior z-value
-zscore <- function(mean, sd, theta) (mean - theta) / sd
-z1 <- zscore(pd_sd$pmn[1], pd_sd$psd[1], .17)
-z2 <- zscore(pd_sd$pmn[2], pd_sd$psd[2], .17)
-z3 <- zscore(pd_sd$pmn[3], pd_sd$psd[3], .17)
-
-# Posterior scaling of sd
-ps1 <- pd_sd$psd[1]^2 / as.numeric(levels(pd_sd$Prior)[1])^2 # 841
-ps2 <- pd_sd$psd[2]^2 / as.numeric(levels(pd_sd$Prior)[2])^2 # 35
-ps3 <- pd_sd$psd[3]^2 / as.numeric(levels(pd_sd$Prior)[3])^2 # 0.53
-
-# Posterior means
-pms <- round(pd_sd$pmn, digits=3)
-
-library(ggplot2)
-library(ggpubr)
-priorvar <- ggplot(data.frame(
-  "Male" = c(rnorm(10000, mean=.17, sd=0.001), 
-             rnorm(10000, mean=.17, sd=.01), 
-             rnorm(10000, mean=.17, sd=.1)),
-  "Prior" = factor(c(rep(1, 10000), rep(2, 10000), rep(3, 10000)), labels = c("0.001", "0.01", "0.1"))
-  ),
-  aes(x=Male, fill=Prior)) +
-  geom_histogram(alpha=0.4, position="identity", color="black") +
-  theme_blm(text_size = 9) +
-  theme(axis.title = element_blank(),
-        axis.text.y=element_blank()) +
-  scale_fill_brewer(palette = "Set1",
-                    name="Prior variance") +
-  labs(title = "(a) Prior distribution")
-
-# Posterior distribution
-postvar <- ggplot(pd, aes(x=Male, fill=Prior)) +
-  geom_histogram(alpha=0.4, position="identity", color="black") +
-  theme_blm(text_size = 9) +
-  theme(axis.title = element_blank(),
-        axis.text.y=element_blank()) +
-  geom_vline(xintercept = pms[1], color=RColorBrewer::brewer.pal(3, "Set1")[1], 
-             linetype="dashed", size=1.2) +
-  geom_vline(xintercept = pms[2], color=RColorBrewer::brewer.pal(3, "Set1")[2], 
-             linetype="dashed", size=1.2) +
-  geom_vline(xintercept = pms[3], color=RColorBrewer::brewer.pal(3, "Set1")[3], 
-             linetype="dashed", size=1.2) +
-  scale_fill_brewer(palette = "Set1") +
-  labs(title= "(b) Posterior distribution")
-
-# Arrange plots with common legend
-ggarrange(priorvar, postvar, ncol=2, common.legend=TRUE, legend="top")
-```
-
-The effect of changing the prior variance can be summarized using a posterior shrinking factor (CITE BETANCOURT) and posterior z-score. The shrinking factor shows us the factor by which the variance of the posterior distribution shrinks or expands compared to the prior variance. The posterior z-score tells us the direction and magnitude by which the posterior mean shifts compared to the prior mean; if we are confident in the precision of our domain knowledge (resulting in small prior variance), the resulting posterior weights this information strongly and we end up with a posterior mean that lies closer to the prior mean (represented by the z-score). However, given that we have small variance, and if this is not corroborated by the data, then the shrinkage factor will be large. 
-
-If we carry this argument to its logical endpoint, it follows that we would next arrive at a means to compare these posteriors relative to each other. This, in essence, is the Bayes Factor.
 
 ## Other material
 

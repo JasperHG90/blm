@@ -21,6 +21,341 @@ contains <- function(x, val) {
 
 # Not exported -----
 
+# Functions used to parse/check hypotheses -----
+
+# Scale a vector of coefficients to unit measurement
+# This creates scaled beta coefficients
+scale_coef <- function(b, y_sd) {
+  b * sd(b) / y_sd
+}
+
+# Parse hypothesis
+#' @importFrom stringr str_detect
+#' @importFrom stringr str_split
+#' @importFrom stringr str_extract
+parse_hypothesis <- function(hypothesis_this) {
+
+  # Get from the global environment
+  operators_allowed <- getOption("blm_hypothesis_operators")$operators
+
+  # Check if operations allowed
+  detect_operator <- stringr::str_detect(hypothesis_this, operators_allowed)
+
+  # If all false, then error
+  if(all(detect_operator == FALSE)) {
+    stop(paste0("No allowed operators found in hypothesis. Allowed operators are '",
+                paste0(operators_allowed, collapse=", "), "'"))
+  }
+
+  # Which operators found?
+  # Split into: primary operators (>, <, =)
+  # Group operators (|, &)
+  pops <- operators_allowed[1:3][detect_operator[1:3]]
+  gops <- operators_allowed[4:5][detect_operator[4:5]]
+
+  # If multiple primary operators found but not & then ==> error
+  if((length(gops) == 0) & (length(pops) > 1)) {
+    stop("Multiple primary operators ('=', '<', '>') passed without a group operator ('&')")
+  }
+
+  # Check for '&' (multiple hypotheses)
+  if(any(gops == "\\&")) {
+    hyps <- stringr::str_split(hypothesis_this, "\\&") %>%
+      # Trim whitespace
+      lapply(trimws) %>%
+      # To list
+      unlist() %>%
+      as.list()
+  } else {
+    hyps <- list(hypothesis_this)
+  }
+
+  # For each operator, split at left and right side
+  hyps_split <- hyps %>%
+    lapply(function(x) {
+
+      # Detect operator
+      pop_current <- stringr::str_extract(x, pops) %>%
+        na.omit(.) %>%
+        as.character()
+
+      # Split string
+      sp <- stringr::str_split(x, pop_current)[[1]] %>%
+        trimws()
+
+      # Check length
+      if(length(sp) > 2) {
+        stop(paste0("Too many elements in hypothesis: '", paste0(pop_current), "'"))
+      }
+
+      # Any numeric?
+      nums <- c()
+      for(i in sp) nums <- c(nums, suppressWarnings(!is.na(as.numeric(i))))
+      # Left and right parts
+      left <- ifelse(nums[1], as.numeric(sp[1]), sp[1])
+      right <- ifelse(nums[2], as.numeric(sp[2]), sp[2])
+
+      # Result
+      res <- list(
+        "operator" = pop_current,
+        "left" = list(
+          "expression" = left,
+          "abs_values" = stringr::str_detect(left, "\\|"),
+          "algebra" = stringr::str_detect(left, "\\*|\\-|\\+|\\/"),
+          "is_numeric" = nums[1]
+        ) ,
+        "right" = list(
+          "expression" = right,
+          "abs_values" = stringr::str_detect(right, "\\|"),
+          "algebra" = stringr::str_detect(right, "\\*|\\-|\\+|\\/"),
+          "is_numeric" = nums[2]
+        ))
+
+      # Parse parameter names
+      res$left$params <- parse_parameters(res$left$expression, res$left$abs_values, res$left$algebra,
+                                          res$left$is_numeric)
+      res$right$params <- parse_parameters(res$right$expression, res$right$abs_values, res$right$algebra,
+                                           res$right$is_numeric)
+
+      # Add algebra operators
+      if(res$left$algebra) {
+        res$left$algebra_operator <- stringr::str_extract(res$left$expression, "\\*|\\-|\\+|\\/")
+      }
+      if(res$right$algebra) {
+        res$right$algebra_operator <- stringr::str_extract(res$right$expression, "\\*|\\-|\\+|\\/")
+      }
+
+      # Return
+      return(res)
+
+    })
+
+  # Names of hypotheses
+  names(hyps_split) <- paste0("group_", 1:length(hyps_split))
+
+  # Add order of evaluation by reversing groups
+  hyps_split <- hyps_split[length(hyps_split):1]
+
+  # Return
+  return(hyps_split)
+
+}
+
+# Check if all parsed parameters in parameters in data
+check_hypothesis <- function(hypothesis_parsed, parameters) {
+
+  # Retrieve parameters
+  pars_in_hyp <- lapply(hypothesis_parsed, function(x) list(x$left$params, x$right$params)) %>%
+    unlist(recursive = TRUE) %>%
+    unique()
+
+  # If pars not in parameters of data, throw error
+  if(any(!pars_in_hyp %in% parameters)) {
+    stop(paste0("User passed parameters ('",
+                paste0(pars_in_hyp[!pars_in_hyp %in% parameters], collapse=", "),
+                "') in hypotheses that are not present in data"))
+  }
+
+}
+
+# Parse parameters from an expression
+#' @importFrom stringr str_replace_all
+#' @importFrom stringr str_split
+parse_parameters <- function(exp, abs_values, algebra, is_numeric) {
+  # Assign r
+  r <- exp
+  # Check abs values
+  if(abs_values) {
+    # Strip
+    r <- stringr::str_replace_all(r, "\\|", "")
+  }
+  if(algebra) {
+    r <- stringr::str_split(r, "\\*|\\-|\\+|\\/")[[1]] %>%
+      trimws()
+  }
+  if(is_numeric) {
+    r <- c()
+  }
+
+  # Is any a number?
+  # If empty
+  nnums <- c()
+  for(i in seq_along(r)){
+    if(suppressWarnings(is.na(as.numeric(r[i])))) {
+      nnums <- c(nnums, i)
+    }
+  }
+  r <- r[nnums]
+
+  return(r)
+}
+
+# Compute the complexity of a hypothesis
+# @param hypothesis_i the current hypothesis under evaluation
+# @param priors object of class priors containing prior information
+# @param y_sd standard deviation of the outcome variable y
+# CITE HOITINK
+compute_hypothesis_complexity <- function(hypothesis_i, priors, y_sd) {
+
+  # Get parsed version of the hypothesis
+  hpar <- hypothesis_i$parsed
+
+  # The order has already been reversed if multiple hypotheses!
+
+  # Get an overview of the parameters mentioned
+  params_in_hyp <- lapply(hpar, function(x) c(x$left$params, x$right$params)) %>%
+    unlist(recursive = TRUE) %>%
+    unique()
+
+  # Draw samples from the priors
+  prior_samples <- lapply(params_in_hyp, function(x) {
+
+    # Prior information
+    prinf <- priors[[x]]
+
+    # Draw
+    rnorm(50000, prinf$mu, prinf$sd) %>%
+      scale_coef(y_sd)
+
+  })
+
+  # Names
+  names(prior_samples) <- params_in_hyp
+
+  # Assign to environment
+  for(i in seq_along(prior_samples)) {
+
+    # Assign value to local scope. i.e. this has the effect of b0 <- value
+    assign(names(prior_samples)[i], prior_samples[[i]])
+
+  }
+
+  # Evaluate the parameters
+  evaluated_hyps <- rep(0, 50000)
+
+  for(i in seq_along(hpar)) {
+
+    # Current
+    cur <- hpar[[i]]
+
+    # Evaluate the expression
+    evaluated_hyps <- evaluated_hyps + eval(parse(text=paste(cur$left$expression, cur$operator, cur$right$expression)))
+
+  }
+
+  # Only accept evaluated_hyps if it is TRUE in all cases. i.e. value for pos i == # of evaluted hypotheses
+  evaluated_hyps <- ifelse(evaluated_hyps == length(hpar), 1, 0)
+
+  # Return proportion (complexity)
+  return(mean(evaluated_hyps))
+
+}
+
+# Compute the fit of a hypothesis
+# @param hypothesis_i the current hypothesis under evaluation
+# @param posterior posterior samples
+# @param y_sd standard deviation of the outcome variable y
+# CITE HOITINK
+compute_hypothesis_fit <- function(hypothesis_i, posterior, y_sd) {
+
+  # Get parsed version of the hypothesis
+  hpar <- hypothesis_i$parsed
+
+  # The order has already been reversed if multiple hypotheses!
+
+  # Get an overview of the parameters mentioned
+  params_in_hyp <- lapply(hpar, function(x) c(x$left$params, x$right$params)) %>%
+    unlist(recursive = TRUE) %>%
+    unique()
+
+  # Extract posterior from the posterior samples
+  post_samples <- vector("list", length(params_in_hyp))
+
+  # Names
+  names(post_samples) <- params_in_hyp
+
+  # Assign to environment
+  for(i in seq_along(post_samples)) {
+
+    # Assign value to local scope. i.e. this has the effect of b0 <- value
+    assign(params_in_hyp[i], posterior[,params_in_hyp[i]])
+
+  }
+
+  # Evaluate the parameters
+  evaluated_hyps <- rep(0, nrow(posterior))
+
+  for(i in seq_along(hpar)) {
+
+    # Current
+    cur <- hpar[[i]]
+
+    # Evaluate the expression
+    evaluated_hyps <- evaluated_hyps + eval(parse(text=paste(cur$left$expression, cur$operator, cur$right$expression)))
+
+  }
+
+  # Only accept evaluated_hyps if it is TRUE in all cases. i.e. value for pos i == # of evaluted hypotheses
+  evaluated_hyps <- ifelse(evaluated_hyps == length(hpar), 1, 0)
+
+  # Return proportion (fit)
+  return(mean(evaluated_hyps))
+
+}
+
+
+# Helper functions for sampling ----
+
+# Initiate initial values for a Gibbs chain
+initialize_chain_values <- function(priors) {
+
+  # For each prior, draw initial values and construct a weight matrix
+  w <- matrix(0L, nrow = length(priors)-1, ncol=1)
+
+  # To grid
+  for(i in seq_along(priors)) {
+    if(names(priors)[i] == "sigma") {
+      sigma <- draw_value(priors[[i]])
+    } else {
+      w[i,1] <- draw_value(priors[[i]])
+    }
+  }
+
+  # Return
+  return(
+    list(
+      "w" = w,
+      "sigma" = sigma
+    )
+  )
+
+}
+
+# Helper function that calls the Julia MC sampler
+mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, samplers) {
+
+  # Unroll initial values
+  w <- initial_values$w
+  # If intercept-only model, then w is a scalar. Coerce to array
+  # JuliaCall screws this up in conversion!!!
+  if(is.vector(w)) {
+    w <- matrix(w, ncol=1, nrow=1)
+
+  }
+
+  sigma <- initial_values$sigma
+
+  # Call MCMC sampler in Julia
+  r <- .blm$julia$eval("MCMC_sampler")(X, as.numeric(y), w, sigma, as.integer(iterations),
+                                       as.integer(thinning), unname(priors), unname(samplers))
+
+  # Burn
+  return(r)
+
+}
+
+# Helper functions for evaluation -----
+
 # Autocorrelation plot
 # @param pd posterior samples
 # @param chain chain to show autocorrelation plot for
@@ -84,64 +419,6 @@ density_plot <- function(samples) {
 
 }
 
-# Calculate mode
-calc_mode <- function(x) {
-  uniqv <- unique(x)
-  uniqv[which.max(tabulate(match(x, uniqv)))]
-}
-
-# Helper functions for sampling ----
-
-# Initiate initial values for a Gibbs chain
-initialize_chain_values <- function(priors) {
-
-  # For each prior, draw initial values and construct a weight matrix
-  w <- matrix(0L, nrow = length(priors)-1, ncol=1)
-
-  # To grid
-  for(i in seq_along(priors)) {
-    if(names(priors)[i] == "sigma") {
-      sigma <- draw_value(priors[[i]])
-    } else {
-      w[i,1] <- draw_value(priors[[i]])
-    }
-  }
-
-  # Return
-  return(
-    list(
-      "w" = w,
-      "sigma" = sigma
-    )
-  )
-
-}
-
-# Helper function that calls the Julia MC sampler
-mc_sampler <- function(X, y, initial_values, iterations, thinning, priors, samplers) {
-
-  # Unroll initial values
-  w <- initial_values$w
-  # If intercept-only model, then w is a scalar. Coerce to array
-  # JuliaCall screws this up in conversion!!!
-  if(is.vector(w)) {
-    w <- matrix(w, ncol=1, nrow=1)
-
-  }
-
-  sigma <- initial_values$sigma
-
-  # Call MCMC sampler in Julia
-  r <- .blm$julia$eval("MCMC_sampler")(X, as.numeric(y), w, sigma, as.integer(iterations),
-                                       as.integer(thinning), unname(priors), unname(samplers))
-
-  # Burn
-  return(r)
-
-}
-
-# Helper functions for evaluation -----
-
 # Helper function for autocorrelation
 autocor <- function(x, n=10) {
 
@@ -162,6 +439,12 @@ autocor <- function(x, n=10) {
     )
   )
 
+}
+
+# Calculate mode
+calc_mode <- function(x) {
+  uniqv <- unique(x)
+  uniqv[which.max(tabulate(match(x, uniqv)))]
 }
 
 # Posterior predictive checks in julia
@@ -225,6 +508,11 @@ BIC_blm <- function(n, p, LL) {
 # See Wagemakers 2007
 BF <- function(BIC0, BIC1) {
   exp((BIC0 - BIC1)/2)
+}
+
+## Sample size helper
+sample_size <- function(n, pk) {
+  n / (1 + 2 * sum(pk))
 }
 
 # Helper functions for special cat() ----
@@ -419,13 +707,8 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
 #' @param n number of examples
 #' @param j number of variables
 #' @param binary number of columns with 0/1 outcomes
-#' @seed seed for pseudo-random number generator
+#' @param seed seed for pseudo-random number generator
 #'
 #' @return list containing true values and data frame with n rows and j columns with simulated data.
 #' @export
 blmsim <- generate_dataset
-
-## Sample size helper
-sample_size <- function(n, pk) {
-  n / (1 + 2 * sum(pk))
-}
