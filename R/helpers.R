@@ -77,7 +77,8 @@ density_plot <- function(samples) {
     ggplot2::scale_color_brewer(palette = "Set1", name = "chain",
                                 labels = paste0("chain ", 1:length(unique(samples$chain)))) +
     theme_blm() +
-    ggplot2::theme(axis.title = ggplot2::element_blank()) +
+    ggplot2::theme(axis.title = ggplot2::element_blank(),
+                   legend.position="none") +
     ggplot2::facet_wrap("parameter ~ .", scales = "free") +
     ggplot2::labs(title = "Posterior densities", subtitle = "each chain is indicated by its own color")
 
