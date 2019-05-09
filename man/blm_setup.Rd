@@ -7,7 +7,7 @@
 blm_setup(...)
 }
 \arguments{
-\item{...}{arguments passed to \code{JuliaCall::julia_setup}.}
+\item{...}{arguments passed to \code{\link{JuliaCall::julia_setup}}.}
 }
 \description{
 \code{blm_setup} runs the julia setup for the blm package

@@ -41,7 +41,7 @@ op_split <- str_split(f1, operator)[[1]] %>%
 
 ## EXAMPLE
 
-mscale <- function(x, mu, sd) {
+mscale <- function(b, y) {
   (x - mu)/sd
 }
 

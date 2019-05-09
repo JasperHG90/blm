@@ -300,14 +300,7 @@ cat.GR <- function(x) {
 
 # Misc ----
 
-# Generate a dataset with normal variables and outcome for testing purposes
-#
-# @param n number of examples
-# @param j number of variables
-# @param binary number of columns with 0/1 outcomes
-# @seed seed for pseudo-random number generator
-#
-# @return data frame with n rows and j columns.
+# See documentation below.
 generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
                              heteroskedastic = FALSE, correlated_errors = FALSE, ...) {
 
@@ -346,10 +339,6 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
     }
   }
 
-  # Coefficients
-  if(!is.null(seed)) {
-    set.seed(seed)
-  }
   # Intercept + j coefs
   coef <- c(rnorm(1, 0, 20), rnorm(j, 0, 5))
   sigmaSq <- runif(1, 1, 10)
@@ -384,11 +373,6 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
 
   } else if(correlated_errors) { # Make the example correlated
 
-    # Create a time-series object
-    if(!is.null(seed)) {
-      set.seed(seed)
-    }
-
     # Correlated values
     ord <- arima.sim(list(order = c(1,0,0), ar = degree), n = n, sd=sqrt(sigmaSq))
 
@@ -401,10 +385,6 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
                sd = sqrt(sigmaSq))
 
   } else {
-    # Sigma squared
-    if(!is.null(seed)) {
-      set.seed(seed)
-    }
 
     # Add intercept
     X <- cbind(rep(1, n), X)
@@ -432,6 +412,17 @@ generate_dataset <- function(n = 2000, j = 5, binary = 1, seed=NULL,
   )
 
 }
+
+#' Generate a dataset with normal variables and outcome for testing purposes
+#'
+#' @param n number of examples
+#' @param j number of variables
+#' @param binary number of columns with 0/1 outcomes
+#' @seed seed for pseudo-random number generator
+#'
+#' @return list containing true values and data frame with n rows and j columns with simulated data.
+#' @export
+blmsim <- generate_dataset
 
 ## Sample size helper
 sample_size <- function(n, pk) {

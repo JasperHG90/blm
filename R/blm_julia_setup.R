@@ -5,7 +5,7 @@
 #'
 #' \code{blm_setup} runs the julia setup for the blm package
 #'
-#' @param ... arguments passed to \code{JuliaCall::julia_setup}.
+#' @param ... arguments passed to \code{\link{JuliaCall::julia_setup}}.
 #'
 #' @examples
 #' \dontrun{
