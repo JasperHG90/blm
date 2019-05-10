@@ -145,10 +145,6 @@ Finish loading setup script for JuliaCall.
 
 This means you are good to go.
 
-## References
-
-The following resources were used.
-
 ## Short example
 
 To build a Bayesian Linear Model (blm) object, start by executing the following:
@@ -267,3 +263,7 @@ I used the following materials in building this library
 - Gu, X., Mulder, J., & Hoijtink, H. (2018). Approximated adjusted fractional Bayes factors: A general method for testing informative hypotheses. British Journal of Mathematical and Statistical Psychology, 71(2), 229-261.
 
 - Gu, X., Hoijtink, H., & Mulder, J. (2016). Error probabilities in default Bayesian hypothesis testing. Journal of Mathematical Psychology, 72, 130-143.
+
+- Lambert, B. [Ben Lambert]. (2018, May 17). *Introducing Bayes Factors and Marginal Likelihoods*. Retrieved from https://www.youtube.com/watch?v=T-kMpA4z-7k
+
+- Morey, R. (2014, February 9). *What is a Bayes Factor?*. [Blog Post]. Retrieved from https://bayesfactor.blogspot.com/2014/02/the-bayesfactor-package-this-blog-is.html 
