@@ -17,6 +17,7 @@ The following documents contain specific information or implementation notes:
 - [Implementation notes Metropolis-Hastings sampler](https://github.com/JasperHG90/blm/blob/master/notes/2.%20Implementation%20notes%20MH/MH.pdf)
 - [Multilevel analysis of Directors data using JAGS](https://github.com/JasperHG90/blm/blob/master/notes/6.%20Linear%20Mixed%20Effects%20in%20JAGS/multiJags.pdf)
 - [Bayes Factors](https://github.com/JasperHG90/blm/blob/master/notes/7.%20Bayes%20Factors/BF.pdf)
+- [blm function examples](https://github.com/JasperHG90/blm/blob/master/notes/5.%20blm%20example/blm.pdf)
 
 ## Folder structure
 
@@ -228,7 +229,7 @@ rate   0.01
 scale  0.01
 ```
 
-View the full example here [LINK].
+View the full example [here](https://github.com/JasperHG90/blm/blob/master/notes/5.%20blm%20example/blm.pdf).
 
 ## References
 
