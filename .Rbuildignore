@@ -4,3 +4,5 @@
 ^testing$
 ^notes$
 ^img$
+^_pkgdown\.yml$
+^docs$

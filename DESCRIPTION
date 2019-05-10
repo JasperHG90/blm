@@ -8,6 +8,8 @@ Maintainer: Jasper Ginn <jasperginn@gmail.com>
 Description: The R package blm can be used to perform Bayesian
   linear regression with informative priors. It uses a Gibbs 
   sampler implemented in Julia.
+URL: https://github.com/JasperHG90/blm
+BugReports: https://github.com/JasperHG90/blm/issues
 License: MIT
 Encoding: UTF-8
 LazyData: true
