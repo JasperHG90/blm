@@ -61,18 +61,18 @@ The folder structure is described below. Important files are annotated.
     │   └── ...
     ├── R
     │   ├── blm_julia_setup.R                       # Logic to build a bridge between R / Julia               
-    │   ├── classes.R                               # S3 classes used by blm library          
+    │   ├── classes.R                               # core S3 classes used by blm library          
     │   ├── data.R                                  # Documentation for the 'directors' data
     │   ├── generics.R                              # S3 generics for all methods defined in blm
     │   ├── ggplot_theme.R                          # ggplot2 theme used by blm plotting function
     │   ├── helpers.R                               # utility functions 
     │   ├── input_checks.R                          # helper functions that check whether inputs to key functions are valid
     │   ├── methods_blm.R                           # S3 methods for core class 'blm' 
-    │   ├── methods_hypotheses.R                    # S3 methods for class 'hypotheses' 
+    │   ├── methods_hypotheses.R                    # S3 methods for classes 'hypotheses' and 'hypothesis' 
     │   ├── methods_misc.R                          # S3 methods for minor classes 'R2' and 'DIC'
     │   ├── methods_posterior.R                     # S3 methods for class 'posterior'
     │   ├── methods_ppc.R                           # S3 methods for class 'ppc'
-    │   ├── methods_prior.R                         # S3 methods for class 'prior'
+    │   ├── methods_prior.R                         # S3 methods for classes 'prior' and 'priors'
     │   ├── methods_sampler.R                       # S3 methods for class 'sampler'
     │   ├── methods_shared.R                        # S3 methods that are shared by classes
     │   └── zzz.R                                   # Contains start-up logic when package is loaded by user
