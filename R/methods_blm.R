@@ -19,6 +19,11 @@ print.blm <- function(x) {
   print(get_value(x, "sampling_settings"))
   print(get_value(x, "priors"))
 
+  # If hypotheses, cat
+  if(contains(x, "hypotheses")) {
+    print(get_value(x, "hypotheses"))
+  }
+
 }
 
 # Summary method
@@ -110,7 +115,7 @@ summary.blm <- function(x) {
     summary(get_value(x, "rsq"))
   }
 
-  # If bayes factor, cat value
+  # If bayes factor for the model, cat value
   if(contains(x, "model_BF")) {
     # Cat model DIC
     summary(get_value(x, "DIC"),
@@ -118,10 +123,16 @@ summary.blm <- function(x) {
               get_value("null_model") %>%
               get_value("DIC"))
     summary(get_value(x, "model_BF"))
-    cat("(BF > 1 is evidence for the user-defined model against the intercept-only model)")
+    cat("(BF > 1 is evidence for the user-defined model against the intercept-only model)\n\n")
   } else {
     # Cat model DIC
     summary(get_value(x, "DIC"))
+  }
+
+  # if hypotheses
+  if(contains(x, "hypotheses")) {
+    # Cat
+    summary(get_value(x, "hypotheses"))
   }
 
 }
@@ -502,6 +513,9 @@ set_hypothesis.blm <- function(x, hypothesis_user) {
   # Set names
   names(x$hypotheses) <- paste0("hypothesis_", 1:length(x$hypotheses))
 
+  # Set class
+  class(x$hypotheses) <- "hypotheses"
+
   # Return
   return(x)
 
@@ -657,7 +671,9 @@ sample_posterior.blm <- function(x) {
     # Calculate model DIC
     evaluate_model_fit() %>%
     # Calculate model bayes factor (if null model is sampled)
-    evaluate_model_BF()
+    evaluate_model_BF() %>%
+    # Evaluate hypotheses (if exist)
+    evaluate_hypotheses()
 
   # Return blm results
   return(x)
@@ -705,7 +721,9 @@ update_posterior.blm <- function(x, iterations = 1000) {
     # Calculate R-squared
     evaluate_R2() %>%
     # Calculate model bayes factor (if null computed)
-    evaluate_model_BF()
+    evaluate_model_BF() %>%
+    # Evaluate hypotheses (if exist)
+    evaluate_hypotheses()
 
   # Update number of iterations on the sample
   x <- get_value(x, "sampling_settings") %>%
@@ -1007,9 +1025,11 @@ evaluate_accepted_draws.blm <- function(x) {
 #' @export
 evaluate_hypotheses.blm <- function(x) {
 
-  # Error if no hypotheses
+  # Silently exit if no hypotheses
   if(!contains(x, "hypotheses")) {
-    stop("No hypotheses specified.")
+
+    return(x)
+
   }
 
   # Error if no posterior

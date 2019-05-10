@@ -38,28 +38,39 @@ k <- 50000
 fit <- blm("Compensation ~ Age + Male", data=directors) %>%
   # Specify MCMC options
   set_sampling_options(iterations=k, chains=2, thinning=5) %>%
+  # Compute intercept-only model
+  compute_null_model() %>%
   # Set reasonable priors
-  set_prior("b1", mu=0, sd=.01) %>%
-  set_prior("b2", mu=.05, sd=.03) %>%
+  #set_prior("b1", mu=.01, sd=.2) %>% # 1 % increase / every year ==> 20% spread
+  #set_prior("b2", mu=.05, sd=.03) %>%
   # Set hypotheses
   # H1: Males earn about the same as females
   set_hypothesis("b0 + b2 < b0") %>%
   # H2: Directors only earn more as they get older
   set_hypothesis("b1 > 0") %>%
-  # H3: Sectors are ordered as: mu_services > mu_basic materials > mu_financial
+  #H3: Sectors are ordered as: mu_services > mu_basic materials > mu_financial
   #set_hypothesis("b0 + b4 > b0 & b0 > b0 + b3") %>%
-  set_hypothesis("|b0| > 0") %>%
+  #set_hypothesis("|b0| > 0") %>%
   # Sample posterior
   sample_posterior()
 
-# Evaluate hypotheses
+# Print blm
+print(fit)
+
+# Add another hypothesis
 fit <- fit %>%
+  set_hypothesis("b0 > 0") %>%
   evaluate_hypotheses()
 
-fit$hypotheses$hypothesis_1$result # We expect this to be true (mean males < mean females)
-fit$hypotheses$hypothesis_2$result # Age > 0 is also in line of expectation
-fit$hypotheses$hypothesis_3$result # Mu services > mu basic materials > mu financial (just for testing)
-fit$hypotheses$hypothesis_4$result # This is also in line because of course abs(b0) > 0
+# Print blm
+print(fit)
+
+# Summary
+summary(fit)
+
+fit %>%
+  get_value("hypotheses") %>%
+  summary()
 
 library(bain)
 ## Compared to Bain
@@ -68,7 +79,13 @@ regr$call$formula
 # Set seed
 set.seed(453)
 summary(regr)
-z<-bain(regr,"Male1 < Male0 ; Age > 0", standardize = TRUE)
+z<-bain(regr,"Male1 < Male0; Age > 0; Male0 > 0", standardize = TRUE)
 z # Why is BF 4 ==> it is: (fit_hypothesis / complexity_hypothesis) / (fit_complement_of_hypothesis / complexity_complement_of_hypothesis)
 
-# In case of |u1 - u2| < .2sd ==> which sd are we referring to? p.35
+# In case of |u1 - u2| < .2sd ==> which sd!! are we referring to? p.35
+# Exact equality constraints ==> how do we do this? (p.36)
+# How to calculate Pr_b ???
+
+# If complexity is 0 ==> how to deal with this numerically if f / c == BF
+
+h <- fit$hypotheses
