@@ -1,21 +1,22 @@
 # Bayesian Linear Model (`blm`)
 
-I created this R library to implement some core Bayesian ideas taught in the course "Introduction to Bayesian Statitics" at Utrecht University. Secondly, it also provided me with an opportunity to further practice Julia [LINK]. Julia code is fast, but needs to compile on the first run. Hence, the highly repetitive nature of the code for Bayesian statistics (small functions that are repeatedly used) makes Julia an ideal programming language to run Markov Chain Monte Carlo (MCMC) samplers.
+I created this R library to implement some core Bayesian ideas taught in the course "Introduction to Bayesian Statitics" at Utrecht University. Secondly, it also provided me with an opportunity to further practice [Julia](https://julialang.org/). Julia code is fast, but needs to compile on the first run. Hence, the highly repetitive nature of the code for Bayesian estimation (small functions that are repeatedly used) makes Julia an ideal programming language to run Markov Chain Monte Carlo (MCMC) samplers.
 
-Thanks to the R library JuliaCall [LINK], it is possible to create a near-seamless bridge between R code and Julia code (much like the Reticulate [LINK] library does for Python). This bridge is used as follows:
+Thanks to the R library [JuliaCall](https://github.com/Non-Contradiction/JuliaCall), it is possible to create a near-seamless bridge between R code and Julia code (much like the [Reticulate](https://rstudio.github.io/reticulate/) library does for Python). This bridge is used as follows:
 
-1. All model-building aspects are constructed in R. Users specify a model much like they would with the `lm()` function. blm imports the magrittr library [LINK] to facilitate model-building, and allows the user to build a model using a 'tidy' workflow. The functions associated with this part of the model begin with `set_` (e.g. `set_priors()`). 
-2. After the model is specified by the user, the sampling plan is executed (much like the `collect()` command from the dbplyr library [LINK]). This part calls the Julia code to draw posterior samples. The functions associated with this part of the model end with `_posterior` (e.g. `sample_posterior()`, `update_posterior()`, `delete_posterior()`).
+1. All model-building aspects are constructed in R. Users specify a model much like they would with the `lm()` function. blm imports the [magrittr](https://magrittr.tidyverse.org/) library to facilitate model building, and allows the user to build a model using a 'tidy' workflow. The functions associated with this part of the model begin with `set_` (e.g. `set_priors()`). The exception here is the function `compute_null_model()`, which (if added) computes the intercept-only model during evaluation. 
+2. After the model is specified by the user, the sampling plan is executed (much like the `collect()` command from the [dbplyr](https://github.com/tidyverse/dbplyr) library). This part calls the Julia code to draw posterior samples. The functions associated with this part of the model end with `_posterior` (e.g. `sample_posterior()`, `update_posterior()`, `delete_posterior()`).
 3. Once the posterior distribution is sampled, all plotting functionality and summary statistics of the posterior is executed in R. If additional samples or computations need to be carried out (e.g. posterior predictive checks or DIC), these are executed in Julia. The functions associated with this part start with `evaluate_` (e.g. `evaluate_model_fit()`).
 
-All core functions return S3 objects. Data embedded in these objects can be retrieved using the `get_value()` function (exported to facilitate the tidy workflow).
+All core functions return S3 objects. Data embedded in these objects can be retrieved using the `get_value()` function. To check whether an object contains a specific value, you can execute `contains()`.
 
 The following documents contain specific information or implementation notes:
 
-- [Course summary](https://github.com/JasperHG90/blm/blob/master/docs/course_summary.pdf)
-- [Implementation notes Gibbs sampler](https://github.com/JasperHG90/blm/blob/master/docs/conditionalposterior.pdf)
-- [Implementation notes Metropolis-Hastings sampler](https://github.com/JasperHG90/blm/blob/master/docs/MH.pdf)
-- Multilevel analysis of Directors data using JAGS
+- [Course summary](https://github.com/JasperHG90/blm/blob/master/notes/3.%20Course%20summary/course_summary.pdf)
+- [Implementation notes Gibbs sampler](https://github.com/JasperHG90/blm/blob/master/notes/1.%20Implementation%20notes%20Gibbs/conditionalposterior.pdf)
+- [Implementation notes Metropolis-Hastings sampler](https://github.com/JasperHG90/blm/blob/master/notes/2.%20Implementation%20notes%20MH/MH.pdf)
+- [Multilevel analysis of Directors data using JAGS](https://github.com/JasperHG90/blm/blob/master/notes/6.%20Linear%20Mixed%20Effects%20in%20JAGS/multiJags.pdf)
+- [Bayes Factors](https://github.com/JasperHG90/blm/blob/master/notes/7.%20Bayes%20Factors/BF.pdf)
 
 ## Folder structure
 
@@ -25,22 +26,39 @@ The folder structure is described below. Important files are annotated.
     │   └── directors.rda              
     ├── data-raw                                    # R script used to create 'directors.rda'
     │   └── preprocess_directors_data.R  
-    ├── docs                                        # Implementation notes, course summary and final assignment
-    │   ├── conditionalposteriors.pdf               #  - Implementation notes for Gibbs sampler               
-    │   ├── MH.pdf                                  #  - Implementation notes for Metropolis-Hastings sampler
-    │   ├── final_assigment.pdf                     #  - Final assignment for the course
-    │   ├── course_summary.pdf                      #  - Course summary
-    │   ├── multilevel_jags.pdf                     #  - multilevel analysis of the directors dataset using JAGS
+    ├── notes                                       # Implementation notes, course summary and final assignment
+    │   ├── 1. Implementation notes Gibbs    
+    │       ├── conditionalposteriors.pdf           #  - Implementation notes for Gibbs sampler
+    │       └── ...
+    │   ├── 2. Implementation notes MH 
+    │       ├── MH.pdf                              #  - Implementation notes for Metropolis-Hastings sampler
+    │       └── ...
+    │   ├── 3. Course summary
+    │       ├── course_summary.pdf                  #  - Course summary
+    │       └── ...
+    │   ├── 4. Final Assigment
+    │       ├── final_assignment.pdf                #  - Final assignment for the course
+    │       └── ...
+    │   ├── 5. blm example
+    │       ├── blm.pdf                             #  - Short example of blm code
+    │       └── ...
+    │   ├── 6. Linear Mixed Effects JAGS
+    │       ├── multilevel_jags.pdf                 #  - multilevel analysis of the directors dataset using JAGS
+    │       └── ... 
+    │   ├── 7. Bayes Factors
+    │       ├── BF.pdf                              #  - Some background and references on Informative Hypotheses and Bayes Factors
+    │       └── ... 
+    ├── docs                                        # pkgdown documents
     │   └── ...
     ├── experiments                                 # Various files used to test out new features / run simulations
-        └── ...
+    │   └── ...
     ├── img                                         # Images used by the README
-        └── ...
+    │   └── ...
     ├── inst
-        └── julia
-            └── blm.jl                              # Julia script containing core blm functions.
+    │   └── julia
+    │       └── blm.jl                              # Julia script containing core blm functions.
     ├── man                                         # Documentation for R functions used by the library
-        └── ...
+    │   └── ...
     ├── R
     │   ├── blm_julia_setup.R                       # Logic to build a bridge between R / Julia               
     │   ├── classes.R                               # S3 classes used by blm library          
@@ -50,6 +68,7 @@ The folder structure is described below. Important files are annotated.
     │   ├── helpers.R                               # utility functions 
     │   ├── input_checks.R                          # helper functions that check whether inputs to key functions are valid
     │   ├── methods_blm.R                           # S3 methods for core class 'blm' 
+    │   ├── methods_hypotheses.R                    # S3 methods for class 'hypotheses' 
     │   ├── methods_misc.R                          # S3 methods for minor classes 'R2' and 'DIC'
     │   ├── methods_posterior.R                     # S3 methods for class 'posterior'
     │   ├── methods_ppc.R                           # S3 methods for class 'ppc'

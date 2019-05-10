@@ -29,6 +29,24 @@ get_value.R2 <- function(x, var) {
 
 # Get a value from a blm or related object (internal objects)
 #' @export
+get_value.hypotheses <- function(x, var) {
+
+  ## Get this value
+  return(x[[var]])
+
+}
+
+# Get a value from a blm or related object (internal objects)
+#' @export
+get_value.hypothesis <- function(x, var) {
+
+  ## Get this value
+  return(x[[var]])
+
+}
+
+# Get a value from a blm or related object (internal objects)
+#' @export
 get_value.priors <- function(x, var) {
 
   ## Get this value
@@ -73,6 +91,7 @@ get_value.sampler <- function(x, var) {
 }
 
 # Not exported
+#' @export
 get_value.prior <-function(x, var) {
 
     ## Get this value
@@ -86,7 +105,9 @@ set_value.sampler <-
   set_value.prior <-
   set_value.posterior <-
   set_value.blm <-
-  set_value.chain <- function(x, var, val) {
+  set_value.chain <-
+  set_value.hypothesis <-
+  set_value.hypotheses <- function(x, var, val) {
 
     ## Set this value
     x[[var]] <- val
