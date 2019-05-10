@@ -18,6 +18,7 @@ The following documents contain specific information or implementation notes:
 - [Multilevel analysis of Directors data using JAGS](https://github.com/JasperHG90/blm/blob/master/notes/6.%20Linear%20Mixed%20Effects%20in%20JAGS/multiJags.pdf)
 - [Bayes Factors](https://github.com/JasperHG90/blm/blob/master/notes/7.%20Bayes%20Factors/BF.pdf)
 - [blm function examples](https://github.com/JasperHG90/blm/blob/master/notes/5.%20blm%20example/blm.pdf)
+- [R script used for Posterior Predictive Checks simulations](https://github.com/JasperHG90/blm/blob/master/experiments/2.%20Simulations%20PPC/ppc_simulations.R)
 
 ## Folder structure
 
