@@ -117,6 +117,17 @@ parse_hypothesis <- function(hypothesis_this) {
       res$right$params <- parse_parameters(res$right$expression, res$right$abs_values, res$right$algebra,
                                            res$right$is_numeric)
 
+      # If absolute values, replace | | for R command
+      if(res$left$abs_values) {
+        res$left$expression <- stringr::str_replace_all(res$left$expression, "\\|", "") %>%
+          paste0("abs(", ., ")")
+      }
+
+      if(res$right$abs_values) {
+        res$right$expression <- stringr::str_replace_all(res$right$expression, "\\|", "") %>%
+          paste0("abs(", ., ")")
+      }
+
       # Add algebra operators
       if(res$left$algebra) {
         res$left$algebra_operator <- stringr::str_extract(res$left$expression, "\\*|\\-|\\+|\\/")
@@ -278,7 +289,7 @@ compute_hypothesis_fit <- function(hypothesis_i, posterior, y_sd) {
   for(i in seq_along(post_samples)) {
 
     # Assign value to local scope. i.e. this has the effect of b0 <- value
-    assign(params_in_hyp[i], posterior[,params_in_hyp[i]])
+    assign(params_in_hyp[i], posterior[,params_in_hyp[i]] %>% scale_coef(y_sd))
 
   }
 
@@ -291,7 +302,9 @@ compute_hypothesis_fit <- function(hypothesis_i, posterior, y_sd) {
     cur <- hpar[[i]]
 
     # Evaluate the expression
-    evaluated_hyps <- evaluated_hyps + eval(parse(text=paste(cur$left$expression, cur$operator, cur$right$expression)))
+    evaluated_hyps <- evaluated_hyps + eval(parse(text=paste(cur$left$expression,
+                                                             cur$operator,
+                                                             cur$right$expression)))
 
   }
 

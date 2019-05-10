@@ -1051,14 +1051,19 @@ evaluate_hypotheses.blm <- function(x) {
     # Compute fit
     f_i <- compute_hypothesis_fit(chyp, psamp, y_sd)
 
-    # Compute bayes factor
-    BF_iu <- f_i / c_i
-
     # Make results
     hres <- list(
-      "complexity" = c_i,
-      "fit" = f_i,
-      "BF" = BF_iu
+      "hypothesis" = list(
+        "complexity" = c_i,
+        "fit" = f_i
+      ),
+      "complement" = list(
+        "complexity" = 1-c_i,
+        "fit" = 1-f_i
+      ),
+      # The Bayes Factor against complement (c) or the unconstrained hypothesis (u) ==> hoijtink p37
+      "BF_c" = ifelse((1-c_i) == 0, 0, (f_i / c_i) / ((1-f_i) / (1-c_i))),
+      "BF_u" = ifelse(c_i == 0, 0, f_i / c_i)
     )
 
     # Add to hypothesis

@@ -71,7 +71,7 @@ https://en.wikipedia.org/wiki/Probability_interpretations
 
 - Interpretation of random variables ==> Bayesian: data fixed but parameters random (what are implication?)
 
-Much of the differences between Frequentist and Bayesian inference stems epistemological differences in their views of probability. In the Frequentist framework, probabilities are looked upon as the limiting value of the number of $k$ successes in a sequence of $n$ trials [CITE/CHANGE/DIRECT QUOTE FROM STACKEX], or:
+For a large part, differences between Frequentist and Bayesian inference stems from their respective view of uncertainty and how this is captured in the probability framework. In the Frequentist framework, probabilities are looked upon as the limiting value of the number of $k$ successes in a sequence of $n$ trials [CITE/CHANGE/DIRECT QUOTE FROM STACKEX], or:
 
 $$
 \tag{1}
@@ -80,13 +80,13 @@ p = \lim_{n \to \infty} \frac{k}{n}
 \end{aligned}
 $$
 
-The implications of this definition are that (1) probabilities make sense only in the context of infinite trials, and (2) the probability is *fixed* in the population and our uncertainty about it reduces as we repeatedly take more (or larger) samples. In particular, this definition implies that parameters are fixed [CITE/BACK UP], and that the only source of randomness by which our estimate $\hat{p}$ differs from the true value $p$ comes from the data, which may differ from sample to sample due to e.g. sampling error.
+The implications of this definition are that (1) probabilities make sense only in the context of infinite trials, and (2) the probability is *fixed* in the population and our uncertainty about it reduces as we repeatedly take more (or larger) samples. In particular, this definition implies that the only source of randomness by which our estimate $\hat{p}$ differs from the true value $p$ comes from the data [CITE/BACK UP], which may differ from sample to sample due to e.g. sampling error.
 
 [EPISTEMLOGICAL/ONTOLOGICAL DIFFERENCES]
 
 [ASYMPTOTIC ESTIMATORS ETC.] ==> mathematically Frequentist statistics makes sense.
 
-The Bayesian framework looks upon probabilities as a means of quantifying uncertainty about decisions [CHECK]. Even though the 'true' parameter value may be fixed, we are limited by our knowledge of this value. Hence, the uncertainty by which we make statements about the world changes as we collect more information which is represented by the posterior distribution.
+The Bayesian framework looks upon probabilities as a means of quantifying uncertainty about knowledge [CHECK]. Even though the 'true' parameter value may be fixed, we are limited by our knowledge of this value. Hence, the uncertainty by which we make statements about the world changes as we collect more information which is represented by the posterior distribution, which may be looked upon very loosely as the collection 'true' values conditional on how certain we are about the veracity of this knowledge.
 
 The implication of these different interpretations of probability is illustrated by the difference in interpretation of the confidence interval and the credible interval. When we calculate the confidence interval [REFER TO CENTRAL LIMIT THEOREM/FREQUENCY OF SAMPLING MEANS], the boundaries of the confidence intervals are interpreted as random variables due to sampling error (since they estimate the frequency of sampling means). With a credible interval, we do not have this source of variability, which gives rise to the definition that the parameter is contained by the credible interval with some probability because the parameter space is assumed to be known under the assumptions by which we arrived at the posterior distribution [CHECK].
 
@@ -100,7 +100,7 @@ Frequentist statistics obscures the interpretation of critical statistics to the
 
 - Incorporating domain knowledge
 
-In frequentist statistical inference, evidence may originate only from the data. This is not the case in Bayesian statistical inference, where inferences are based on a mix of domain expertise (*prior*/*belief*) and evidence from the data. 
+In frequentist statistical inference, evidence may originate only from the data. This is not the case in Bayesian statistical inference, where inferences are based on a mix of domain expertise (*prior*/*belief*) and evidence from the data. This makes perfect sense in the Bayesian framework; if we are uncertain about our knowledge then constraining the parameter space by injecting what we *do* know is logical.
 
 The claim that the Frequentist approach is more objective would hold only in a universe where the data collection process is guaranteed to be objective. This is a tenuous assumption at best in social science data (how else would we get by that memorable phrase 'lies, damned lies and statistics'?); the way in which we collect data is fraught with subjective decisions during data collection, manipulation and analysis [CITE]. Data, in and of itself, is not objective [CITE], and the critique leveled at Bayesians boils down to the practice of incorporating domain knowledge *explicitly* through the use of a prior. It does, however, raise the question of the extent to which the use of priors influence the analysis. This is illustrated in figure XX below in the case of the directors data. Here, we show the result of increasing the certainty of our prior belief (translates to smaller variance).
 
@@ -258,6 +258,12 @@ $$
 $$
 \text{H}_u\text{: } \beta_\text{Male} \text{ not H}_a
 $$
+
+These hypotheses will be included in the models we construct. (Hoitjtink p.24).
+
+BF sensitive to outliers (Hoijtink pp.31-32) ==> check for outliers before BF. Also violation of model assumptions using ppc. We should use a robust BF but we don't have that. Anyway, interpret the BF with a grain of salt.
+
+Bayes' Factor is sensitive to the choice of prior ==> something about the size of complexity. (Hoijtink pp.29-30)
 
 ```{r model1, include = FALSE}
 ## Run two linear models with blm.
