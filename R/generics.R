@@ -230,6 +230,15 @@ evaluate_model_fit <- function(x) {
 #' @param x blm object
 #'
 #' @return returns the blm object containing Bayes' Factors
+#'
+#' @seealso
+#' \itemize{
+#'   \item{Hoijtink, H., Mulder, J., Van Lissa, C. J., & Gu, X. (2019). A tutorial on testing hypotheses using the Bayes factor.}
+#'   \item{Hoijtink, H., Gu, X., & Mulder, J. (2018). Bayesian evaluation of informative hypotheses for multiple populations. British Journal of Mathematical and Statistical Psychology.}
+#'   \item{Gu, X., Mulder, J., & Hoijtink, H. (2018). Approximated adjusted fractional Bayes factors: A general method for testing informative hypotheses. British Journal of Mathematical and Statistical Psychology, 71(2), 229-261.}
+#'   \item{Gu, X., Hoijtink, H., & Mulder, J. (2016). Error probabilities in default Bayesian hypothesis testing. Journal of Mathematical Psychology, 72, 130-143.}
+#' }
+#'
 #' @export
 evaluate_hypotheses <- function(x) {
   UseMethod("evaluate_hypotheses", x)

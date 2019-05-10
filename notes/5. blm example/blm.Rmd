@@ -3,7 +3,7 @@ title: "Bayesian linear regression with the blm package"
 author: "Jasper Ginn"
 output:
   pdf_document: 
-    number_sections: true
+    number_sections: false
 header-includes:
  \usepackage{float}
  \usepackage{setspace}
@@ -14,27 +14,27 @@ header-includes:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(fig.pos="H", fig.width = 5, fig.height = 4, echo = TRUE, 
-                      fig.align="center", warning = FALSE, message = TRUE)
+knitr::opts_chunk$set(fig.pos="H", fig.width = 7, fig.height = 4, echo = TRUE, 
+                      fig.align="center", warning = FALSE, message = FALSE, eval=TRUE)
 ```
 
-The `blm` package contains a simple Gibbs sampler to run a Bayesian Linear Regression model. It is written partly in R and partly in Julia. The bridge between these two languages is handled by the JuliaCall package.
+The `blm` package contains a simple Gibbs and Metropolis-Hastings sampler to run a Bayesian Linear Regression model. It is written partly in R and partly in Julia. The bridge between these two languages is handled by the [JuliaCall](https://github.com/Non-Contradiction/JuliaCall) library. Julia is a high-performing and high-level language. In the case of an MCMC sampler, we repeatedly sample from conditional posterior distributions, which amplifies the need for speed and efficiency.
 
-Julia is a high-performing and high-level language that provides a +- 18x speedup compared to R. In the case of a Gibbs sampler, we repeatedly sample from conditional posterior distributions, which amplifies the need for speed and efficiency.
+In this document, I only focus on the mechanics of the functions and not the interpretation of results.
 
 ## Setting up blm
 
 To set up the blm package, we load in in R
 
-```{r}
+```{r load, eval=TRUE}
 library(blm)
 ```
 
-This also loads the magrittr package, which is helpful because we can chain commands using the forward-operating pipe command (`%>%`).
+This also loads the [magrittr](https://magrittr.tidyverse.org/) package, which is helpful because we can chain commands using the forward-operating pipe command (`%>%`).
 
 Next, we load the Julia environment
 
-```{r}
+```{r blm setup, eval=TRUE}
 blm_setup()
 ```
 
@@ -42,29 +42,40 @@ This can take a couple of seconds.
 
 ## The data
 
-The data we will use comes from the exercises
+The data we will use is included in the `blm` library, and contains compensation data on $336$ directors in $52$ companies and $3$ sectors.
 
-```{r}
-## Exercise 2 data
-d <- haven::read_sav("../testing/Exercise 2 - Data.sav")
-df <- as.data.frame(d)
-knitr::kable(head(df))
+```{r data, eval=FALSE}
+library(table1)
+data("directors")
+dir2 <- directors
+# Add labels
+label(dir2$Compensation) <- "Compensation ('000 GBR)"
+label(dir2$Age) <- "Age (years)"
+label(dir2$Male) <- "Gender (male)"
+label(dir2$Sector) <- "Sector the company belongs to"
+table1(Compensation ~ Age + Male + Sector, data=dir2)
 ```
 
-This is simulated data. We can plot it with a simple 3D scatterplot
+```{r sumstats, echo=FALSE, eval=TRUE}
+knitr::include_graphics("sumstats.png", dpi=100)
+```
 
-```{r}
-# Plot data
-library(scatterplot3d)
-scatterplot3d(df$extraversion, df$agreeableness, df$attitude, color="lightgreen", xlab="extraversion", 
-              pch=21, ylab="agreeableness", zlab="attitude", main="Attitude ~ agreeableness + extraversion")
+From the summary statistics, we gather that the outcome variable is skewed, which is why we will use $\log{(\text{compensation})}$ rather than the untransformed variable. We also center the Age predictor and Gender predictor^[Even though Male is a categorical variable, centering it reduces autocorrelation.]
+
+```{r prep data, eval=TRUE}
+library(dplyr)
+directors <- directors %>%
+  mutate(Compensation = log(Compensation), 
+         Age = Age - mean(Age),
+         Male = as.numeric(Male),
+         Male = Male - mean(Male))
 ```
 
 For comparison purposes, we run a linear regression (lm) model using Maximum Likelihood
 
-```{r}
+```{r lm}
 # Linear model for comparison
-ffit <- lm("attitude ~ extraversion + agreeableness", data=df)
+ffit <- lm("Compensation ~ Age + Male", data=directors)
 summary(ffit)
 ```
 
@@ -72,22 +83,20 @@ summary(ffit)
 
 To fit a blm model, we call the `blm()` function, which is similar to the `lm()` function.
 
-```{r}
-bfit <- blm("attitude ~ extraversion + agreeableness", 
-            data=df, center = TRUE)
+```{r blm}
+bfit <- blm("Compensation ~ Age + Male", 
+            data=directors)
 ```
-
-The `center = TRUE` option centers the data so that we can remove traces of autocorrelation.
 
 At this point, we can call `print()` and `summary()` on the data to check the model status.
 
-```{r}
+```{r print blm}
 print(bfit)
 ```
 
 This gives us information about the data, the sampling options and the priors, which are uninformative at this point.
 
-```{r}
+```{r summary blm}
 summary(bfit)
 ```
 
@@ -98,85 +107,216 @@ We can update sampling settings as follows
 ```{r}
 bfit <- bfit %>%
   # Update sampling settings
-  sampling_options(., chains = 3, iterations = 15000, thinning = 2, burn = 2000)
+  set_sampling_options(., chains = 3, iterations = 15000, thinning = 2, burn = 2000)
 ```
 
 Priors may be made informative as follows
 
 ```{r}
 bfit <- bfit %>%
-  set_priors("b2" = prior("normal", mu=0.5, sd=2))
+  # Add priors (we're on a log scale)
+  set_prior("b1", mu=.01, sd=.2) %>% # 1 % increase / every year ==> 20% spread
+  set_prior("b2", mu=.05, sd=.03)
 print(bfit)
 ```
 
-If we are happy with these settings, we can sample from the posterior distribution. This process takes the longest during the first time you call the `sample_posterior()` function. This happens because Julia's Just-In-Time (JIT) compiler compiles the code when it is called the first time. In subsequent evaluations of the code, it then uses the already compiled code.
+To add informative hypotheses to the model, we can use `set_hypothesis()`
 
-```{r}
-# First time we call the Julia code
-t1 <- Sys.time()
+```{r hypotheses}
 bfit <- bfit %>%
-  sample_posterior()
-print(Sys.time() - t1)
+  # H1: Males earn about the same as females
+  set_hypothesis("b0 + b2 < b0") %>%
+  # H2: Directors only earn more as they get older
+  set_hypothesis("b1 > 0")
+print(bfit)
 ```
 
-```{r}
-# Subsequent iterations
-t1 <- Sys.time()
+If we do not specify initial values, then `blm` will draw these from the informative or uninformative priors. Given that we are on a log scale, it would be good to set these close to $0$.
+
+```{r initial values}
 bfit <- bfit %>%
+  # Set initial values
+  # If we draw from the priors the starting values will be too large
+  # This is an issue for MH because it takes many more iterations to converge
+  set_initial_values(chain_1 = list("b" = c(7, -5, 0), "sigma" = 1),
+                     chain_2 = list("b" = c(-5, 0, 7), "sigma" = 2)) 
+```
+
+If you want to change the sampler (i.e. use Metropolis-Hastings instead of a Gibbs sampler), then you can use `set_sampler()`. However, this is not recommended as you will only lose efficiency. The MH algorithm was implemented for didactical reasons.
+
+```{r sampler, eval=FALSE}
+bfit <- bfit %>%
+  # Change the sampler of Age to metropolis hastings (random walk)
+  # Lambda parameter controls the variance of the (normal) proposal distribution
+  set_sampler("b1", type="MH", lambda=0.01) 
+```
+
+If you want to compute the intercept-only model next to the model you are interested in, you can add the line `compute_null_model()`:
+
+```{r null model}
+bfit <- bfit %>%
+  # This has the same parameters as set_sampling_options()
+  compute_null_model()
+```
+
+You can always use `get_parameter_names()` to obtain a mapping of variables to parameters:
+
+```{r get params}
+bfit %>%
+  get_parameter_names()
+```
+
+## Sampling from the posterior
+
+If we are happy with these settings, we can sample from the posterior distribution. This process takes the longest during the first time you call the `sample_posterior()` function. This happens because Julia's Just-In-Time (JIT) compiler compiles the code when it is called the first time. In subsequent evaluations of the code, it then uses the already compiled code. To carry out the `blm` sampling plan, you execute:
+
+```{r sample posterior}
+bfit <- bfit %>%
+  # Sample the posterior
   sample_posterior()
-print(Sys.time() - t1)
 ```
 
-To observe the diagnostic information about the posterior sampling, we call `summary()`
+This has several effects:
 
-```{r}
-summary(bfit)
+1. Your sampling plan is now locked, and you can only change the burn-in value. You can delete the posterior as follows:
+
+```{r delete posterior, eval=FALSE}
+bfit <- bfit %>%
+  # Remove posterior samples
+  delete_posterior()
 ```
 
-These diagnostics give us the MAP estimates, credible intervals and Gelman-Rubin statistic for each of the coefficients. The Burn-in diagnostics are the coefficient of a linear regression performed on the squared posterior values against the iteration values. If there is a trend in the posterior values, the coefficient will be removed further away from 0.
+2. The model DIC, hypotheses, intercept-only model, model Bayes Factor and R-squared values are calculated automatically.
+3. If you want to draw more samples under the sampling plan, you can do so as follows:
 
-Next, we can plot the history plots, density plots for the posterior values and autocorrelation plots.
-
-```{r}
-plot(bfit, "history")
+```{r update posterior, eval=TRUE}
+bfit <- bfit %>%
+  # Draw more samples
+  update_posterior(iterations=10000)
 ```
 
-```{r}
+## Assessing convergence
+
+To assess convergence, we can check the convergence plots:
+
+```{r trace}
+bfit %>%
+  plot("history")
+```
+
+```{r density}
 plot(bfit, "density")
 ```
 
-```{r}
-plot(bfit, "autocorrelation", chain=1)
+```{r autocorrelation}
+plot(bfit, "autocorrelation")
 ```
 
-If these values seem OK, we can move on to the posterior predictive checks. These are simulations that check certain assumptions of the data, in this case normality and heteroskedasticity, both of which are violated by our data, as we can see from the residual plot from the linear regression model
+If these look fine, you can also view the Gelman-Rubin statistic:
 
-```{r}
-library(ggplot2)
-ggplot(data.frame("pr" = predict(ffit),
-                  "re" = resid(ffit)),
-       aes(x=pr, y=re)) +
-    geom_point() +
-    geom_smooth()
-```
-
-We can run the posterior predictive checks to test these assumptions as follows
-
-```{r}
-ppc <- bfit %>%
-  posterior_predictive_checks()
-summary(ppc)
-```
-
-We see that we are mainly violating the normality or errors assumption
-
-```{r}
-hist(resid(ffit))
-```
-
-Finally, we can check the fit of the model against an intercept-only model using the DIC
-
-```{r}
+```{r GR}
 bfit %>%
-  model_fit()
+  evaluate_convergence_diagnostics()
 ```
+
+The burn-in diagnostic are regression coefficients of the samples on the index, which will deviate if there is a trend in the data (unless they are non-linear and cancel each other out).
+
+If you compute the intercept-only model, you will also want to check whether that model has converged:
+
+```{r convergence null model}
+plot(bfit, "nullmodel")
+```
+
+To evaluate the effect of autocorrelation on the effective sample size of the MCMC samples, you can execute:
+
+```{r eff sample size}
+bfit %>%
+  evaluate_effective_sample_size()
+```
+
+If you use the MH sampler, you can also check the number of accepted samples like so:
+
+```{r accepted samples}
+bfit %>%
+  evaluate_accepted_draws()
+```
+
+## Evaluating results
+
+Most results are returned when you sample the model. You can view them by executing:
+
+```{r results}
+summary(bfit)
+```
+
+A model that contains all optional elements has the following objects embedded in it:
+
+```{r elements}
+names(bfit)
+```
+
+You can use `contains()` to see whether you model contains a specific element^[`contains()` is also an exported function for other packages, so this may clash with e.g. dplyr]:
+
+```{r contains element}
+# Use blm::contains() in case of clashes
+blm::contains(bfit, "rsq")
+```
+
+If you want to get a summary of the individual elements, you can execute e.g.
+
+```{r evaluate individual elements}
+# i.e. r-squared
+bfit %>%
+  get_value("rsq") %>%
+  summary()
+```
+
+You can also view the posterior for the $R^2$ values:
+
+```{r R2 plot}
+bfit %>%
+  get_value("rsq") %>%
+  plot()
+```
+
+## Posterior predictive checks
+
+`blm` contains three posterior predictive checks. The first checks the residuals for skewness, the second for heteroskedasticity and the third for independence. 
+
+```{r ppc}
+bfit <- bfit %>%
+  # Use a fraction of the total posterior 
+  # (to reduce the size of the output and because it is heavy on this pdf file)
+  evaluate_ppc(p=.15)
+```
+
+The PPC results are the only results not automatically included in the summary output and the only function in the `evaluate_` family that the user must call himself.
+
+```{r ppc summary}
+bfit %>%
+  get_value("ppc") %>%
+  summary()
+```
+
+We can also plot these results:
+
+```{r plot ppc}
+bfit %>%
+  get_value("ppc") %>%
+  plot("independence") %>%
+  plot()
+
+bfit %>%
+  get_value("ppc") %>%
+  plot("normality") %>%
+  plot()
+
+bfit %>%
+  get_value("ppc") %>%
+  plot("heteroskedasticity") %>%
+  plot()
+```
+
+## Misc
+
+The `blm` library contains a [ggplot2](https://ggplot2.tidyverse.org/) theme called `theme_blm()`

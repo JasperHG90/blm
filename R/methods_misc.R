@@ -55,6 +55,10 @@ summary.BF <- function(x) {
 #' @importFrom ggplot2 ggplot
 #' @importFrom ggplot2 aes
 #' @importFrom ggplot2 geom_histogram
+#' @importFrom ggplot2 element_blank
+#' @importFrom ggplot2 labs
+#' @importFrom ggplot2 geom_vline
+#' @importFrom ggplot2 theme
 #' @importFrom latex2exp TeX
 #' @export
 plot.R2 <- function(x) {
@@ -72,6 +76,6 @@ plot.R2 <- function(x) {
     ggplot2::labs(title = title, subtitle = subt) +
     ggplot2::geom_vline(xintercept = median(x$rsquared), linetype="dashed") +
     theme_blm() +
-    ggplot2::theme(axis.title = element_blank())
+    ggplot2::theme(axis.title = ggplot2::element_blank())
 
 }
