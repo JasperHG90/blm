@@ -673,7 +673,9 @@ sample_posterior.blm <- function(x) {
     # Calculate model bayes factor (if null model is sampled)
     evaluate_model_BF() %>%
     # Evaluate hypotheses (if exist)
-    evaluate_hypotheses()
+    evaluate_hypotheses() %>%
+    # Compute outliers
+    evaluate_outliers()
 
   # Return blm results
   return(x)
@@ -723,7 +725,9 @@ update_posterior.blm <- function(x, iterations = 1000) {
     # Calculate model bayes factor (if null computed)
     evaluate_model_BF() %>%
     # Evaluate hypotheses (if exist)
-    evaluate_hypotheses()
+    evaluate_hypotheses() %>%
+    # Compute outliers
+    evaluate_outliers()
 
   # Update number of iterations on the sample
   x <- get_value(x, "sampling_settings") %>%
