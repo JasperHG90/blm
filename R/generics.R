@@ -291,6 +291,18 @@ evaluate_R2 <- function(x) {
   UseMethod("evaluate_R2", x)
 }
 
+#' Evaluate possible outliers
+#'
+#' @param x a blm object
+#'
+#' @return object of class "outliers" is added to the blm object
+#'
+#' @seealso Lynch, S. M. (2007). Introduction to applied Bayesian statistics and estimation for social scientists. Springer Science & Business Media. pp.178-182
+#' @export
+evaluate_outliers <- function(x) {
+  UseMethod("evaluate_outliers", x)
+}
+
 #' Retrieve mapping from variable to parameter names
 #'
 #' blm objects will mostly emit parameter names (b0, b1, etc) instead of variable names. This convenience function returns the mapping from parameter names to variable names.

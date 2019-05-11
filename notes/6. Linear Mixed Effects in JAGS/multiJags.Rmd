@@ -31,11 +31,20 @@ data("directors")
 library(dplyr)
 directors <- directors %>%
   # Log compensation
-  mutate(Compensation = log(Compensation)) %>%
-  # Subtract mean from Age variable
-  mutate(Age = Age - mean(Age),
-         Gend = as.numeric(Male)-1,
-         Male = as.numeric(Male) - mean(as.numeric(Male))) %>%
+  mutate(Compensation = log(Compensation),
+         Male = as.numeric(Male) - 1) %>%
+  # Create level 2 variables
+  group_by(Company) %>%
+  mutate(avgAge = mean(Age),
+         propMale = sum(Male) / n(),
+         # Group-mean center individual data
+         Age = Age - mean(Age),
+         Male = Male - mean(Male)) %>%
+  # Ungroup
+  ungroup() %>%
+  # Grand-mean center group variables
+  mutate(avgAge = avgAge - mean(avgAge),
+         propMale = propMale - mean(propMale)) %>%
   # Sort data (makes it easier later)
   arrange(Sector)
   
@@ -53,9 +62,9 @@ dir_jags <- with(directors, list(## Outcome for individuals (level 1)
                                  # Company indicator
                                  company=as.numeric(as.factor(Company)),
                                  # Average age of directors for each company
-                                 avgAge=unname(tapply(Age, Company, mean)),
+                                 avgAge=avgAge,
                                  # Proportion of males for each company
-                                 avgMale=unname(tapply(Gend, Company, function(x) sum(x)/length(x))),
+                                 avgMale=propMale,
                                  
                                  ## Group totals
                                  
@@ -324,13 +333,13 @@ Explained variance at each level:
 1. Level 1
 
 $$
-R^2_{L1} = \frac{\sigma^2_{e|\text{baseline}} - \sigma^2_{e|\text{model 1}}}{\sigma^2_{e|\text{baseline}}} = 1.34\%
+R^2_{L1} = \frac{\sigma^2_{e|\text{baseline}} - \sigma^2_{e|\text{model 1}}}{\sigma^2_{e|\text{baseline}}} = 1.31\%
 $$
 
 2. Level 2
 
 $$
-R^2_{L2} = \frac{\sigma^2_{u_0|\text{baseline}} - \sigma^2_{u_0|\text{model 1}}}{\sigma^2_{u_0|\text{baseline}}} = 0.76\%
+R^2_{L2} = \frac{\sigma^2_{u_0|\text{baseline}} - \sigma^2_{u_0|\text{model 1}}}{\sigma^2_{u_0|\text{baseline}}} = -.25\%
 $$
 
 ## Adding level-2 predictors
@@ -399,7 +408,6 @@ if(!"model3.rds" %in% list.files()) {
   # Save
   saveRDS(DICm3, "model3_DIC.rds")
 
-  
 } else {
   
   # Load

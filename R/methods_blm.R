@@ -1152,6 +1152,43 @@ evaluate_model_BF.blm <- function(x) {
 
 }
 
+# Evaluate outliers
+#' @export
+evaluate_outliers.blm <- function(x) {
+
+  # Check if posterior in blm object
+  if(!"posterior" %in% names(x)) {
+    stop("Posterior not yet constructed.")
+  }
+
+  # Results list
+  inputs <- list()
+
+  # Get inputs
+  X <- x$input$X
+  y <- x$input$y
+
+  # Get posterior samples
+  postsamps <- x %>%
+    get_value("posterior") %>%
+    bind() %>%
+    as.matrix()
+
+  # Compute outliers
+  r <- julia_outliers(X, y, postsamps)
+
+  # Add
+  inputs$results <- r
+
+  # Add class to input
+  class(inputs) <- "outliers"
+
+  # Return
+  x$outliers <- inputs
+  return(x)
+
+}
+
 # Not exported ----
 
 # Sample the null model if it exists in the data!

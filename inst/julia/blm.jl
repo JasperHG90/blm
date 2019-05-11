@@ -725,3 +725,50 @@ function bayes_R2(X::Array{Float64}, y::Array{Float64}, sampled::Array{Float64})
     return(res)
 
     end;
+
+#=
+PART V: Compute outliers
+=#
+
+function compute_outliers(X::Array{Float64}, y::Array{Float64}, sampled::Array{Float64})
+
+    #=
+    Calculate the proportion of cases where simulated y values exceed the observed y values
+
+    :param X: Design matrix containing j+1 coefficients (first coefficient must equal intercept variable). The design matrix is created in R using model.matrix()
+    :param y: Numeric array with outcome variables. Length(y) == nrow(X)
+    :param sampled: posterior samples for the parameters
+
+    :return: Array. Column vector proportions where y_simulated > y_observed
+
+    :seealso:
+        - Lynch, S. M. (2007). Introduction to applied Bayesian statistics and estimation for social scientists. Springer Science & Business Media. pp.178-182
+    =#
+
+    # 1. Precompute linear combinations as a function of X and the posterior set of params theta = [b0,b1,...,bn]
+    lincom = X * transpose(sampled[: , 1:end-1]) # lincom dims: rows(X) * (iterations-burn)
+
+    # 2. Set up a results matrix for simulated yhat values
+    res = Array{Float64}(undef, size(sampled)[1], size(X)[1])
+    # Prop
+    psa = Array{Float64}(undef, size(y)[1], 1)
+
+    # 3. Draw from a normal distribution given each specific y value and populate results matrix
+    for j in 1:(size(sampled)[1])
+
+        # Simulate y
+        res[j,:] = simulate_y(lincom[:,j], sampled[j,end])
+
+        end;
+
+    # 4. Calculate proportion sim > actual for each individual y-outcome
+    for i in 1:(size(psa)[1])
+
+        psa[i,1] = (sum(res[:,i] .> y[i,1]) / size(res)[1])
+
+        end;
+
+    # 4. Return proportions
+    return(psa)
+
+    end;
