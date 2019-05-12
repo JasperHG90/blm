@@ -68,7 +68,7 @@ set_initial_values <- function(x, ...) {
 #'
 #' @return updated blm object with new priors
 #' @export
-set_prior <- function(x, ...) {
+set_prior <- function(x, par, ...) {
   UseMethod("set_prior", x)
 }
 
@@ -96,13 +96,14 @@ set_prior <- function(x, ...) {
 #' }
 #'
 #' @param x a blm object
+#' @param name name for the hypothesis (e.g. 'H1')
 #' @param hypothesis_user a hypothesis.
 #'
 #' @return a blm object with a new or updated 'hypotheses' object
 #'
 #' @seealso cite Hoitink
 #' @export
-set_hypothesis <- function(x, hypothesis_user) {
+set_hypothesis <- function(x, name, hypothesis_user) {
   UseMethod("set_hypothesis", x)
 }
 

@@ -4,12 +4,12 @@
 \alias{set_prior}
 \title{Change priors for available parameters}
 \usage{
-set_prior(x, ...)
+set_prior(x, par, ...)
 }
 \arguments{
-\item{...}{other arguments passed to function. In the case of intercept and coefficients, these are 'mu' and 'sd' (prior means and variances). In the case of the residual variance, the rate and shape/scale parameter must be passed as 'alpha' and 'beta'}
-
 \item{par}{name of the coefficient, given as b0 (intercept) or b1, ... for coefficients.}
+
+\item{...}{other arguments passed to function. In the case of intercept and coefficients, these are 'mu' and 'sd' (prior means and variances). In the case of the residual variance, the rate and shape/scale parameter must be passed as 'alpha' and 'beta'}
 }
 \value{
 updated blm object with new priors

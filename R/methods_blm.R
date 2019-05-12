@@ -486,13 +486,18 @@ set_sampler.blm <- function(x, par, type = c("Gibbs", "MH"), lambda=0.25) {
 
 # Add a hypothesis to a blm object
 #' @export
-set_hypothesis.blm <- function(x, hypothesis_user) {
+set_hypothesis.blm <- function(x, name, hypothesis_user) {
 
   # Hypothesis in blm object?
   if(!contains(x, "hypotheses")) {
     x <- set_value.blm(x, "hypotheses", list())
     # Add structure
     class(x$hypotheses) <- "hypotheses"
+  }
+
+  # If name not a string, reject
+  if(!is.character(name)) {
+    stop("'name' of the hypothesis must be a character")
   }
 
   # Get parameters
@@ -508,10 +513,7 @@ set_hypothesis.blm <- function(x, hypothesis_user) {
   }
 
   # Add hypothesis
-  x$hypotheses <- append(x$hypotheses, list(hypothesis(hypothesis_user, pars)))
-
-  # Set names
-  names(x$hypotheses) <- paste0("hypothesis_", 1:length(x$hypotheses))
+  x[["hypotheses"]][[name]] <- hypothesis(hypothesis_user, pars)
 
   # Set class
   class(x$hypotheses) <- "hypotheses"

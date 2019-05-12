@@ -228,6 +228,10 @@ H1vH2 <- (f_2 / c_2) / (f_1 / c_1)
 
 From the above plot, we see that the area corresponding to the first hypothesis (left) is smaller than the area corresponding to the first hypothesis of the prior. When we calculate the BF against the unconstricted hypothesis, we get $f_1 / c_1 \approx .19$. For the second hypothesis, we get $f_2 / c_2 \approx 1.15$. This means that, after seeing the data, we now favor $H_1$ over $H_u$ by a factor of $.19$, whereas we favor $H_2$ over $H_u$ by $1.15$. We can also compare $H_1$ and $H_2$, which yields $\frac{f_1 / c_1}{f_2 / c_2} \approx 6.18$, meaning that we favor $H_2$ over $H_1$ by a factor of $6.18$.
 
+## Posterior model probabilities
+
+In regular hypothesis testing, there is a trade off between
+
 # References
 
 [1] Hoijtink, H., Mulder, J., Van Lissa, C. J., & Gu, X. (2019). A tutorial on testing hypotheses using the Bayes factor.

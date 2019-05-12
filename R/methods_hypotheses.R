@@ -10,9 +10,12 @@ print.hypothesis <- function(x) {
   # Number of elements
   elements <- length(x$parsed)
 
+  # Name
+  name <- x$name
+
   # cat
   msg <- paste0(
-    crayon::bold("Bayesian Linear Model (BLM) hypothesis:\n\n"),
+    crayon::bold(name), "\n\n",
     "Hypothesis: ", usr_hyp, "\n",
     "Elements: ", elements
   )
@@ -88,10 +91,12 @@ summary.hypotheses <- function(x) {
 #' @export
 print.hypotheses <- function(x) {
 
+  x[[1]]$name <- names(x)[1]
   print(x[[1]])
-  for(h in x[2:length(x)]) {
+  for(h in 2:length(x)) {
+    x[[h]]$name <- names(x)[h]
     cat("\n\n")
-    print(h)
+    print(x[[h]])
   }
 
 }

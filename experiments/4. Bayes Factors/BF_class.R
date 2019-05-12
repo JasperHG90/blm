@@ -30,6 +30,8 @@ data("directors")
 directors <- directors %>%
   mutate(Age = Age - mean(Age),
          Compensation = log(Compensation))
+         #Male = as.numeric(Male),
+         #Male = Male - mean(Male))
 # Bridge to julia
 blm_setup()
 # Iterations
@@ -45,9 +47,9 @@ fit <- blm("Compensation ~ Age + Male", data=directors) %>%
   #set_prior("b2", mu=.05, sd=.03) %>%
   # Set hypotheses
   # H1: Males earn about the same as females
-  set_hypothesis("b0 + b2 < b0") %>%
+  set_hypothesis("H1", "b0 + b2 < b0") %>%
   # H2: Directors only earn more as they get older
-  set_hypothesis("b1 > 0") %>%
+  set_hypothesis("H2", "b1 > 0") %>%
   #H3: Sectors are ordered as: mu_services > mu_basic materials > mu_financial
   #set_hypothesis("b0 + b4 > b0 & b0 > b0 + b3") %>%
   #set_hypothesis("|b0| > 0") %>%
@@ -79,7 +81,7 @@ regr$call$formula
 # Set seed
 set.seed(453)
 summary(regr)
-z<-bain(regr,"Male1 < Male0; Age > 0; Male0 > 0", standardize = TRUE)
+z<-bain(regr,"Male1 < Male0; Age > 0", standardize = TRUE)
 z # Why is BF 4 ==> it is: (fit_hypothesis / complexity_hypothesis) / (fit_complement_of_hypothesis / complexity_complement_of_hypothesis)
 
 # In case of |u1 - u2| < .2sd ==> which sd!! are we referring to? p.35

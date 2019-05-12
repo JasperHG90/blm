@@ -4,10 +4,12 @@
 \alias{set_hypothesis}
 \title{Add a hypothesis to a blm model}
 \usage{
-set_hypothesis(x, hypothesis_user)
+set_hypothesis(x, name, hypothesis_user)
 }
 \arguments{
 \item{x}{a blm object}
+
+\item{name}{name for the hypothesis (e.g. 'H1')}
 
 \item{hypothesis_user}{a hypothesis.}
 }
