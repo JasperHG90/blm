@@ -1,5 +1,8 @@
 ## Outlier plots etc
 
+library(blm)
+
+# Simulate some data
 d <- blmsim(n=500, j=2)
 df <- cbind(d$X[,-1], d$y) %>% as.data.frame()
 

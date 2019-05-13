@@ -1180,17 +1180,17 @@ evaluate_ppd.blm <- function(x) {
     bind() %>%
     as.matrix()
 
-  # Compute outliers
-  r <- julia_outliers(X, y, postsamps)
+  # Compute ppd
+  r <- julia_ppd(X, y, postsamps)
 
   # Add
   inputs$results <- r
 
   # Add class to input
-  class(inputs) <- "outliers"
+  class(inputs) <- "ppd"
 
   # Return
-  x$outliers <- inputs
+  x$ppd <- inputs
   return(x)
 
 }

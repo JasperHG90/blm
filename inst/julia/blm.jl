@@ -730,7 +730,7 @@ function bayes_R2(X::Array{Float64}, y::Array{Float64}, sampled::Array{Float64})
 PART V: Compute outliers
 =#
 
-function compute_outliers(X::Array{Float64}, y::Array{Float64}, sampled::Array{Float64})
+function compute_ppd(X::Array{Float64}, y::Array{Float64}, sampled::Array{Float64})
 
     #=
     Calculate the proportion of cases where simulated y values exceed the observed y values

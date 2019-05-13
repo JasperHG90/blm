@@ -90,14 +90,21 @@ get_value.sampler <- function(x, var) {
 
 }
 
-# Not exported
 #' @export
 get_value.prior <-function(x, var) {
 
     ## Get this value
     return(x[[var]])
 
-  }
+}
+
+#' @export
+get_value.ppd <-function(x, var) {
+
+  ## Get this value
+  return(x[[var]])
+
+}
 
 # Set a value to a new value
 set_value.sampler <-
@@ -107,7 +114,8 @@ set_value.sampler <-
   set_value.blm <-
   set_value.chain <-
   set_value.hypothesis <-
-  set_value.hypotheses <- function(x, var, val) {
+  set_value.hypotheses <-
+  set_value.ppd <- function(x, var, val) {
 
     ## Set this value
     x[[var]] <- val
