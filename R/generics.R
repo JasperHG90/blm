@@ -109,6 +109,11 @@ set_hypothesis <- function(x, name, hypothesis_user) {
 
 #' Sample the posterior distribution
 #'
+#' Calling the \code{sample_posterior()} function executes a blm sampling plan. The user should set priors, initial values etc. before executing this function, because by executing it the user will 'lock' the sampling plan. That is, no changes may be made except for changing the 'burn' parameter.
+#'
+#' @details
+#' For details on the implementation of the Gibbs sampler, see https://tinyurl.com/y5vk9x35. For details on the implementation of the Metropolis-Hastings sampler, see https://tinyurl.com/y3zp3l3w.
+#'
 #' @param x blm object
 #'
 #' @return blm object containing sampled posterior
@@ -292,7 +297,13 @@ evaluate_R2 <- function(x) {
   UseMethod("evaluate_R2", x)
 }
 
-#' Evaluate possible outliers
+#' Evaluate the posterior predictive distributions for each observation
+#'
+#' This function simulates outcome variables for each of the posterior parameters. It then returns the proportion where:
+#'
+#' \deqn{p = y_{\text{simulated}} > y_{\text{observed}}}
+#'
+#' This allows the user to look for patterns against e.g. the predictors or the outcome. See examples and the reference to Lynch below.
 #'
 #' @param x a blm object
 #'
@@ -300,7 +311,7 @@ evaluate_R2 <- function(x) {
 #'
 #' @seealso Lynch, S. M. (2007). Introduction to applied Bayesian statistics and estimation for social scientists. Springer Science & Business Media. pp.178-182
 #' @export
-evaluate_outliers <- function(x) {
+evaluate_ppd <- function(x) {
   UseMethod("evaluate_outliers", x)
 }
 

@@ -677,7 +677,7 @@ sample_posterior.blm <- function(x) {
     # Evaluate hypotheses (if exist)
     evaluate_hypotheses() %>%
     # Compute outliers
-    evaluate_outliers()
+    evaluate_ppd()
 
   # Return blm results
   return(x)
@@ -729,7 +729,7 @@ update_posterior.blm <- function(x, iterations = 1000) {
     # Evaluate hypotheses (if exist)
     evaluate_hypotheses() %>%
     # Compute outliers
-    evaluate_outliers()
+    evaluate_ppd()
 
   # Update number of iterations on the sample
   x <- get_value(x, "sampling_settings") %>%
@@ -1158,9 +1158,9 @@ evaluate_model_BF.blm <- function(x) {
 
 }
 
-# Evaluate outliers
+# Evaluate posterior predictive distributions
 #' @export
-evaluate_outliers.blm <- function(x) {
+evaluate_ppd.blm <- function(x) {
 
   # Check if posterior in blm object
   if(!"posterior" %in% names(x)) {

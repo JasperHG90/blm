@@ -13,7 +13,10 @@ sample_posterior(x)
 blm object containing sampled posterior
 }
 \description{
-Sample the posterior distribution
+Calling the \code{sample_posterior()} function executes a blm sampling plan. The user should set priors, initial values etc. before executing this function, because by executing it the user will 'lock' the sampling plan. That is, no changes may be made except for changing the 'burn' parameter.
+}
+\details{
+For details on the implementation of the Gibbs sampler, see https://tinyurl.com/y5vk9x35. For details on the implementation of the Metropolis-Hastings sampler, see https://tinyurl.com/y3zp3l3w.
 }
 \examples{
 data("directors")
