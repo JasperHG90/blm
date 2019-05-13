@@ -312,7 +312,7 @@ evaluate_R2 <- function(x) {
 #' @seealso Lynch, S. M. (2007). Introduction to applied Bayesian statistics and estimation for social scientists. Springer Science & Business Media. pp.178-182
 #' @export
 evaluate_ppd <- function(x) {
-  UseMethod("evaluate_outliers", x)
+  UseMethod("evaluate_ppd", x)
 }
 
 #' Retrieve mapping from variable to parameter names

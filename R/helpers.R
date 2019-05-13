@@ -481,11 +481,11 @@ bayes_R2 <- function(X, y, posterior_samples) {
 }
 
 # Outliers in Julia
-julia_outliers <- function(X, y, posterior_samples) {
+julia_ppd <- function(X, y, posterior_samples) {
 
   # Call Julia function outliers
   return(
-    .blm$julia$eval("compute_outliers")(X, as.numeric(y), posterior_samples)
+    .blm$julia$eval("compute_ppd")(X, as.numeric(y), posterior_samples)
   )
 
 }
