@@ -34,6 +34,10 @@ fit <- blm("likeability ~ male + attitude + extraversion", data=df) %>%
 fit <- fit %>%
   evaluate_ppc()
 
+# View
+fit %>%
+  get_value("ppc")
+
 # Retrieveo ppd
 out <- fit %>% get_value("ppd")
 # Retrieve actual
