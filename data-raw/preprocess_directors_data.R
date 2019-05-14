@@ -6,6 +6,7 @@ rm(list=ls())
 library(dplyr)
 library(tidyr)
 library(purrr)
+library(forcats)
 directors <- read.csv2("testing/FinalData.csv") %>%
   # Select only independent directors
   filter(isED == 0) %>%
@@ -17,13 +18,10 @@ directors <- read.csv2("testing/FinalData.csv") %>%
   # Keep these sectors
   filter(Sector %in% c("Basic Materials","Services", "Financial")) %>%
   # Refactor
-  mutate(Sector = factor(as.character(Sector),
-                         levels = c("Financial", "Services",
-                                    "Basic Materials"))) %>%
+  mutate(Sector = as_factor(as.character(Sector)),
+         Sector = fct_relevel(Sector, "Financial")) %>%
   # Mutate into proper data types
-  mutate(Sector = factor(as.character(Sector)),
-         Industry = factor(as.character(Industry)),
-                         #levels = c("Financial", "Services", "Basic Materials")),
+  mutate(Industry = factor(as.character(Industry)),
          Male = factor(isM, levels=c(0,1)),
          Company = as.factor(as.character(Company))) %>%
   select(-isM) %>%

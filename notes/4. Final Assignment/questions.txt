@@ -1,0 +1,7 @@
+# Questions
+
+- Can I compare non-nested models with DIC? (if same data)
+- Prob_b and Prob_a in Bayes factors
+- b0 = 0 ==> how to program this???
+- WHat does it mean for a hypothesis to be '1 standard deviation away?
+- |a - (a+b)| < .05 ==> what does this formulation mean in terms of standardized coefficients? (right side of operator)

@@ -69,11 +69,9 @@ Problem statement, literature & hypotheses
 
 https://en.wikipedia.org/wiki/Probability_interpretations
 
-- Interpretation of random variables ==> Bayesian: data fixed but parameters random (what are implication?)
-
 ## Definition of probability and the source of uncertainty 
 
-For a large part, differences between Frequentist and Bayesian inference stems from their respective view of uncertainty and how this is captured by probabilities [CITE]. In the Frequentist framework, probabilities are looked upon as the limiting value of the number of $k$ successes in a sequence of $n$ trials [CITE/CHANGE/DIRECT QUOTE FROM STACKEX], or:
+For a large part, differences between Frequentist and Bayesian inference stems from their respective view of uncertainty and how this is captured by probabilities [CITE]. In the Frequentist framework, probabilities are looked upon as the limiting value of the number of $k$ successes in a sequence of $n$ trials [CITE], or:
 
 $$
 \tag{1}
@@ -82,43 +80,13 @@ p = \lim_{n \to \infty} \frac{k}{n}
 \end{aligned}
 $$
 
-The implications of this definition are that (1) probabilities make sense only in the context of infinite trials, and (2) the probability is *fixed* in the population and our uncertainty about it reduces as we repeatedly take more (or larger) samples. In particular, this definition implies that the only source of randomness by which our estimate $\hat{p}$ differs from the true value $p$ comes from the data [CITE/BACK UP], which may differ from sample to sample due to e.g. sampling error.
+The implications of this definition are that (1) probabilities make sense only in the context of infinite trials, and (2) the probability is *fixed* in the population and our uncertainty about it reduces as we repeatedly take more (or larger) samples. In particular, this definition implies that the only source of randomness by which our estimate $\hat{p}$ differs from the true value $p$ comes from the data [CITE], which may differ from sample to sample due to, for example, sampling error.
 
-[ASYMPTOTIC ESTIMATORS ETC.] ==> mathematically Frequentist statistics makes sense.
-
-The Bayesian framework looks upon probabilities as a means of quantifying uncertainty about knowledge [CHECK]. Even though the 'true' parameter value may be fixed, we are limited by our knowledge of this value. Hence, the uncertainty by which we make statements about the world changes as we collect more information which is represented by the posterior distribution, which may be looked upon very loosely as the collection 'true' values conditional on how certain we are about the veracity of this knowledge.
-
-The implication of these different interpretations of probability is illustrated by the difference in interpretation of the confidence interval and the credible interval. When we calculate the confidence interval [REFER TO CENTRAL LIMIT THEOREM/FREQUENCY OF SAMPLING MEANS], the boundaries of the confidence intervals are interpreted as random variables due to sampling error (since they estimate the frequency of sampling means). With a credible interval, we do not have this source of variability, which gives rise to the definition that the parameter is contained by the credible interval with some probability because the parameter space is assumed to be known under the assumptions by which we arrived at the posterior distribution [CHECK].
+The Bayesian framework looks upon probabilities as a means of quantifying uncertainty about knowledge [CITE]. Even though the 'true' parameter value may be fixed, we are limited by our knowledge of this value. Hence, the uncertainty by which we make statements about the world changes as we collect more information which is represented by the posterior distribution, which may be looked upon very loosely as the collection 'true' values conditional on how certain we are about the veracity of this knowledge.
 
 ## Epistemological differences about what constitutes knowledge
 
-In frequentist statistical inference, evidence may originate only from the data. This is not the case in Bayesian statistical inference, where inferences are based on a mix of domain expertise (*prior*/*belief*) and evidence from the data. This makes perfect sense in the Bayesian framework; if we are uncertain about our knowledge then constraining the parameter space by injecting what we *do* know is logical. Hence, prior beliefs are just knowledge translated from some non-mathematical source into a mathematical format.
-
-The claim that the Frequentist approach is more objective would hold only in a universe where the data collection process, (pre-)processing and analysis are guaranteed to be objective. This is a tenuous assumption at best in social science data (how else would we get by that memorable phrase 'lies, damned lies and statistics'?); the way in which we collect data is fraught with subjective decisions during data collection, manipulation and analysis [CITE]. Data, in and of itself, is not objective [CITE], and the critique leveled at Bayesians boils down to the practice of incorporating domain knowledge *explicitly* through the use of a prior. It does, however, raise the question of the extent to which the use of priors influence the analysis. This is illustrated in figure XX below in the case of the directors data. Here, we show the result of increasing the certainty of our prior belief (translates to smaller variance). Also note that, when priors are uninformative, results are similar.
-
-## Inference based on uncertainty, and how this changes hypotheses formulation / testing
-
-Given that, for a Frequentist, the data are a random variable and the source of variation, it makes sense to optimize the 'likelihood' of the data conditional on the parameters. That is, we find the *most likely combination* of parameters $\hat{\theta}$ that explain the data and that provide consistent and asymptotically unbiased estimators, or:
-
-$$
-\tag{1}
-\hat{\theta} = \arg \max_{\theta \in \Theta} \text{LL}(\theta |\text{data}) 
-$$
-
-Conversely, given that a Bayesian thinks that the data is fixed, they are interested in finding the distribution of the parameters and hence the source of variance:
-
-$$
-\tag{2}
-p(\theta | \text{data}) = \frac{p(\text{data}|\theta) p(\theta)}{p(\text{data})}
-$$
-
---> Probability of the null hypothesis (p 161, 162 Berger & Benny). "Flipping" of the hypothesis 
-
-- Endless transformations on posterior distribution ==> not possible in frequentist except when calculating mean/variances ==> see freq cartoon book
-
-- Frequentists obscure the interpretation process, Bayesian obscure the posterior distribution collection process
-
-Frequentist statistics obscures the interpretation of critical statistics to the point where students learn the heuristics ('p-value is significant') before truly understanding what that heuristic means. Conversely, Bayesian statistics provides an explicit description of a model and its assumptions and has an intuitive interpretation of statistical results. However, the approach obfuscates the estimation method by using the arcane process of Markov Chain Monte Carlo (MCMC) sampling. 
+In Frequentist statistical inference, evidence may originate only from the data. This is not the case in Bayesian statistical inference, where inferences are based on a mix of domain expertise (*prior* or *belief*) and evidence from the data. This makes perfect sense in the Bayesian framework; if we are uncertain about our knowledge then we can constrain the parameter space by injecting what we *do* know. Hence, a Bayesian looks upon prior beliefs as just another source of knowledge that has been translated into a probability density. The exact definition of the prior belief affects the results to the degree to which we feel certain of its veracity. This is illustrated in the figure below: a strong belief in our prior knowledge (represented by a small variance) leads to a more constrained posterior.
 
 ```{r calculate prior variance effect}
 # Posterior shrinkage
@@ -231,9 +199,45 @@ postvar <- ggplot(pd, aes(x=Male, fill=Prior)) +
 ggarrange(priorvar, postvar, ncol=2, common.legend=TRUE, legend="top")
 ```
 
-The effect of changing the prior variance can be summarized using a posterior shrinking factor (CITE BETANCOURT) and posterior z-score. The shrinking factor shows us the factor by which the variance of the posterior distribution shrinks or expands compared to the prior variance. The posterior z-score tells us the direction and magnitude by which the posterior mean shifts compared to the prior mean; if we are confident in the precision of our domain knowledge (resulting in small prior variance), the resulting posterior weights this information strongly and we end up with a posterior mean that lies closer to the prior mean (represented by the z-score). However, given that we have small variance, and if this is not corroborated by the data, then the shrinkage factor will be large. 
+The claim that the Frequentist approach is more objective would hold only if the data collection process, (pre-)processing steps and analysis are guaranteed to be objective. This is a tenuous assumption at best in the social sciences; the way in which we collect data is fraught with subjective decisions during data collection, manipulation and analysis [CITE]. Data, in and of itself, is not objective [CITE], and the critique leveled at Bayesians boils down to the practice of incorporating domain knowledge *explicitly* through the use of a prior.
 
-If we carry this argument to its logical endpoint, it follows that we would next arrive at a means to compare these posteriors relative to each other. This, in essence, is the Bayes Factor.
+## Methods of estimation and hypothesis testing
+
+Whether a statistician regards the data or the parameters as a random variable determines their choice of estimation method. A Frequentist, believing that variation originates from data, will want to optimize the 'likelihood' of the data conditional on the parameters. That is, we find the *most likely combination* of parameters $\hat{\theta}$ that explain the data and that provide consistent and asymptotically unbiased estimators, or:
+
+$$
+\tag{1}
+\hat{\theta} = \arg \max_{\theta \in \Theta} \text{Log Likelihood}(\theta |\text{data}) 
+$$
+
+Conversely, given that a Bayesian thinks of the data as fixed and the parameters as random variables, they are interested in finding the distribution of the parameters and hence the source of variance:
+
+$$
+\tag{2}
+p(\theta | \text{data}) = \frac{p(\text{data}|\theta) p(\theta)}{p(\text{data})}
+$$
+
+The question of how the definition of probability and the methods of estimation impact inference under these frameworks is illustrated by the difference in interpretation of the confidence interval and the credible interval. When we calculate the confidence interval [REFER TO CENTRAL LIMIT THEOREM/FREQUENCY OF SAMPLING MEANS], the boundaries of the confidence intervals are interpreted as random variables due to sampling error since they estimate the frequency of sampling means. With a credible interval, we do not have this source of variability, which gives rise to the definition that the parameter is contained in the credible interval with some probability because the parameter space is assumed to be known under the assumptions by which we arrived at the posterior distribution [CHECK].
+
+Further implications are to be found in the way we test hypotheses in these frameworks. In the Frequentist framework, we usually partition parameter space into an acceptance and a rejection region based on some null and alternative hypothesis. On the basis of a test statistic, computed from the data, we then decide whether or not the result we observe is likely to occur due to chance.
+
+* Type I && II
+* Test statistic
+* probability of a hypothesis given the data
+
+This is not so in the Bayesian Framework. Given that the data or the evidence can be viewed as a means to update a prior belief, hypothesis testing focuses on the degree to which the evidence found in the data supports this initial belief.
+
+--> Probability of the null hypothesis (p 161, 162 Berger & Benny). "Flipping" of the hypothesis 
+
+- Endless transformations on posterior distribution ==> not possible in frequentist except when calculating mean/variances ==> see freq cartoon book
+
+- Frequentists obscure the interpretation process, Bayesian obscure the posterior distribution collection process
+
+Frequentist statistics obscures the interpretation of critical statistics to the point where students learn the heuristics ('p-value is significant') before truly understanding what that heuristic means. Conversely, Bayesian statistics provides an explicit description of a model and its assumptions and has an intuitive interpretation of statistical results. However, the approach obfuscates the estimation method by using the arcane process of Markov Chain Monte Carlo (MCMC) sampling. 
+
+<!-- Legacy
+The effect of changing the prior variance can be summarized using a posterior shrinking factor (CITE BETANCOURT) and posterior z-score. The shrinking factor shows us the factor by which the variance of the posterior distribution shrinks or expands compared to the prior variance. The posterior z-score tells us the direction and magnitude by which the posterior mean shifts compared to the prior mean; if we are confident in the precision of our domain knowledge (resulting in small prior variance), the resulting posterior weights this information strongly and we end up with a posterior mean that lies closer to the prior mean (represented by the z-score). However, given that we have small variance, and if this is not corroborated by the data, then the shrinkage factor will be large. 
+-->
 
 # Methods & Results
 
@@ -244,17 +248,7 @@ out <- capture.output(stargazer::stargazer(dirs, summary=TRUE, median=TRUE))
 cat(paste0(out[-1:-3], "\n"))
 ```
 
-Model 1 is given by the following equation:
-
-$$
-\tag{1}
-\begin{aligned}
-\hat{\log(\text{compensation}_i)} = 
-&\beta_0 + \beta_{1} \text{age}_i + \beta_2\text{male}_i + \epsilon_i
-\end{aligned}
-$$
-
-Model 2 is given by the following equation:
+The model is given by the following equation:
 
 $$
 \begin{aligned}
@@ -272,7 +266,11 @@ $$
 $$
 
 $$
-\text{H}_2\text{: } \beta_{\text{Age}} > 0
+\text{H}_2\text{: } \beta_{\text{Age}} > 0 
+$$
+
+$$
+\text{H}_3\text{: } \beta_{\text{Financial}} > \beta_{\text{Basic Materials}} > \beta_{\text{Services}}
 $$
 
 $$
@@ -281,11 +279,17 @@ $$
 
 These hypotheses will be included in the models we construct. (Hoitjtink p.24).
 
+PRA is the weight of a particular Bayes factor compared to the other hypotheses. That is, it is a proportion of the total evidence.
+
+PRB is the probability of the marginal likelihood of each hypothesis, or $P(H_i | model)$. In essence, this functions as an indication of error probabilities; if we 'cut' the parameter space into many pieces, so does our confidence in our hypothesis go down.
+
+The quantities PRB are the Bayesian error probabilities 
+
 BF sensitive to outliers (Hoijtink pp.31-32) ==> check for outliers before BF. Also violation of model assumptions using ppc. We should use a robust BF but we don't have that. Anyway, interpret the BF with a grain of salt.
 
 Bayes' Factor is sensitive to the choice of prior ==> something about the size of complexity. (Hoijtink pp.29-30)
 
-```{r model1, include = FALSE}
+```{r model1, include = FALSE, eval=FALSE}
 ## Run two linear models with blm.
 
 # Model 1: only age and male dummy ==> baseline model -----
@@ -302,13 +306,18 @@ dirmod1 <- blm("Compensation ~ Age + Male",
                      chain_2 = list("b" = c(-5, 0, 7), "sigma" = 2)) %>%
   # Set priors
   set_prior("b1", mu=0, sd=.1) %>%
-  set_prior("b2", mu=.05, sd=.03) %>%
+  set_prior("b2", mu=.05, sd=.1) %>%
   # Compute null model as well
   compute_null_model() %>%
+  # Set hypotheses
+  # What does this formulation mean in terms of standardized coefficients?
+  set_hypothesis("H1", "|b0 - (b0 + b2)| < .01") %>%
   # Sample
   sample_posterior() %>%
-  # Compute posterior predictive checks (using a random sample of 50% of the data)
-  evaluate_ppc(p=0.5)
+  # Compute posterior predictive checks (using a random sample of 80% of the data)
+  evaluate_ppc(p=.8) %>%
+  # Evaluate hypotheses
+  evaluate_hypotheses()
 
 # Sanity check for coefficients ==> compare to linear model
 coef(dirmod1)
@@ -328,9 +337,11 @@ plot(dirmod1, "autocorrelation") # OK
 
 # Summary
 summary(dirmod1)
+# DIC Null model = 5.13 
 # DIC = 508
-# R2 = low (approx 2.5%)
-# ==> neither male nor age is a predictor of logged compensation (CCI contains 0)
+# R2 = low (approx 2.1%)
+# Approx. model BF == .0915
+# ==> male is a predictor of logged compensation (CCI contains 0)
 
 # Plot R-squared 
 # See: https://www.tandfonline.com/doi/abs/10.1080/00031305.2018.1549100?casa_token=eO-_tpyCd3wAAAAA:w9MZzAbhBb6HM-2iOPyvD2Y2veCac-HA6oDUc2drJEicqA8hXZ5IlzZUbmwtsdCWAbFzPi7kMJX1lw for thoughts on the R2 method.
@@ -505,7 +516,7 @@ dirmod2 %>%
 saveRDS(dirmod2, "models/model2.rds")
 ```
 
-```{r PPC results, eval=TRUE, fig.width=7, fig.height=2, fig.cap="A random subset of observed and simulated correlation coefficients for model 1 (left) and model 2 (right). The figure shows that the observed residuals (in red) are much more correlated than is reasonable under the model (represented by the blue, simulated values)."}
+```{r PPC results, eval=FALSE, fig.width=7, fig.height=2, fig.cap="A random subset of observed and simulated correlation coefficients for model 1 (left) and model 2 (right). The figure shows that the observed residuals (in red) are much more correlated than is reasonable under the model (represented by the blue, simulated values)."}
 # Collect ppc results
 ppc1 <- do.call(cbind.data.frame, dirmod1$ppc$results)
 ppc2 <- do.call(cbind.data.frame, dirmod2$ppc$results)
@@ -562,10 +573,35 @@ indeppc2 <- dirmod2 %>% get_value("ppc") %>%
 gridExtra::grid.arrange(indeppc1, indeppc2, ncol=2)
 ```
 
-From figure XX and the posterior predictive checks (table XY), we observe that the data are not independent $(\hat{r}_{\text{PPC, Model1}} = .466)$. That is, directors who are in the same board tend to are more similar to each other than directors from other boards. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards. Indeed, the results of the random effects model shows that the intra-class correlation coefficient $\rho$ equals $57\%$, meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The results of running all different stages of a multilevel model are presented in another document.] 
+From the posterior predictive checks (table XY), we observe that the data are not independent $(\hat{r}_{\text{PPC, Model1}} = .466)$. That is, directors who are in the same board tend to are more similar to each other than directors from other boards. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards. Indeed, the results of the random effects model shows that the intra-class correlation coefficient $\rho$ equals $57\%$, meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The results of running all different stages of a multilevel model are presented in another document.] 
 
 ```{r MLM intercept-only model}
 library(rjags)
+
+# Reload directors
+data("directors")
+
+# Preprocess directors data
+library(dplyr)
+directors <- directors %>%
+  # Log compensation
+  mutate(Compensation = log(Compensation),
+         Male = as.numeric(Male) - 1) %>%
+  # Create level 2 variables
+  group_by(Company) %>%
+  mutate(avgAge = mean(Age),
+         propMale = sum(Male) / n(),
+         # Group-mean center individual data
+         Age = Age - mean(Age),
+         Male = Male - mean(Male)) %>%
+  # Ungroup
+  ungroup() %>%
+  # Grand-mean center group variables
+  mutate(avgAge = avgAge - mean(avgAge),
+         propMale = propMale - mean(propMale)) %>%
+  # Sort data (makes it easier later)
+  arrange(Sector)
+  
 # Jags data
 dir_jags <- with(directors, list(## Outcome for individuals (level 1)
   
@@ -579,13 +615,24 @@ dir_jags <- with(directors, list(## Outcome for individuals (level 1)
                                  
                                  # Company indicator
                                  company=as.numeric(as.factor(Company)),
+                                 # Average age of directors for each company
+                                 avgAge=avgAge,
+                                 # Proportion of males for each company
+                                 avgMale=propMale,
                                  
                                  ## Group totals
                                  
                                  # Number of individuals
                                  n=nrow(directors),  
                                  # Number of companies
-                                 k=length(unique(Company))))
+                                 k=length(unique(Company)),
+                                 
+                                 ## Number of predictors
+                                 
+                                 # Number of individual-level predictors
+                                 p1=2,
+                                 # Number of company-level predictors
+                                 p2=2))
 
 # Intercept-only model
 io_mod <- "model {
@@ -644,7 +691,7 @@ resm1 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
 #plot(resm1)
 
 # DIC
-DICm1 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD")
+DICm1 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD") # 288.6
 
 # MAP values
 MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
@@ -663,6 +710,10 @@ for(i in seq_along(1:nrow(resmat))) {
 
 quantile(ve, c(0.025, .25, .5, .75, .975))
 # VE between .45 and .69
+
+# Save the model and DIC
+#saveRDS(resm1, "models/ML_interceptonly.rds")
+#saveRDS(DICm1, "models/ML_io_DIC.rds")
 ```
 
 The final random effects model is presented in table YY. This model corresponds to the following equation.
@@ -733,7 +784,7 @@ params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10")
 resm2 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
 
 # DIC
-DICm2 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD")
+DICm2 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD") # 280.9 => +- 9 difference
 
 # Calculate variance explained
 # MAP values for model 1
@@ -741,7 +792,58 @@ MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
 MAPm2 <- apply(do.call(rbind.data.frame, resm2), 2, mean)
 
 # Map values
-MAPve <- apply(ve_2, 2, median)
+#MAPve <- apply(ve_2, 2, median)
+
+# Save model
+saveRDS(DICm2, "models/ML_final_DIC.rds")
+saveRDS(resm2, "models/model3.rds")
+```
+
+```{r calculate variance explained for mixed model, eval=TRUE}
+# Calculate R^2. Marginal (only explained by predictors) & Conditional (predicted by variance component)
+# See: https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.2041-210x.2012.00261.x
+
+# Function to calculate marginal & conditional R^2
+# @param X design matrix containing fixed part of the model
+# @param w coefficient matrix
+# @e_1 random part of level 1
+# @e_2 random part of level 2
+MLM_R2 <- function(X, w, e_1, e_2) {
+  
+  # Component 1: fixed effect
+  e_f <- var(X %*% w)
+
+  # Compute marginal & conditional R^2
+  mar <- (e_f) / (e_f + e_1 + e_2) # Variance explained by fixed factors (marginal R^2)
+  con <- (e_f + e_2) / (e_f + e_1 + e_2) # Variance explained by fixed and random factors (conditional R^2)
+  
+  # Return
+  return(
+    c(mar, con)
+  )
+  
+}
+
+# Coerce to matrix
+resmat <- do.call(rbind, resm2)
+
+# New matrix with same dims
+ve_2 <- matrix(0, ncol=2, nrow=nrow(resmat))
+
+# X for fixed effect
+X <- matrix(directors$Age, ncol=1)
+
+# FOr each row
+# Posterior distribution of variance explained (pseudo R-squared)
+for(i in seq_along(1:nrow(resmat))) {
+  ve_2[i,] <- MLM_R2(X, 
+                 resmat[i,2],
+                 resmat[i,3],
+                 resmat[i,4])
+}
+
+# Median var explained
+mve <- apply(ve_2, 2, median)
 ```
 
 \begin{table}[H] \centering 
@@ -797,49 +899,7 @@ $\text{H}_2$ & .3 & .2 & \\
 plot(predict(dirmod2), resid(dirmod2))
 ```
 
-```{r calculate variance explained for mixed model, eval=TRUE}
-# Calculate R^2
-# See: https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.2041-210x.2012.00261.x
 
-# Function to calculate marginal & conditional R^2
-# @param X design matrix containing fixed part of the model
-# @param w coefficient matrix
-# @e_1 random part of level 1
-# @e_2 random part of level 2
-MLM_R2 <- function(X, w, e_1, e_2) {
-  
-  # Component 1: fixed effect
-  e_f <- var(X %*% w)
-
-  # Compute marginal & conditional R^2
-  mar <- (e_f) / (e_f + e_1 + e_2) # Variance explained by fixed factors (marginal R^2)
-  con <- (e_f + e_2) / (e_f + e_1 + e_2) # Variance explained by fixed and random factors (conditional R^2)
-  
-  # Return
-  return(
-    c(mar, con)
-  )
-  
-}
-
-# Coerce to matrix
-resmat <- do.call(rbind, resm2)
-
-# New matrix with same dims
-ve_2 <- matrix(0, ncol=2, nrow=nrow(resmat))
-
-# X for fixed effect
-X <- matrix(directors$Age, ncol=1)
-
-# FOr each row
-# Posterior distribution of variance explained (pseudo R-squared)
-for(i in seq_along(1:nrow(resmat))) {
-  ve_2[i,] <- MLM_R2(X, 
-                 resmat[i,2],
-                 resmat[i,3],
-                 resmat[i,4])
-}
-```
 
 ```{r r-squared plot, fig.cap="Bayesian R-squared value for model 1 (a) and model 2 (b). The proportion of cases in which the R-squared value of model 2 exceeds that of model 1 is .99. Figure (c) shows the marginal (blue) and conditional (red) R-squared values for the posterior distribution. The marginal R-squared indicates the amount of variance explained by the fixed part of the model; the conditional R-squared indicates the amount of variance explained by the fixed and random part of the model.", fig.height=2, fig.width=7, eval=TRUE}
 library(latex2exp)

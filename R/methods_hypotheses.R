@@ -93,10 +93,12 @@ print.hypotheses <- function(x) {
 
   x[[1]]$name <- names(x)[1]
   print(x[[1]])
-  for(h in 2:length(x)) {
-    x[[h]]$name <- names(x)[h]
-    cat("\n\n")
-    print(x[[h]])
+  if(length(x) > 1) {
+    for(h in 2:length(x)) {
+      x[[h]]$name <- names(x)[h]
+      cat("\n\n")
+      print(x[[h]])
+    }
   }
 
 }

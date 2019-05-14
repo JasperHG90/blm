@@ -175,6 +175,8 @@ check_hypothesis <- function(hypothesis_parsed, parameters) {
 parse_parameters <- function(exp, abs_values, algebra, is_numeric) {
   # Assign r
   r <- exp
+  # Strip parentheses if in equation
+  r <- stringr::str_replace_all(r, "\\(|\\)", "")
   # Check abs values
   if(abs_values) {
     # Strip
@@ -198,7 +200,7 @@ parse_parameters <- function(exp, abs_values, algebra, is_numeric) {
   }
   r <- r[nnums]
 
-  return(r)
+  return(unique(r))
 }
 
 # Compute the complexity of a hypothesis
