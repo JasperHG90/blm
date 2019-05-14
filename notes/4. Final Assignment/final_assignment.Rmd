@@ -51,7 +51,6 @@ directors <- directors %>%
 # Load models 
 # i.e. prevent R from re-running the models the entire time when knitting the doc (this takes a long time).
 # Instead, run code line-by-line if you need to.
-dirmod1 <- readRDS("models/model1.rds")
 dirmod2 <- readRDS("models/model2.rds")
 resm2 <- readRDS("models/model3.rds")
 ```
@@ -64,6 +63,8 @@ blm_setup()
 # Introduction
 
 Problem statement, literature & hypotheses
+
+Most of the literature on director compensation concerns execute directors. Execute directors are employed by the firm, while independent directors are concerned primarily with oversight.
 
 # Differences in Bayesian and Frequentist inference
 
@@ -257,21 +258,21 @@ $$
 \end{aligned}
 $$
 
-Given that we measure the compensation on a log scale, the coefficients we derive from the model must be interpreted as percentages. This forces us to rethink the priors we set on the model (default is mu=0, sd=1000). Additionally, even if we know very little of the effect of age on compensation (or gender for that matter), we can set some reasonable assumptions in terms of upper and lower bounds. For age, we now assume that, as age increases, compensation increases as well (not a crazy assumption). But, given that we are not certain about the extent to which it increases, we set the standard deviation of this estimate to $.1$, representing a spread of approximately $10\%$^[For values close to $0$, $exp(x) \approx 1 + x$]. For gender, we know from earlier studies that the gender gap is $17\%$. However, theory suggests that the gender gap is lower or non-existent at top-tier firms. Hence, we set this prior a mean of $.05$ with a spread of $.03$, which reflects our uncertainty of the estimate. 
+Given that we measure the compensation on a log scale, the coefficients we derive from the model must be interpreted as change in percentages. This forces us to rethink the priors we set on the model. Additionally, even if we know very little of the effect of age on compensation (or gender for that matter), we can set some reasonable assumptions in terms of upper and lower bounds. For age, we now assume that, as age increases, compensation increases as well. But, given that we are not certain about the extent to which it increases, we set the standard deviation of this estimate to $.2$, representing a spread of approximately $20\%$^[For values close to $0$, $exp(x) \approx 1 + x$]. For gender, we know from earlier studies that the gender gap is $17\%$. However, theory suggests that the gender gap is lower or non-existent at top-tier firms. Hence, we set this prior a mean of $.1$ with a spread of $.1$, which reflects our uncertainty of the estimate. 
 
-Our hypotheses are:
+We hypothesize that there is at most a small difference between the compensation of male and female directors.
 
 $$
 \text{H}_1\text{: } \beta_{\text{Male}} \approx 0
 $$
 
+Furthermore, we hypothesize that age positively impacts a director's compensation.
+
 $$
 \text{H}_2\text{: } \beta_{\text{Age}} > 0 
 $$
 
-$$
-\text{H}_3\text{: } \beta_{\text{Financial}} > \beta_{\text{Basic Materials}} > \beta_{\text{Services}}
-$$
+Then the unconstrained hypothesis is:
 
 $$
 \text{H}_u\text{: } \beta_\text{Male}, \beta_{\text{Age}}
@@ -289,104 +290,10 @@ BF sensitive to outliers (Hoijtink pp.31-32) ==> check for outliers before BF. A
 
 Bayes' Factor is sensitive to the choice of prior ==> something about the size of complexity. (Hoijtink pp.29-30)
 
-```{r model1, include = FALSE, eval=FALSE}
-## Run two linear models with blm.
-
-# Model 1: only age and male dummy ==> baseline model -----
-
-# Priors are uninformative (mean 0, sd 1000)
-# Initial values are drawn from the priors
-dirmod1 <- blm("Compensation ~ Age + Male",
-                    data=directors) %>%
-  # Set sampling options
-  set_sampling_options(chains = 2, iterations = 30000,
-                       burn = 8000, thinning=3) %>%
-  # Set initial values
-  set_initial_values(chain_1 = list("b" = c(7, -5, 0), "sigma" = 1),
-                     chain_2 = list("b" = c(-5, 0, 7), "sigma" = 2)) %>%
-  # Set priors
-  set_prior("b1", mu=0, sd=.1) %>%
-  set_prior("b2", mu=.05, sd=.1) %>%
-  # Compute null model as well
-  compute_null_model() %>%
-  # Set hypotheses
-  # What does this formulation mean in terms of standardized coefficients?
-  set_hypothesis("H1", "|b0 - (b0 + b2)| < .01") %>%
-  # Sample
-  sample_posterior() %>%
-  # Compute posterior predictive checks (using a random sample of 80% of the data)
-  evaluate_ppc(p=.8) %>%
-  # Evaluate hypotheses
-  evaluate_hypotheses()
-
-# Sanity check for coefficients ==> compare to linear model
-coef(dirmod1)
-coef(lm("Compensation ~ Age + Male", data=directors))
-
-# Check convergence for intercept-only model
-plot(dirmod1, "nullmodel") # OK
-
-# Inspect convergence
-dirmod1 %>%
-  evaluate_convergence_diagnostics() # OK (GR statistic)
-
-# Plots
-plot(dirmod1, "history") # Ok
-plot(dirmod1, "density") # OK
-plot(dirmod1, "autocorrelation") # OK
-
-# Summary
-summary(dirmod1)
-# DIC Null model = 5.13 
-# DIC = 508
-# R2 = low (approx 2.1%)
-# Approx. model BF == .0915
-# ==> male is a predictor of logged compensation (CCI contains 0)
-
-# Plot R-squared 
-# See: https://www.tandfonline.com/doi/abs/10.1080/00031305.2018.1549100?casa_token=eO-_tpyCd3wAAAAA:w9MZzAbhBb6HM-2iOPyvD2Y2veCac-HA6oDUc2drJEicqA8hXZ5IlzZUbmwtsdCWAbFzPi7kMJX1lw for thoughts on the R2 method.
-dirmod1 %>% 
-  get_value("rsq") %>%
-  plot()
-
-# Summary of ppc
-dirmod1 %>%
-  get_value("ppc") %>%
-  summary() # Violating independence. Others OK.
-
-# Plot results of the ppc
-## NOTE: it's best to execute these plots in the console
-plot(dirmod1 %>% 
-            get_value("ppc"), 
-          "normality") %>%
-      plot() # Two-sided test ==> violation 
-plot(dirmod1 %>% 
-            get_value("ppc"), 
-          "heteroskedasticity") %>%
-      plot() # One-sided test ==> violation (data are more heteroskedastic)
-plot(dirmod1 %>%
-            get_value("ppc"), 
-          "independence") %>%
-      plot() # Two-sided test ==> violation (data are muchos correlated)
-
-# Get the average correlation in the residuals
-dirmod1 %>%
-  get_value("ppc") %>%
-  get_value("data") %>%
-  .$independence %>%
-  apply(2, mean)
-
-# Soooo, the average correlation in the observed data is +-.46
-
-# Save this model
-saveRDS(dirmod1, "models/model1.rds")
-```
-
-```{r model2, include = FALSE}
+```{r model1, include = FALSE}
 # Model 2: Age, gender and sector -----
 
-# Hypothesis: the relationship between gender and compensation differs across sectors
-# We have three: financial (base case), services and Basic materials
+# We have three sectors: financial (base case), services and Basic materials 
 
 # Create the model
 dirmod2 <- blm("Compensation ~ Sector + Age + Male",
@@ -400,9 +307,17 @@ dirmod2 <- dirmod2 %>%
   # Need to delete posterior when we change settings
   # (only has an effect if posterior already present)
   delete_posterior() %>%
+  # Change the uninformative priors for the intercept and the sectors
+  # We are reasoning in percentage change now. So uninformative priors should reflect this
+  # on the same scale. (except the intercept)
+  set_prior("b0", mu = 0, sd = 100) %>%
+  set_prior("b1", mu = 0, sd = log(1000)) %>%
+  set_prior("b2", mu = 0, sd = log(1000)) %>%
   # Set an informative prior on the coefficients
+  # Age centered at 0 with .2 variance
+  set_prior("b3", mu = 0, sd = .2) %>%
   # Males (b4) are speculated to have 17% pay increase over women
-  set_prior("b4", mu = .17, sd=0.01) %>%
+  set_prior("b4", mu = .11, sd=0.1) %>%
   # Change the sampler of Age to metropolis hastings (random walk)
   # Lambda parameter controls the variance of the (normal) proposal distribution
   set_sampler("b3", type="MH", lambda=0.01) %>%
@@ -414,10 +329,16 @@ dirmod2 <- dirmod2 %>%
   # This is an issue for MH because it takes many more iterations to converge
   set_initial_values(chain_1 = list("b" = c(4, 2, 3, 8, 10), "sigma"= 1),
                      chain_2 = list("b" = c(2, 4, 7, 2, 3), "sigma"=2)) %>%
-  # Compute null model
+  # Compute null model (the intercept-only model)
   compute_null_model() %>%
+  # Set hypotheses
+  set_hypothesis("H1", "|b0 - (b0 + b4)| < .01") %>% # Gender
+  set_hypothesis("H2", "b3 > 0") %>%                # Age
   # Sample the posterior distribution
   sample_posterior()
+
+# Print model specification
+print(dirmod2)
 
 # Evaluate the accepted draws
 dirmod2 %>% 
@@ -430,7 +351,7 @@ dirmod2 %>%
 # Check history
 plot(dirmod2, "history") # This seems OK
 # Check autocorrelation
-plot(dirmod2, "autocorrelation") # Little bit, but not unexpected given MH sampler. At any rate, not too big so not really an issue.
+plot(dirmod2, "autocorrelation") # OK
 
 # Evaluate the effect of MH on the effective sample size
 dirmod2 %>% 
@@ -438,6 +359,9 @@ dirmod2 %>%
 
 # View densities
 plot(dirmod2, "density") # OK
+
+# Did the null model converge?
+plot(dirmod2, "nullmodel") # OK
 
 # Summary
 summary(dirmod2)
@@ -463,7 +387,7 @@ quantile(dirmod2$rsq$rsquared, c(0.025, 0.25, 0.5, 0.75, 0.975)) # 95% CCI [.045
 
 # Posterior predictive checks
 dirmod2 <- dirmod2 %>%
-  evaluate_ppc(p=.5)
+  evaluate_ppc(p=1)
 
 # Residual plot
 errs <- data.frame(
@@ -473,11 +397,13 @@ errs <- data.frame(
 )
 
 library(ggplot2)
+# Color residuals by company
 p1 <- ggplot(errs, aes(x=predicted_model, y=residuals_model, color=as.factor(company))) +
   geom_point() +
   theme_blm() +
   theme(legend.position="none")
 library(purrr)
+# Correlation within each board
 rc <- errs %>%
   split(.$company) %>%
   map(function(x) {
@@ -490,17 +416,18 @@ rc <- data.frame(
   "cor" = unname(rc),
   "comp" = names(rc)
 )
-
+# Plot correlation within each board
 p2 <- ggplot(rc, aes(x=reorder(comp, -abs(cor)), y=cor)) +
   geom_bar(stat="identity") +
   theme_blm() +
   theme(axis.title.x = element_blank(),
-        axis.text.x = element_blank()) # ==> correlation by boards, should do a multilevel model here to accomodate hierarchical structure of the data.
+        axis.text.x = element_blank()) 
+# ==> correlation by boards, should do a multilevel model here to accomodate hierarchical structure of the data.
 
 library(gridExtra)
 grid.arrange(p1, p2, ncol=2)
 # Summary
-summary(dirmod2$ppc)
+summary(dirmod2$ppc) # Violating independence assumption
 p <- plot(dirmod2$ppc, "normality") ; plot(p) # Two-sided test ==> violation ==> less skewed compared to model 1
 p <- plot(dirmod2$ppc, "heteroskedasticity") ; plot(p) # One-sided test ==> violation (data are more heteroskedastic) ==> more extreme than model 1
 p <- plot(dirmod2$ppc, "independence") ; plot(p) # Two-sided test ==> violation (data are correlated) ==> less extreme than model 1 so we're better taking into account group effects
@@ -510,7 +437,11 @@ p <- plot(dirmod2$ppc, "independence") ; plot(p) # Two-sided test ==> violation 
 # Model fit
 dirmod2 %>%
   get_value("DIC") %>%
-  summary()# ==> DIC is 487.895 with 6 parameters ==> fit is better than model 1
+  summary()# ==> DIC is 487.895 with 6 parameters 
+dirmod2 %>%
+  get_value("null_model") %>%
+  get_value("DIC") %>%
+  summary() # ==> 512 so the model above fits significantly better
 
 # Save this model
 saveRDS(dirmod2, "models/model2.rds")
@@ -895,7 +826,7 @@ $\text{H}_2$ & .3 & .2 & \\
 \end{small}
 \end{table}
 
-```{r classical residuals}
+```{r classical residuals, eval=FALSE}
 plot(predict(dirmod2), resid(dirmod2))
 ```
 
@@ -905,25 +836,20 @@ plot(predict(dirmod2), resid(dirmod2))
 library(latex2exp)
 library(ggplot2)
 # Plot r-squared
-p1 <- dirmod1 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
-  theme(axis.title = element_blank(),
-        axis.text.y = element_blank(),
-        plot.subtitle = element_blank()) +
-  labs(title = latex2exp::TeX("\\textbf{(a) Bayesian $R^2$ posterior (model 1)}"))
-# Model 2
-p2 <- dirmod2 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
+# Model 1
+p1 <- dirmod2 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
   theme(axis.title = element_blank(),
         axis.text.y = element_blank(),
         plot.subtitle = element_blank()) +
   labs(title = latex2exp::TeX("\\textbf{(b) Bayesian $R^2$ posterior (model 2)}"))
-# Model 3 (multilevel)
+# Model 2 (multilevel)
 veg <- ve_2 %>%
   as.data.frame() %>%
   rename("MR2" = V1, "CR2" = V2) %>%
   #select(CR2) %>%
   tidyr::gather(type, rsq)
 # Plot
-p3 <-  ggplot(veg, aes(x=rsq, fill=type)) +
+p2 <-  ggplot(veg, aes(x=rsq, fill=type)) +
     geom_histogram(alpha=.4, color="black") +
     theme_blm(text_size=8) +
     scale_fill_brewer(palette="Set1") +
@@ -939,7 +865,7 @@ p3 <-  ggplot(veg, aes(x=rsq, fill=type)) +
     labs(title = latex2exp::TeX("\\textbf{(c) Marginal and Conditional $R^2$ posterior}"))
 
 # Grid
-grid.arrange(p1, p2, p3, ncol=3)
+grid.arrange(p1, p2, ncol=2)
 ```
 
 ## Other material
