@@ -29,9 +29,17 @@ library(blm)
 # Load ggplot
 library(ggplot2)
 library(gridExtra)
+library(dplyr)
 
 # Get the directors data
 data("directors")
+
+# remove where outcome / covariate age is NA
+# (blm cannot handle missing values)
+directors_with_na <- directors
+directors <- directors %>%
+  filter(!is.na(Age),
+         !is.na(Compensation))
 
 # Keep for later
 dirs <- directors
@@ -62,9 +70,624 @@ blm_setup()
 
 # Introduction
 
-Problem statement, literature & hypotheses
+The gender gap in compensation remains a pervasive problem despite efforts to achieve income parity between men and women in the private and public sector. In 2019, the difference in compensation between men and women stood at an estimated median 17\% in the general workforce [CITE], and it appears that the glass ceiling may stretch all the way to the top. In 2016, a report found that the average growth in compensation for male execute board members of S&P500 companies^[The S\&P500 is a stock market index that tracks the 500 most profitable companies listed on the US stock exchange.] was twice that of female executive board members [CITE]. 
 
-Most of the literature on director compensation concerns execute directors. Execute directors are employed by the firm, while independent directors are concerned primarily with oversight.
+The boards of American companies consists of *executive* and *independent* directors. Execute directors are employed by the firm and usually have high positions within the company (for example the Chief Executive Officer), while independent directors are concerned primarily with oversight [CITE]. Most of the literature on director compensation concerns executive directors rather than independent directors [CITE]. In this paper, I examine the gender gap in compensation among $336$ independent directors in three sectors and $52$ companies using Bayesian Linear Regression.
+
+The results indicate that we cannot conclude definitively that male independent directors receive a higher remuneration than female independent directors after controlling for age and sector. Model fit statistics and evaluation suggest that linear regression is not an appropriate method to analyse these data because director compensation is highly correlated within companies.  
+
+The paper is structured as follows. Section 1 outlines the hypotheses, model specification and reports the results of the analyses. In turn, section 2 elaborates on the differences between Frequentist and Bayesian statistical inference. Section three concludes.
+
+# Methods & Results
+
+Table XX below shows the descriptive statistics for each variable. The outcome variable **compensation** is given in thousands of Great British pounds and has been log-transformed.
+
+```{r descriptive statistics, eval=FALSE, results='asis'}
+out <- capture.output(stargazer::stargazer(directors_with_na, summary=TRUE, median=TRUE))
+cat(paste0(out[-1:-3], "\n"))
+```
+
+The model is given by the following equation:
+
+$$
+\tag{1}
+\begin{aligned}
+\hat{\log(\text{compensation}_i)} = 
+&\beta_0 + \beta_{1} \text{age}_i + \beta_2\text{male}_i + \beta_3\text{SectorServices}_i + \beta_4\text{SectorBasicMaterials}_i + \epsilon_i
+\end{aligned}
+$$
+
+Given that we measure the compensation on a log scale, the coefficients we derive from the model must be interpreted as change in percentages. This forces us to rethink the priors we set on the model. Additionally, even if we know very little of the effect of age on compensation (or gender for that matter), we can set some reasonable assumptions in terms of upper and lower bounds. For age, we now assume that, as age increases, compensation increases as well. But, given that we are not certain about the extent to which it increases, we set the standard deviation of this estimate to $.2$, representing a spread of approximately $20\%$^[For values close to $0$, $exp(x) \approx 1 + x$]. For gender, we know from earlier studies that the gender gap is $17\%$. However, theory suggests that the gender gap is lower or non-existent at top-tier firms. Hence, we set this prior a mean of $.1$ with a spread of $.1$, which reflects our uncertainty of the estimate. 
+
+We hypothesize that there is at most a small difference, which we will set at $5\%$, between the compensation of male and female directors.
+
+$$
+\text{H}_1\text{: } |\beta_{\text{Male}}| \leq .05
+$$
+
+Furthermore, we hypothesize that age positively impacts a director's compensation.
+
+$$
+\text{H}_2\text{: } \beta_{\text{Age}} > 0 
+$$
+
+Finally, we specify the unconstrained hypothesis as:
+
+$$
+\text{H}_u\text{: } \beta_\text{Male}, \beta_{\text{Age}}
+$$
+
+These hypotheses will be included in the models we construct. (Hoitjtink p.24).
+
+PRA is the weight of a particular Bayes factor compared to the other hypotheses. That is, it is a proportion of the total evidence.
+
+PRB is the probability of the marginal likelihood of each hypothesis, or $P(H_i | model)$. In essence, this functions as an indication of error probabilities; if we 'cut' the parameter space into many pieces, so does our confidence in our hypothesis go down.
+
+The quantities PRB are the Bayesian error probabilities 
+
+BF sensitive to outliers (Hoijtink pp.31-32) ==> check for outliers before BF. Also violation of model assumptions using ppc. We should use a robust BF but we don't have that. Anyway, interpret the BF with a grain of salt.
+
+Bayes' Factor is sensitive to the choice of prior ==> something about the size of complexity. (Hoijtink pp.29-30)
+
+```{r model1, include = FALSE}
+# Model 2: Age, gender and sector -----
+
+# We have three sectors: financial (base case), services and Basic materials 
+
+# Create the model
+dirmod2 <- blm("Compensation ~ Sector + Age + Male",
+                data=directors) 
+
+# Retrieve parameter names
+dirmod2 %>% get_parameter_names()
+
+# Update the model specification
+dirmod2 <- dirmod2 %>%
+  # Need to delete posterior when we change settings
+  # (only has an effect if posterior already present)
+  delete_posterior() %>%
+  # Change the uninformative priors for the intercept and the sectors
+  # We are reasoning in percentage change now. So uninformative priors should reflect this
+  # on the same scale. (except the intercept)
+  set_prior("b0", mu = 0, sd = 100) %>%
+  set_prior("b1", mu = 0, sd = log(1000)) %>%
+  set_prior("b2", mu = 0, sd = log(1000)) %>%
+  # Set an informative prior on the coefficients
+  # Age centered at 0 with .2 variance
+  set_prior("b3", mu = 0, sd = .2) %>%
+  # Males (b4) are speculated to have 17% pay increase over women
+  set_prior("b4", mu = .17, sd=0.1) %>%
+  # Change the sampler of Age to metropolis hastings (random walk)
+  # Lambda parameter controls the variance of the (normal) proposal distribution
+  set_sampler("b3", type="MH", lambda=0.01) %>%
+  # Update sampling settings
+  set_sampling_options(chains = 2, iterations = 80000,
+                       burn = 15000, thinning=5) %>%
+  # Set initial values
+  # If we draw from the priors the starting values will be too large
+  # This is an issue for MH because it takes many more iterations to converge
+  set_initial_values(chain_1 = list("b" = runif(5, 0, 10), "sigma"=1),
+                     chain_2 = list("b" = runif(5, 0, 10), "sigma"=2)) %>%
+  # Compute null model (the intercept-only model)
+  compute_null_model() %>%
+  # Set hypotheses
+  set_hypothesis("H1", "|b0 - (b0 + b4)| < .05") %>% # Gender: less than 5 percent difference
+  set_hypothesis("H2", "b3 > 0") %>%                 # Age: larger than 0
+  # Sample the posterior distribution
+  sample_posterior()
+
+# Print model specification
+print(dirmod2)
+
+# Evaluate the accepted draws
+dirmod2 %>% 
+  evaluate_accepted_draws() # ~ 40-45%
+
+# Look at burn-in diagnostics
+dirmod2 %>% 
+  evaluate_convergence_diagnostics() # GR: chains have converged
+
+# Check history
+plot(dirmod2, "history") # This seems OK
+# Check autocorrelation
+plot(dirmod2, "autocorrelation") # OK
+
+# Evaluate the effect of MH on the effective sample size
+dirmod2 %>% 
+  evaluate_effective_sample_size() # OK
+
+# View densities
+plot(dirmod2, "density") # OK
+
+# Did the null model converge?
+plot(dirmod2, "nullmodel") # OK
+
+# Summary
+summary(dirmod2)
+# ==> Male not a predictor
+# ==> age a predictor
+# ==> Both sectors increase compensation for directors
+
+# R-squared value
+# Compute a z-score difference from the posterior to the prior
+# Idea: how much does the posterior shift when confronted with new data?
+#        calculate on the scale of the posterior
+thprior <- rnorm(1, mean=dirmod2$priors$b4$mu, sd=dirmod2$priors$b4$sd)
+ps <- get_posterior_samples(dirmod2) 
+pmu <- apply(ps, 2, mean)
+psd <- apply(ps, 2, sd)
+z <- abs((pmu["Male"] - thprior) / psd["Male"])
+shrink <- psd[5] / .01 # Factor of 6 ==> this means that the posterior variance is 6 times larger than the prior variance.
+
+# Plot
+plot(dirmod2$rsq)
+median(dirmod2$rsq$rsquared) # R-squared ~ .089
+quantile(dirmod2$rsq$rsquared, c(0.025, 0.25, 0.5, 0.75, 0.975)) # 95% CCI [.045, .15]
+
+# Posterior predictive checks
+dirmod2 <- dirmod2 %>%
+  evaluate_ppc(p=1)
+
+# Residual plot
+errs <- data.frame(
+  "residuals_model" = resid(dirmod2),
+  "predicted_model" = predict(dirmod2),
+  "company" = as.character(directors$Company[!is.na(directors$Compensation)])
+)
+
+library(ggplot2)
+# Color residuals by company
+p1 <- ggplot(errs, aes(x=predicted_model, y=residuals_model, color=as.factor(company))) +
+  geom_point() +
+  theme_blm() +
+  theme(legend.position="none")
+library(purrr)
+# Correlation within each board
+rc <- errs %>%
+  split(.$company) %>%
+  map(function(x) {
+    x$residuals_lagged <- c(NA, x$residuals_model[1:length(x$residuals_model)-1])
+    cor(x$residuals_model, x$residuals_lagged, use="complete.obs")
+  }) %>%
+  unlist()
+
+rc <- data.frame(
+  "cor" = unname(rc),
+  "comp" = names(rc)
+)
+# Plot correlation within each board
+p2 <- ggplot(rc, aes(x=reorder(comp, -abs(cor)), y=cor)) +
+  geom_bar(stat="identity") +
+  theme_blm() +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank()) 
+# ==> correlation by boards, should do a multilevel model here to accomodate hierarchical structure of the data.
+
+library(gridExtra)
+grid.arrange(p1, p2, ncol=2)
+# Summary
+summary(dirmod2$ppc) # Violating independence assumption
+p <- plot(dirmod2$ppc, "normality") ; plot(p) # Two-sided test ==> violation ==> less skewed compared to model 1
+p <- plot(dirmod2$ppc, "heteroskedasticity") ; plot(p) # One-sided test ==> violation (data are more heteroskedastic) ==> more extreme than model 1
+p <- plot(dirmod2$ppc, "independence") ; plot(p) # Two-sided test ==> violation (data are correlated) ==> less extreme than model 1 so we're better taking into account group effects
+
+## Autocorrelation ==> not strange. Board members of the same COMPANY are more alike than board members of other company. Hence the correlation in the errors.
+
+# Model fit
+dirmod2 %>%
+  get_value("DIC") %>%
+  summary()# ==> DIC is 487.895 with 6 parameters 
+dirmod2 %>%
+  get_value("null_model") %>%
+  get_value("DIC") %>%
+  summary() # ==> 513 so the model above fits significantly better
+
+# Save this model
+saveRDS(dirmod2, "models/model2.rds")
+```
+
+
+```{r PPC results, eval=FALSE, fig.width=7, fig.height=2, fig.cap="A random subset of observed and simulated correlation coefficients for model 1 (left) and model 2 (right). The figure shows that the observed residuals (in red) are much more correlated than is reasonable under the model (represented by the blue, simulated values)."}
+# Collect ppc results
+ppc_results <- dirmod2$ppc$data$independence
+# Mean correlation over samples
+mcor <- mean(ppc_results[,2])
+
+# Get values for independence ppc
+
+# Model 1
+indeppc2 <- dirmod2 %>% get_value("ppc") %>%
+  get_value("data") %>% .$independence %>%
+  as.data.frame() %>%
+  tidyr::gather(type, value) %>%
+  mutate(type = ifelse(type == "V1", "Simulated", "Observed"),
+         samp = runif(1:n())) %>%
+  filter(samp <= .15) %>%
+  group_by(type) %>%
+  mutate(index = 1:n()) %>%
+  ggplot(aes(x=index, y=value, color=type)) +
+    geom_point() +
+    theme_blm() +
+    scale_color_brewer(palette = "Set1") +
+    theme(axis.text.x = element_blank(),
+          axis.title.y = element_blank(),
+          legend.title = element_text(rel(1.2)),
+          legend.text = element_text(rel(1.2)),
+          axis.title.x = element_blank(),
+          legend.position = "none") +
+  labs(title="(b) Model 2", subtitle = "PPC independence of errors")
+# Plot
+indeppc2
+```
+
+From the posterior predictive checks (table XY), we observe that the data are not independent $(\hat{r}_{\text{PPC, Model1}} = .423)$. That is, directors who are in the same board tend to are more similar to each other than directors from other boards. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards. Indeed, the results of the random effects model shows that the intra-class correlation coefficient $\rho$ equals $57\%$, meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The results of running all different stages of a multilevel model are presented in another document.] 
+
+```{r MLM intercept-only model}
+library(rjags)
+
+# Reload directors
+data("directors")
+# Remove missing values
+directors <- directors %>%
+  filter(!is.na(Age),
+         !is.na(Compensation)) %>%
+  # Refactor
+  mutate(Company = factor(as.character(Company)))
+
+# Preprocess directors data
+library(dplyr)
+directors <- directors %>%
+  # Log compensation
+  mutate(Compensation = log(Compensation),
+         Male = as.numeric(Male) - 1) %>%
+  # Create level 2 variables
+  group_by(Company) %>%
+  mutate(avgAge = mean(Age, na.rm=TRUE),
+         propMale = sum(Male) / n(),
+         # Group-mean center individual data
+         Age = Age - mean(Age),
+         Male = Male - mean(Male)) %>%
+  # Ungroup
+  ungroup() %>%
+  # Grand-mean center group variables
+  mutate(avgAge = avgAge - mean(avgAge),
+         propMale = propMale - mean(propMale)) %>%
+  # Sort data (makes it easier later)
+  arrange(Sector)
+  
+# Jags data
+dir_jags <- with(directors, list(## Outcome for individuals (level 1)
+  
+                                 compensation = Compensation,
+                                 # Age of individuals
+                                 age=Age,
+                                 # Gender of individuals
+                                 gender=Male,
+                                 
+                                 ## Company-level variables (level 2)
+                                 
+                                 # Company indicator
+                                 company=as.numeric(as.factor(Company)),
+                                 # Average age of directors for each company
+                                 avgAge=avgAge,
+                                 # Proportion of males for each company
+                                 avgMale=propMale,
+                                 
+                                 ## Group totals
+                                 
+                                 # Number of individuals
+                                 n=nrow(directors),  
+                                 # Number of companies
+                                 k=length(unique(Company)),
+                                 
+                                 ## Number of predictors
+                                 
+                                 # Number of individual-level predictors
+                                 p1=2,
+                                 # Number of company-level predictors
+                                 p2=2))
+
+# Intercept-only model
+io_mod <- "model {
+
+  ### Level 2 ==> companies
+
+	# Priors (companies)
+	tau_u0 ~ dgamma(.01, .01)
+	# Hyperprior for mean
+  gamma_00 ~ dnorm(0, 1.0E-4)
+  # For each company
+	for (j in 1:k) {
+	  # For each company, draw from normal
+    b0[j] ~ dnorm(gamma_00, tau_u0)
+	}
+
+	### Level 1 ==> individuals
+
+  # Priors
+  # Individual precision
+	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect (variance within companies)
+  # For each individual
+	for (i in 1:n) {
+		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
+		mu[i] <- b0[company[i]] # Linear combination for each person
+	}
+
+  # Invert gamma
+  sigma_e <- 1 / sqrt(tau)
+  sigma_u0 <- 1 / sqrt(tau_u0)
+
+}"
+
+# Run the model in JAGS
+# Initial values
+dir_inits <- list(
+  init1 <- list(tau=runif(1), tau_u0=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1))
+)
+
+# Specify model in JAGS
+mod_io <- jags.model(textConnection(io_mod), 
+                     data = dir_jags,
+                     inits = dir_inits,
+                     n.chains=2)
+
+# Burn
+update(mod_io, n.iter=60000)
+
+# Draw samples
+params <- c("sigma_e", "sigma_u0", "gamma_00")
+# Run the chain
+resm1 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
+
+# Convergence?
+plot(resm1) # Ok
+gelman.plot(resm1) # Ok
+
+# DIC
+DICm1 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD") # 288.6
+
+# MAP values
+MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
+
+# Coerce to matrix
+resmat <- do.call(rbind, resm1)
+
+# New matrix with same dims
+ve <- matrix(0, ncol=1, nrow=nrow(resmat))
+
+# FOr each row
+# Posterior distribution of ICC
+for(i in seq_along(1:nrow(resmat))) {
+  ve[i,] <- c(resmat[i,3]^2 / sum(resmat[i,-1]^2))
+}
+
+quantile(ve, c(0.025, .25, .5, .75, .975))
+# VE between .45 and .69
+
+# Save the model and DIC
+saveRDS(resm1, "models/ML_interceptonly.rds")
+saveRDS(DICm1, "models/ML_io_DIC.rds")
+```
+
+The final random effects model is presented in table YY. This model corresponds to the following equation.
+
+$$
+\tag{3}
+\begin{aligned}
+\text{compensation}_{ij} =
+&\gamma_{00} + u_{0j} + \gamma_{10}\cdot \text{Age}_{ij} + e_{ij}
+\end{aligned}
+$$
+
+Where $\gamma_{00}$ is the overall intercept and $u_{0j}$ is a company-specific error term. Notice that the fit of this model is much better than that of the previous models, indicating that the multilevel approach seems appropriate (mention DIC). The marginal and conditional R-squared values [CITE] are $R^2_{\text{M}} = .0056; \ 95\% \ \text{CCI}=[.0008, .015]$ and $R^2_{\text{C}} = .5398; \ 95\% \ \text{CCI}=[.4807, .6]$ respectively. This indicates that the fixed part of the model (age) explains almost no variation in the data, but the fixed and random parts together explain some $54\%$ of the total variation. Hence, it appears that director compensation is  that we do not have the right variables at either level 1 or 2 that would help us explain the heterogeneity in comepnsation among directors within boards and between boards.
+
+```{r MLM level-1 predictors}
+# Initial values
+dir_inits <- list(
+  init1 <- list(tau=runif(1), tau_u0=runif(1)),
+  init2 <- list(tau=runif(1), tau_u0=runif(1))
+)
+
+# Model
+mlm_2 <- "model {
+
+  ### Level 2 ==> companies
+
+	# Priors (companies)
+	tau_u0 ~ dgamma(.01, .01)
+	# Hyperprior for mean
+  gamma_00 ~ dnorm(0, 1.0E-4)
+  gamma_10 ~ dnorm(0, 1.0E-4)
+  # For each company
+	for (j in 1:k) {
+	  # For each company, draw from normal
+    b0[j] ~ dnorm(gamma_00, tau_u0)
+	}
+
+	### Level 1 ==> individuals
+
+  # Priors
+  # Individual precision
+	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect
+  # For each individual
+	for (i in 1:n) {
+		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
+		mu[i] <- b0[company[i]] + # Intercept
+		         gamma_10*age[i] #+ gamma_20*gender[i] # Level 1 variables
+	}
+
+  # Invert gamma
+  sigma_e <- 1 / sqrt(tau)
+  sigma_u0 <- 1 / sqrt(tau_u0)
+
+}"
+
+# Specify model in JAGS
+mod_io <- jags.model(textConnection(mlm_2), 
+                     data = dir_jags,
+                     inits = dir_inits,
+                     n.chains=2)
+
+# Burn
+update(mod_io, n.iter=60000)
+
+# Draw samples
+params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10")
+# Run the chain
+resm2 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
+
+# DIC
+DICm2 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD") # 280.9 => +- 9 difference
+
+# Calculate variance explained
+# MAP values for model 1
+MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
+MAPm2 <- apply(do.call(rbind.data.frame, resm2), 2, mean)
+
+# Map values
+#MAPve <- apply(ve_2, 2, median)
+
+# Save model
+saveRDS(DICm2, "models/ML_final_DIC.rds")
+saveRDS(resm2, "models/model3.rds")
+```
+
+```{r calculate variance explained for mixed model, eval=TRUE}
+# Calculate R^2. Marginal (only explained by predictors) & Conditional (predicted by variance component)
+# See: https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.2041-210x.2012.00261.x
+
+# Function to calculate marginal & conditional R^2
+# @param X design matrix containing fixed part of the model
+# @param w coefficient matrix
+# @e_1 random part of level 1
+# @e_2 random part of level 2
+MLM_R2 <- function(X, w, e_1, e_2) {
+  
+  # Component 1: fixed effect
+  e_f <- var(X %*% w)
+
+  # Compute marginal & conditional R^2
+  mar <- (e_f) / (e_f + e_1 + e_2) # Variance explained by fixed factors (marginal R^2)
+  con <- (e_f + e_2) / (e_f + e_1 + e_2) # Variance explained by fixed and random factors (conditional R^2)
+  
+  # Return
+  return(
+    c(mar, con)
+  )
+  
+}
+
+# Coerce to matrix
+resmat <- do.call(rbind, resm2)
+
+# New matrix with same dims
+ve_2 <- matrix(0, ncol=2, nrow=nrow(resmat))
+
+# X for fixed effect
+X <- matrix(directors$Age, ncol=1)
+
+# FOr each row
+# Posterior distribution of variance explained (pseudo R-squared)
+for(i in seq_along(1:nrow(resmat))) {
+  ve_2[i,] <- MLM_R2(X, 
+                 resmat[i,2],
+                 resmat[i,3],
+                 resmat[i,4])
+}
+
+# Median var explained
+mve <- apply(ve_2, 2, median)
+```
+
+\begin{table}[H] \centering 
+\begin{small}
+  \caption{Model results } 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{3}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-4} 
+\\[-1.8ex] & \multicolumn{3}{c}{Compensation (GBR '000, logged)} \\ 
+\\[-1.8ex] & (1) & (2) & (3)\\ 
+\\[-1.8ex] & Linear & Linear & Linear mixed effects \\
+\\[-1.8ex] & (blm) & (blm) & (JAGS) \\
+\hline \\[-1.8ex] 
+\textit{(a) Fixed} & & & \\
+Constant & 4.991  (4.936, 5.046) & 4.821 (4.732, 4.910) & 4.991 (4.877, 5.110) \\ 
+SectorBasic Materials &  & .225 (.079, .370) &  \\ 
+SectorServices &  & .292 (.169, .414) &  \\ 
+Male & .065 ($-$.085, .215) & .153 (.095, .209) & \\ 
+Age & .008 (0.000, .017) & .009 (.001, .017) & .001 (.0035, .0155) \\ 
+\hline \\[-1.8ex] 
+\textit{(b) Random} & & & \\
+$\sigma^2_e$ & .516 & .501 & .342 \\
+$\sigma^2_{u0}$ & & & .399\\
+\hline \\[-1.8ex] 
+\textit{(c) Model Fit} \\
+Observations & 336 & 336 & 336 \\
+Companies & & & 52 \\
+DIC & 508 & 488 & 280 \\ 
+Penalty. & 4 & 6 & 47 \\ 
+R$^{2}$ & .021 & .098 & .006 (M), .536 (C) \\ 
+BF & .112 & 37.596 & \\
+\hline \\[-1.8ex] 
+\textit{(d) Post. Pred. Checks} & & & \\
+Normality & .361 & .353 &  \\
+Homoskedasticity & .326 & .607 & \\
+Independence & 0 & 0 & \\
+\hline \\[-1.8ex] 
+\textit{(e) Bayes' Factors} & & & \\
+$\text{H}_1$ & 4.5 & 5.2 &  \\
+$\text{H}_2$ & 3.4 & 6 & \\
+$\text{H}_2$ & .3 & .2 & \\
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{3}{r}{Baseline is sector 'Financials' for models (1) and (2)} \\
+\end{tabular} 
+\end{small}
+\end{table}
+
+```{r classical residuals, eval=FALSE}
+plot(predict(dirmod2), resid(dirmod2))
+```
+
+```{r r-squared plot, fig.cap="Bayesian R-squared value for model 1 (a) and model 2 (b). The proportion of cases in which the R-squared value of model 2 exceeds that of model 1 is .99. Figure (c) shows the marginal (blue) and conditional (red) R-squared values for the posterior distribution. The marginal R-squared indicates the amount of variance explained by the fixed part of the model; the conditional R-squared indicates the amount of variance explained by the fixed and random part of the model.", fig.height=2, fig.width=7, eval=TRUE}
+library(latex2exp)
+library(ggplot2)
+# Plot r-squared
+# Model 1
+p1 <- dirmod2 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
+  theme(axis.title = element_blank(),
+        axis.text.y = element_blank(),
+        plot.subtitle = element_blank()) +
+  labs(title = latex2exp::TeX("\\textbf{(b) Bayesian $R^2$ posterior (model 2)}"))
+# Model 2 (multilevel)
+veg <- ve_2 %>%
+  as.data.frame() %>%
+  rename("MR2" = V1, "CR2" = V2) %>%
+  #select(CR2) %>%
+  tidyr::gather(type, rsq)
+# Plot
+p2 <-  ggplot(veg, aes(x=rsq, fill=type)) +
+    geom_histogram(alpha=.4, color="black") +
+    theme_blm(text_size=8) +
+    scale_fill_brewer(palette="Set1") +
+    geom_vline(xintercept=veg %>% filter(type=="MR2") %>% 
+                 select(rsq) %>% pull() %>% 
+                 median(), linetype="dashed") +
+    geom_vline(xintercept=veg %>% filter(type=="CR2") %>% 
+                 select(rsq) %>% pull() %>% 
+                 median(), linetype="dashed") +
+    theme(axis.title = element_blank(),
+          axis.text.y = element_blank(),
+          legend.position = "none") +
+    labs(title = latex2exp::TeX("\\textbf{(c) Marginal and Conditional $R^2$ posterior}"))
+
+# Grid
+grid.arrange(p1, p2, ncol=2)
+```
 
 # Differences in Bayesian and Frequentist inference
 
@@ -240,633 +863,6 @@ Frequentist statistics obscures the interpretation of critical statistics to the
 The effect of changing the prior variance can be summarized using a posterior shrinking factor (CITE BETANCOURT) and posterior z-score. The shrinking factor shows us the factor by which the variance of the posterior distribution shrinks or expands compared to the prior variance. The posterior z-score tells us the direction and magnitude by which the posterior mean shifts compared to the prior mean; if we are confident in the precision of our domain knowledge (resulting in small prior variance), the resulting posterior weights this information strongly and we end up with a posterior mean that lies closer to the prior mean (represented by the z-score). However, given that we have small variance, and if this is not corroborated by the data, then the shrinkage factor will be large. 
 -->
 
-# Methods & Results
-
-Table XX below shows the descriptive statistics for each variable. The outcome variable **compensation** is given in thousands of Great British pounds and has been log-transformed.
-
-```{r descriptive statistics, eval=FALSE, results='asis'}
-out <- capture.output(stargazer::stargazer(dirs, summary=TRUE, median=TRUE))
-cat(paste0(out[-1:-3], "\n"))
-```
-
-The model is given by the following equation:
-
-$$
-\begin{aligned}
-\hat{\log(\text{compensation}_i)} = 
-&\beta_0 + \beta_{1} \text{age}_i + \beta_2\text{male}_i + \beta_3\text{SectorServices}_i + \beta_4\text{SectorBasicMaterials}_i + \epsilon_i
-\end{aligned}
-$$
-
-Given that we measure the compensation on a log scale, the coefficients we derive from the model must be interpreted as change in percentages. This forces us to rethink the priors we set on the model. Additionally, even if we know very little of the effect of age on compensation (or gender for that matter), we can set some reasonable assumptions in terms of upper and lower bounds. For age, we now assume that, as age increases, compensation increases as well. But, given that we are not certain about the extent to which it increases, we set the standard deviation of this estimate to $.2$, representing a spread of approximately $20\%$^[For values close to $0$, $exp(x) \approx 1 + x$]. For gender, we know from earlier studies that the gender gap is $17\%$. However, theory suggests that the gender gap is lower or non-existent at top-tier firms. Hence, we set this prior a mean of $.1$ with a spread of $.1$, which reflects our uncertainty of the estimate. 
-
-We hypothesize that there is at most a small difference between the compensation of male and female directors.
-
-$$
-\text{H}_1\text{: } \beta_{\text{Male}} \approx 0
-$$
-
-Furthermore, we hypothesize that age positively impacts a director's compensation.
-
-$$
-\text{H}_2\text{: } \beta_{\text{Age}} > 0 
-$$
-
-Then the unconstrained hypothesis is:
-
-$$
-\text{H}_u\text{: } \beta_\text{Male}, \beta_{\text{Age}}
-$$
-
-These hypotheses will be included in the models we construct. (Hoitjtink p.24).
-
-PRA is the weight of a particular Bayes factor compared to the other hypotheses. That is, it is a proportion of the total evidence.
-
-PRB is the probability of the marginal likelihood of each hypothesis, or $P(H_i | model)$. In essence, this functions as an indication of error probabilities; if we 'cut' the parameter space into many pieces, so does our confidence in our hypothesis go down.
-
-The quantities PRB are the Bayesian error probabilities 
-
-BF sensitive to outliers (Hoijtink pp.31-32) ==> check for outliers before BF. Also violation of model assumptions using ppc. We should use a robust BF but we don't have that. Anyway, interpret the BF with a grain of salt.
-
-Bayes' Factor is sensitive to the choice of prior ==> something about the size of complexity. (Hoijtink pp.29-30)
-
-```{r model1, include = FALSE}
-# Model 2: Age, gender and sector -----
-
-# We have three sectors: financial (base case), services and Basic materials 
-
-# Create the model
-dirmod2 <- blm("Compensation ~ Sector + Age + Male",
-                data=directors) 
-
-# Retrieve parameter names
-dirmod2 %>% get_parameter_names()
-
-# Update the model specification
-dirmod2 <- dirmod2 %>%
-  # Need to delete posterior when we change settings
-  # (only has an effect if posterior already present)
-  delete_posterior() %>%
-  # Change the uninformative priors for the intercept and the sectors
-  # We are reasoning in percentage change now. So uninformative priors should reflect this
-  # on the same scale. (except the intercept)
-  set_prior("b0", mu = 0, sd = 100) %>%
-  set_prior("b1", mu = 0, sd = log(1000)) %>%
-  set_prior("b2", mu = 0, sd = log(1000)) %>%
-  # Set an informative prior on the coefficients
-  # Age centered at 0 with .2 variance
-  set_prior("b3", mu = 0, sd = .2) %>%
-  # Males (b4) are speculated to have 17% pay increase over women
-  set_prior("b4", mu = .11, sd=0.1) %>%
-  # Change the sampler of Age to metropolis hastings (random walk)
-  # Lambda parameter controls the variance of the (normal) proposal distribution
-  set_sampler("b3", type="MH", lambda=0.01) %>%
-  # Update sampling settings
-  set_sampling_options(chains = 2, iterations = 80000,
-                       burn = 15000, thinning=5) %>%
-  # Set initial values
-  # If we draw from the priors the starting values will be too large
-  # This is an issue for MH because it takes many more iterations to converge
-  set_initial_values(chain_1 = list("b" = c(4, 2, 3, 8, 10), "sigma"= 1),
-                     chain_2 = list("b" = c(2, 4, 7, 2, 3), "sigma"=2)) %>%
-  # Compute null model (the intercept-only model)
-  compute_null_model() %>%
-  # Set hypotheses
-  set_hypothesis("H1", "|b0 - (b0 + b4)| < .01") %>% # Gender
-  set_hypothesis("H2", "b3 > 0") %>%                # Age
-  # Sample the posterior distribution
-  sample_posterior()
-
-# Print model specification
-print(dirmod2)
-
-# Evaluate the accepted draws
-dirmod2 %>% 
-  evaluate_accepted_draws() # ~ 40-45%
-
-# Look at burn-in diagnostics
-dirmod2 %>% 
-  evaluate_convergence_diagnostics() # GR: chains have converged
-
-# Check history
-plot(dirmod2, "history") # This seems OK
-# Check autocorrelation
-plot(dirmod2, "autocorrelation") # OK
-
-# Evaluate the effect of MH on the effective sample size
-dirmod2 %>% 
-  evaluate_effective_sample_size() # OK
-
-# View densities
-plot(dirmod2, "density") # OK
-
-# Did the null model converge?
-plot(dirmod2, "nullmodel") # OK
-
-# Summary
-summary(dirmod2)
-# ==> Male still not a predictor
-# ==> age now a predictor
-# ==> Both sectors increase compensation for directors
-
-# R-squared value
-# Compute a z-score difference from the posterior to the prior
-# Idea: how much does the posterior shift when confronted with new data?
-#        calculate on the scale of the posterior
-thprior <- rnorm(1, mean=dirmod2$priors$b4$mu, sd=dirmod2$priors$b4$sd)
-ps <- get_posterior_samples(dirmod2) 
-pmu <- apply(ps, 2, mean)
-psd <- apply(ps, 2, sd)
-z <- abs((pmu["Male"] - thprior) / psd["Male"])
-shrink <- psd[5] / .01 # Factor of 6 ==> this means that the posterior variance is 6 times larger than the prior variance.
-
-# Plot
-plot(dirmod2$rsq)
-median(dirmod2$rsq$rsquared) # R-squared ~ .089
-quantile(dirmod2$rsq$rsquared, c(0.025, 0.25, 0.5, 0.75, 0.975)) # 95% CCI [.045, .15]
-
-# Posterior predictive checks
-dirmod2 <- dirmod2 %>%
-  evaluate_ppc(p=1)
-
-# Residual plot
-errs <- data.frame(
-  "residuals_model" = resid(dirmod2),
-  "predicted_model" = predict(dirmod2),
-  "company" = directors$Company
-)
-
-library(ggplot2)
-# Color residuals by company
-p1 <- ggplot(errs, aes(x=predicted_model, y=residuals_model, color=as.factor(company))) +
-  geom_point() +
-  theme_blm() +
-  theme(legend.position="none")
-library(purrr)
-# Correlation within each board
-rc <- errs %>%
-  split(.$company) %>%
-  map(function(x) {
-    x$residuals_lagged <- c(NA, x$residuals_model[1:length(x$residuals_model)-1])
-    cor(x$residuals_model, x$residuals_lagged, use="complete.obs")
-  }) %>%
-  unlist()
-
-rc <- data.frame(
-  "cor" = unname(rc),
-  "comp" = names(rc)
-)
-# Plot correlation within each board
-p2 <- ggplot(rc, aes(x=reorder(comp, -abs(cor)), y=cor)) +
-  geom_bar(stat="identity") +
-  theme_blm() +
-  theme(axis.title.x = element_blank(),
-        axis.text.x = element_blank()) 
-# ==> correlation by boards, should do a multilevel model here to accomodate hierarchical structure of the data.
-
-library(gridExtra)
-grid.arrange(p1, p2, ncol=2)
-# Summary
-summary(dirmod2$ppc) # Violating independence assumption
-p <- plot(dirmod2$ppc, "normality") ; plot(p) # Two-sided test ==> violation ==> less skewed compared to model 1
-p <- plot(dirmod2$ppc, "heteroskedasticity") ; plot(p) # One-sided test ==> violation (data are more heteroskedastic) ==> more extreme than model 1
-p <- plot(dirmod2$ppc, "independence") ; plot(p) # Two-sided test ==> violation (data are correlated) ==> less extreme than model 1 so we're better taking into account group effects
-
-## Autocorrelation ==> not strange. Board members of the same COMPANY are more alike than board members of other company. Hence the correlation in the errors.
-
-# Model fit
-dirmod2 %>%
-  get_value("DIC") %>%
-  summary()# ==> DIC is 487.895 with 6 parameters 
-dirmod2 %>%
-  get_value("null_model") %>%
-  get_value("DIC") %>%
-  summary() # ==> 512 so the model above fits significantly better
-
-# Save this model
-saveRDS(dirmod2, "models/model2.rds")
-```
-
-```{r PPC results, eval=FALSE, fig.width=7, fig.height=2, fig.cap="A random subset of observed and simulated correlation coefficients for model 1 (left) and model 2 (right). The figure shows that the observed residuals (in red) are much more correlated than is reasonable under the model (represented by the blue, simulated values)."}
-# Collect ppc results
-ppc1 <- do.call(cbind.data.frame, dirmod1$ppc$results)
-ppc2 <- do.call(cbind.data.frame, dirmod2$ppc$results)
-
-# Bind rows
-ppc_results <- round(rbind(ppc1, ppc2), digits=4)
-row.names(ppc_results) <- c("Model 1", "Model 2")
-
-# Get values for independence ppc
-indeppc1 <- dirmod1 %>% get_value("ppc") %>%
-  get_value("data") %>% .$independence %>%
-  as.data.frame() %>%
-  tidyr::gather(type, value) %>%
-  mutate(type = ifelse(type == "V1", "Simulated", "Observed"),
-         samp = runif(1:n())) %>%
-  filter(samp <= .15) %>%
-  group_by(type) %>%
-  mutate(index = 1:n()) %>%
-  ggplot(aes(x=index, y=value, color=type)) +
-    geom_point() +
-    theme_blm() +
-    scale_color_brewer(palette = "Set1") +
-    theme(axis.text.x = element_blank(),
-          legend.title = element_text(rel(1.2)),
-          legend.text = element_text(rel(1.2)),
-          axis.title.y = element_text(size=12),
-          axis.title.x = element_blank(),
-          legend.position = "none") +
-    scale_y_continuous(name = latex2exp::latex2exp("Pearson corr. coef.")) +
-  labs(title="(b) Model 2", subtitle = "PPC independence of errors")
-
-# Model 2
-indeppc2 <- dirmod2 %>% get_value("ppc") %>%
-  get_value("data") %>% .$independence %>%
-  as.data.frame() %>%
-  tidyr::gather(type, value) %>%
-  mutate(type = ifelse(type == "V1", "Simulated", "Observed"),
-         samp = runif(1:n())) %>%
-  filter(samp <= .15) %>%
-  group_by(type) %>%
-  mutate(index = 1:n()) %>%
-  ggplot(aes(x=index, y=value, color=type)) +
-    geom_point() +
-    theme_blm() +
-    scale_color_brewer(palette = "Set1") +
-    theme(axis.text.x = element_blank(),
-          axis.title.y = element_blank(),
-          legend.title = element_text(rel(1.2)),
-          legend.text = element_text(rel(1.2)),
-          axis.title.x = element_blank(),
-          legend.position = "none") +
-  labs(title="(b) Model 2", subtitle = "PPC independence of errors")
-
-gridExtra::grid.arrange(indeppc1, indeppc2, ncol=2)
-```
-
-From the posterior predictive checks (table XY), we observe that the data are not independent $(\hat{r}_{\text{PPC, Model1}} = .466)$. That is, directors who are in the same board tend to are more similar to each other than directors from other boards. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards. Indeed, the results of the random effects model shows that the intra-class correlation coefficient $\rho$ equals $57\%$, meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The results of running all different stages of a multilevel model are presented in another document.] 
-
-```{r MLM intercept-only model}
-library(rjags)
-
-# Reload directors
-data("directors")
-
-# Preprocess directors data
-library(dplyr)
-directors <- directors %>%
-  # Log compensation
-  mutate(Compensation = log(Compensation),
-         Male = as.numeric(Male) - 1) %>%
-  # Create level 2 variables
-  group_by(Company) %>%
-  mutate(avgAge = mean(Age),
-         propMale = sum(Male) / n(),
-         # Group-mean center individual data
-         Age = Age - mean(Age),
-         Male = Male - mean(Male)) %>%
-  # Ungroup
-  ungroup() %>%
-  # Grand-mean center group variables
-  mutate(avgAge = avgAge - mean(avgAge),
-         propMale = propMale - mean(propMale)) %>%
-  # Sort data (makes it easier later)
-  arrange(Sector)
-  
-# Jags data
-dir_jags <- with(directors, list(## Outcome for individuals (level 1)
-  
-                                 compensation = Compensation,
-                                 # Age of individuals
-                                 age=Age,
-                                 # Gender of individuals
-                                 gender=Male,
-                                 
-                                 ## Company-level variables (level 2)
-                                 
-                                 # Company indicator
-                                 company=as.numeric(as.factor(Company)),
-                                 # Average age of directors for each company
-                                 avgAge=avgAge,
-                                 # Proportion of males for each company
-                                 avgMale=propMale,
-                                 
-                                 ## Group totals
-                                 
-                                 # Number of individuals
-                                 n=nrow(directors),  
-                                 # Number of companies
-                                 k=length(unique(Company)),
-                                 
-                                 ## Number of predictors
-                                 
-                                 # Number of individual-level predictors
-                                 p1=2,
-                                 # Number of company-level predictors
-                                 p2=2))
-
-# Intercept-only model
-io_mod <- "model {
-
-  ### Level 2 ==> companies
-
-	# Priors (companies)
-	tau_u0 ~ dgamma(.01, .01)
-	# Hyperprior for mean
-  gamma_00 ~ dnorm(0, 1.0E-4)
-  # For each company
-	for (j in 1:k) {
-	  # For each company, draw from normal
-    b0[j] ~ dnorm(gamma_00, tau_u0)
-	}
-
-	### Level 1 ==> individuals
-
-  # Priors
-  # Individual precision
-	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect (variance within companies)
-  # For each individual
-	for (i in 1:n) {
-		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
-		mu[i] <- b0[company[i]] # Linear combination for each person
-	}
-
-  # Invert gamma
-  sigma_e <- 1 / sqrt(tau)
-  sigma_u0 <- 1 / sqrt(tau_u0)
-
-}"
-
-# Run the model in JAGS
-# Initial values
-dir_inits <- list(
-  init1 <- list(tau=runif(1), tau_u0=runif(1)),
-  init2 <- list(tau=runif(1), tau_u0=runif(1))
-)
-
-# Specify model in JAGS
-mod_io <- jags.model(textConnection(io_mod), 
-                     data = dir_jags,
-                     inits = dir_inits,
-                     n.chains=2)
-
-# Burn
-update(mod_io, n.iter=60000)
-
-# Draw samples
-params <- c("sigma_e", "sigma_u0", "gamma_00")
-# Run the chain
-resm1 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
-
-# Convergence?
-#plot(resm1)
-
-# DIC
-DICm1 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD") # 288.6
-
-# MAP values
-MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
-
-# Coerce to matrix
-resmat <- do.call(rbind, resm1)
-
-# New matrix with same dims
-ve <- matrix(0, ncol=1, nrow=nrow(resmat))
-
-# FOr each row
-# Posterior distribution of variance explained
-for(i in seq_along(1:nrow(resmat))) {
-  ve[i,] <- c(resmat[i,3]^2 / sum(resmat[i,-1]^2))
-}
-
-quantile(ve, c(0.025, .25, .5, .75, .975))
-# VE between .45 and .69
-
-# Save the model and DIC
-#saveRDS(resm1, "models/ML_interceptonly.rds")
-#saveRDS(DICm1, "models/ML_io_DIC.rds")
-```
-
-The final random effects model is presented in table YY. This model corresponds to the following equation.
-
-$$
-\tag{3}
-\begin{aligned}
-\text{compensation}_{ij} =
-&\gamma_{00} + u_{0j} + \gamma_{10}\cdot \text{Age}_{ij} + e_{ij}
-\end{aligned}
-$$
-
-Where $\gamma_{00}$ is the overall intercept and $u_{0j}$ is a company-specific error term. Notice that the fit of this model is much better than that of the previous models, indicating that the multilevel approach seems appropriate. The marginal and conditional R-squared values [CITE] are $R^2_{\text{M}} = .0056; \ 95\% \ \text{CCI}=[.0008, .015]$ and $R^2_{\text{C}} = .5398; \ 95\% \ \text{CCI}=[.4807, .6]$ respectively. This indicates that the fixed part of the model (age) explains almost no variation in the data, but the fixed and random parts together explain some $54\%$ of the total variation. Hence, we must conclude that we do not have the right variables at either level 1 or 2 that would help us explain the heterogeneity in comepnsation among directors.
-
-```{r MLM level-1 predictors}
-# Initial values
-dir_inits <- list(
-  init1 <- list(tau=runif(1), tau_u0=runif(1)),
-  init2 <- list(tau=runif(1), tau_u0=runif(1))
-)
-
-# Model
-mlm_2 <- "model {
-
-  ### Level 2 ==> companies
-
-	# Priors (companies)
-	tau_u0 ~ dgamma(.01, .01)
-	# Hyperprior for mean
-  gamma_00 ~ dnorm(0, 1.0E-4)
-  gamma_10 ~ dnorm(0, 1.0E-4)
-  # For each company
-	for (j in 1:k) {
-	  # For each company, draw from normal
-    b0[j] ~ dnorm(gamma_00, tau_u0)
-	}
-
-	### Level 1 ==> individuals
-
-  # Priors
-  # Individual precision
-	tau ~ dgamma(.01, .01)  # standard deviation of fixed effect
-  # For each individual
-	for (i in 1:n) {
-		compensation[i] ~ dnorm(mu[i], tau) # Combine likelihood and priors
-		mu[i] <- b0[company[i]] + # Intercept
-		         gamma_10*age[i] #+ gamma_20*gender[i] # Level 1 variables
-	}
-
-  # Invert gamma
-  sigma_e <- 1 / sqrt(tau)
-  sigma_u0 <- 1 / sqrt(tau_u0)
-
-}"
-
-# Specify model in JAGS
-mod_io <- jags.model(textConnection(mlm_2), 
-                     data = dir_jags,
-                     inits = dir_inits,
-                     n.chains=2)
-
-# Burn
-update(mod_io, n.iter=60000)
-
-# Draw samples
-params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10")
-# Run the chain
-resm2 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
-
-# DIC
-DICm2 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD") # 280.9 => +- 9 difference
-
-# Calculate variance explained
-# MAP values for model 1
-MAPm1 <- apply(do.call(rbind.data.frame, resm1), 2, mean)
-MAPm2 <- apply(do.call(rbind.data.frame, resm2), 2, mean)
-
-# Map values
-#MAPve <- apply(ve_2, 2, median)
-
-# Save model
-saveRDS(DICm2, "models/ML_final_DIC.rds")
-saveRDS(resm2, "models/model3.rds")
-```
-
-```{r calculate variance explained for mixed model, eval=TRUE}
-# Calculate R^2. Marginal (only explained by predictors) & Conditional (predicted by variance component)
-# See: https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.2041-210x.2012.00261.x
-
-# Function to calculate marginal & conditional R^2
-# @param X design matrix containing fixed part of the model
-# @param w coefficient matrix
-# @e_1 random part of level 1
-# @e_2 random part of level 2
-MLM_R2 <- function(X, w, e_1, e_2) {
-  
-  # Component 1: fixed effect
-  e_f <- var(X %*% w)
-
-  # Compute marginal & conditional R^2
-  mar <- (e_f) / (e_f + e_1 + e_2) # Variance explained by fixed factors (marginal R^2)
-  con <- (e_f + e_2) / (e_f + e_1 + e_2) # Variance explained by fixed and random factors (conditional R^2)
-  
-  # Return
-  return(
-    c(mar, con)
-  )
-  
-}
-
-# Coerce to matrix
-resmat <- do.call(rbind, resm2)
-
-# New matrix with same dims
-ve_2 <- matrix(0, ncol=2, nrow=nrow(resmat))
-
-# X for fixed effect
-X <- matrix(directors$Age, ncol=1)
-
-# FOr each row
-# Posterior distribution of variance explained (pseudo R-squared)
-for(i in seq_along(1:nrow(resmat))) {
-  ve_2[i,] <- MLM_R2(X, 
-                 resmat[i,2],
-                 resmat[i,3],
-                 resmat[i,4])
-}
-
-# Median var explained
-mve <- apply(ve_2, 2, median)
-```
-
-\begin{table}[H] \centering 
-\begin{small}
-  \caption{Model results } 
-  \label{} 
-\begin{tabular}{@{\extracolsep{5pt}}lccc} 
-\\[-1.8ex]\hline 
-\hline \\[-1.8ex] 
- & \multicolumn{3}{c}{\textit{Dependent variable:}} \\ 
-\cline{2-4} 
-\\[-1.8ex] & \multicolumn{3}{c}{Compensation (GBR '000, logged)} \\ 
-\\[-1.8ex] & (1) & (2) & (3)\\ 
-\\[-1.8ex] & Linear & Linear & Linear mixed effects \\
-\\[-1.8ex] & (blm) & (blm) & (JAGS) \\
-\hline \\[-1.8ex] 
-\textit{(a) Fixed} & & & \\
-Constant & 4.991  (4.936, 5.046) & 4.821 (4.732, 4.910) & 4.991 (4.877, 5.110) \\ 
-SectorBasic Materials &  & .225 (.079, .370) &  \\ 
-SectorServices &  & .292 (.169, .414) &  \\ 
-Male & .065 ($-$.085, .215) & .153 (.095, .209) & \\ 
-Age & .008 (0.000, .017) & .009 (.001, .017) & .001 (.0035, .0155) \\ 
-\hline \\[-1.8ex] 
-\textit{(b) Random} & & & \\
-$\sigma^2_e$ & .516 & .501 & .342 \\
-$\sigma^2_{u0}$ & & & .399\\
-\hline \\[-1.8ex] 
-\textit{(c) Model Fit} \\
-Observations & 336 & 336 & 336 \\
-Companies & & & 52 \\
-DIC & 508 & 488 & 280 \\ 
-Penalty. & 4 & 6 & 47 \\ 
-R$^{2}$ & .021 & .098 & .006 (M), .536 (C) \\ 
-BF & .112 & 37.596 & \\
-\hline \\[-1.8ex] 
-\textit{(d) Post. Pred. Checks} & & & \\
-Normality & .361 & .353 &  \\
-Homoskedasticity & .326 & .607 & \\
-Independence & 0 & 0 & \\
-\hline \\[-1.8ex] 
-\textit{(e) Bayes' Factors} & & & \\
-$\text{H}_1$ & 4.5 & 5.2 &  \\
-$\text{H}_2$ & 3.4 & 6 & \\
-$\text{H}_2$ & .3 & .2 & \\
-\hline 
-\hline \\[-1.8ex] 
-\textit{Note:}  & \multicolumn{3}{r}{Baseline is sector 'Financials' for models (1) and (2)} \\
-\end{tabular} 
-\end{small}
-\end{table}
-
-```{r classical residuals, eval=FALSE}
-plot(predict(dirmod2), resid(dirmod2))
-```
-
-
-
-```{r r-squared plot, fig.cap="Bayesian R-squared value for model 1 (a) and model 2 (b). The proportion of cases in which the R-squared value of model 2 exceeds that of model 1 is .99. Figure (c) shows the marginal (blue) and conditional (red) R-squared values for the posterior distribution. The marginal R-squared indicates the amount of variance explained by the fixed part of the model; the conditional R-squared indicates the amount of variance explained by the fixed and random part of the model.", fig.height=2, fig.width=7, eval=TRUE}
-library(latex2exp)
-library(ggplot2)
-# Plot r-squared
-# Model 1
-p1 <- dirmod2 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
-  theme(axis.title = element_blank(),
-        axis.text.y = element_blank(),
-        plot.subtitle = element_blank()) +
-  labs(title = latex2exp::TeX("\\textbf{(b) Bayesian $R^2$ posterior (model 2)}"))
-# Model 2 (multilevel)
-veg <- ve_2 %>%
-  as.data.frame() %>%
-  rename("MR2" = V1, "CR2" = V2) %>%
-  #select(CR2) %>%
-  tidyr::gather(type, rsq)
-# Plot
-p2 <-  ggplot(veg, aes(x=rsq, fill=type)) +
-    geom_histogram(alpha=.4, color="black") +
-    theme_blm(text_size=8) +
-    scale_fill_brewer(palette="Set1") +
-    geom_vline(xintercept=veg %>% filter(type=="MR2") %>% 
-                 select(rsq) %>% pull() %>% 
-                 median(), linetype="dashed") +
-    geom_vline(xintercept=veg %>% filter(type=="CR2") %>% 
-                 select(rsq) %>% pull() %>% 
-                 median(), linetype="dashed") +
-    theme(axis.title = element_blank(),
-          axis.text.y = element_blank(),
-          legend.position = "none") +
-    labs(title = latex2exp::TeX("\\textbf{(c) Marginal and Conditional $R^2$ posterior}"))
-
-# Grid
-grid.arrange(p1, p2, ncol=2)
-```
 
 ## Other material
 

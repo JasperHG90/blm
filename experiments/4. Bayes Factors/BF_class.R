@@ -28,6 +28,7 @@ library(dplyr)
 data("directors")
 # Adjust
 directors <- directors %>%
+  na.omit() %>%
   mutate(Age = Age - mean(Age),
          Compensation = log(Compensation))
          #Male = as.numeric(Male),
@@ -40,8 +41,6 @@ k <- 50000
 fit <- blm("Compensation ~ Age + Male", data=directors) %>%
   # Specify MCMC options
   set_sampling_options(iterations=k, chains=2, thinning=5) %>%
-  # Compute intercept-only model
-  compute_null_model() %>%
   # Set reasonable priors
   #set_prior("b1", mu=.01, sd=.2) %>% # 1 % increase / every year ==> 20% spread
   #set_prior("b2", mu=.05, sd=.03) %>%
@@ -61,7 +60,6 @@ print(fit)
 
 # Add another hypothesis
 fit <- fit %>%
-  set_hypothesis("b0 > 0") %>%
   evaluate_hypotheses()
 
 # Print blm

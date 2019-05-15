@@ -1,6 +1,9 @@
 ## Code used to create the 'directors' data
 ## Data is proprietary and cannot be shared
 
+## Code used to create the 'directors' data
+## Data is proprietary and cannot be shared
+
 rm(list=ls())
 # Subset
 library(dplyr)
@@ -12,9 +15,6 @@ directors <- read.csv2("testing/FinalData.csv") %>%
   filter(isED == 0) %>%
   # Select only these variables
   select(Recent_Comp_Thous, Sector, isM, Age, Company, Industry) %>%
-  # Remove NA
-  filter(!is.na(Recent_Comp_Thous),
-         !is.na(Age)) %>%
   # Keep these sectors
   filter(Sector %in% c("Basic Materials","Services", "Financial")) %>%
   # Refactor

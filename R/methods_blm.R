@@ -569,6 +569,7 @@ set_initial_values.blm <- function(x, ...) {
 
   # For each chain, set initial values
   for(i in names(opts)) {
+    #browser()
     # Set coefficients
     x[["sampling_settings"]][[i]][["initial_values"]][["w"]][1:m,1] <- opts[[i]]$b
     # Set sigma
@@ -616,6 +617,11 @@ set_prior.blm <- function(x, par, ...) {
 
 #' @export
 compute_null_model.blm <- function(x, iterations=10000, chains=1, thinning=1, burn = 1000) {
+
+  # If null model already exists, remove
+  if(contains(x, "null_model")) {
+    x$null_model <- NULL
+  }
 
   # Checks
   iterations <- as.integer(iterations)

@@ -1,5 +1,5 @@
 ## Simulation study for PPC
-## Plan: Run
+## Plan: Run the plans below ==> without any violations and violating to different degrees
 
 library(blm)
 blm_setup()
@@ -55,8 +55,8 @@ for(j in seq_along(grid)) {
       independence <- !heteroskedastic & !noviolation
 
       # Simulate data
-      dat <-blm:::generate_dataset(n = 100, j=2, binary = 0, heteroskedastic = heteroskedastic,
-                                 correlated_errors = independence, degree=grid[[j]][["degrees"]][[d]])
+      dat <-blm::blmsim(n = 100, j=2, binary = 0, heteroskedastic = heteroskedastic,
+                        correlated_errors = independence, degree=grid[[j]][["degrees"]][[d]])
 
       # Unroll
       df <- as.data.frame(cbind(dat$y, dat$X[,-1]))
@@ -68,7 +68,7 @@ for(j in seq_along(grid)) {
         set_sampling_options(iterations = 15000, burn = 2000, chains = 1) %>%
         sample_posterior() %>%
         # PPC
-        evaluate_ppc(iterations = 4000)
+        evaluate_ppc(p=1)
 
       # Store ppc
       ppcr <- get_value(bfit, "ppc")
@@ -88,4 +88,4 @@ for(j in seq_along(grid)) {
 }
 
 # Store data
-saveRDS(sim_res, "experiments/ppc_autocor_data.rds")
+saveRDS(sim_res, "experiments/ppc_simulated/final.rds")
