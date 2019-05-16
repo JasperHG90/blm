@@ -322,7 +322,7 @@ grid.arrange(p1, p2, p3, p4)
 
 # Methods & Results
 
-Table XX below shows the descriptive statistics for each variable. The outcome variable **compensation** is given in thousands of Great British pounds and has been log-transformed.
+Table XX below shows the descriptive statistics for each variable. The outcome variable **compensation** is given in thousands of Great British pounds and has been log-transformed. The variable **Age** has been grand-mean centered to facilitate interpretation and estimation.
 
 ```{r descriptive statistics, eval=FALSE, results='asis'}
 out <- capture.output(stargazer::stargazer(directors_with_na, summary=TRUE, median=TRUE))
@@ -335,7 +335,7 @@ $$
 \tag{1}
 \begin{aligned}
 \hat{\log(\text{compensation}_i)} = 
-&\beta_0 + \beta_{1} \text{age}_i + \beta_2\text{male}_i + \beta_3\text{SectorServices}_i + \beta_4\text{SectorBasicMaterials}_i + \epsilon_i
+&\beta_0 + \beta_{1} [\text{age}_i - \bar{\text{age}}] + \beta_2\text{male}_i + \beta_3\text{SectorServices}_i + \beta_4\text{SectorBasicMaterials}_i + \epsilon_i
 \end{aligned}
 $$
 
@@ -563,7 +563,11 @@ indeppc2 <- dirmod2 %>% get_value("ppc") %>%
 indeppc2
 ```
 
-From the posterior predictive checks (table XY), we observe that the data are not independent $(\hat{r}_{\text{PPC, Model1}} = .423)$. That is, directors who are in the same board tend to are more similar to each other than directors from other boards. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards. Indeed, the results of the random effects model shows that the intra-class correlation coefficient $\rho$ equals $57\%$, meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The results of running all different stages of a multilevel model are presented in another document.] 
+The model results are presented in table XX. The convergence diagnostics show that the posterior distributions have forgotten their initial states and have converged to their stable distributions; there is little to no trace of autocorrelation and the Gelman-Rubin statistic is close to $1$, which indicates that the chains have converged to the same stationary distribution. The DIC for the model of interest (model 2) is $488$ compared to $512$ for the intercept-only model, which indicates it yields a better fit. The MC error, which should be less than $5\%$ of the standard deviation, is negligible.
+
+From the posterior predictive checks (table XY), we observe that the data are not independent $(p_{\text{independence}} = 0$. Directors who are in the same board tend to are more similar to each other than directors from other boards. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards. Indeed, the results of the random effects model shows that the intra-class correlation coefficient $\rho$ equals $57\%$, meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The results of running all different stages of a multilevel model are presented in another document.] 
+
+The model results indicate that gender is not a predictor of director compensation $(\beta_{\text{male}} = .062; 95\% \ \ \text{CCI} = [-.08, .205])$, and credible interval for this coefficient tells us that there is a lot of uncertainty in this estimate. Age has a small, positive effect on director compensation $(\beta_{\text{age}} = .01; 95\% \ \ \text{CCI} = [.002, .018])$. When holding the other variables constant, every one-year increase above the mean age leads to a $1\%$ increase in compensation. Finally, it appears that directors in the sectors 'basic materials' and 'services' earn some $25\%$ and $34\%$ more than their counterparts in the financial sector. The mean $R^2$ value for this model is $R^2 = .09; 95\% \ \ \text{CCI} = [.041, .15])$ [CITE GELMAN], indicating that we are explaining between $4\%$ and $15\%$ of the variance in the data.
 
 ```{r MLM intercept-only model}
 library(rjags)
@@ -713,7 +717,7 @@ saveRDS(resm1, "models/ML_interceptonly.rds")
 saveRDS(DICm1, "models/ML_io_DIC.rds")
 ```
 
-The final random effects model is presented in table YY. This model corresponds to the following equation.
+Given the hierarchical nature of the data, we next run a linear mixed effects model. This model corresponds to the following equation.
 
 $$
 \tag{3}
@@ -843,6 +847,42 @@ for(i in seq_along(1:nrow(resmat))) {
 mve <- apply(ve_2, 2, median)
 ```
 
+```{r r-squared plot, fig.cap="Bayesian R-squared value for model 1 (a) and model 2 (b). The proportion of cases in which the R-squared value of model 2 exceeds that of model 1 is .99. Figure (c) shows the marginal (blue) and conditional (red) R-squared values for the posterior distribution. The marginal R-squared indicates the amount of variance explained by the fixed part of the model; the conditional R-squared indicates the amount of variance explained by the fixed and random part of the model.", fig.height=2, fig.width=7, eval=TRUE}
+library(latex2exp)
+library(ggplot2)
+# Plot r-squared
+# Model 1
+p1 <- dirmod2 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
+  theme(axis.title = element_blank(),
+        axis.text.y = element_blank(),
+        plot.subtitle = element_blank()) +
+  labs(title = latex2exp::TeX("\\textbf{(b) Bayesian $R^2$ posterior (model 2)}"))
+# Model 2 (multilevel)
+veg <- ve_2 %>%
+  as.data.frame() %>%
+  rename("MR2" = V1, "CR2" = V2) %>%
+  #select(CR2) %>%
+  tidyr::gather(type, rsq)
+# Plot
+p2 <-  ggplot(veg, aes(x=rsq, fill=type)) +
+    geom_histogram(alpha=.4, color="black") +
+    theme_blm(text_size=8) +
+    scale_fill_brewer(palette="Set1") +
+    geom_vline(xintercept=veg %>% filter(type=="MR2") %>% 
+                 select(rsq) %>% pull() %>% 
+                 median(), linetype="dashed") +
+    geom_vline(xintercept=veg %>% filter(type=="CR2") %>% 
+                 select(rsq) %>% pull() %>% 
+                 median(), linetype="dashed") +
+    theme(axis.title = element_blank(),
+          axis.text.y = element_blank(),
+          legend.position = "none") +
+    labs(title = latex2exp::TeX("\\textbf{(c) Marginal and Conditional $R^2$ posterior}"))
+
+# Grid
+grid.arrange(p1, p2, ncol=2)
+```
+
 \begin{table}[H] \centering 
 \begin{small}
   \caption{Model results } 
@@ -897,40 +937,6 @@ $\text{H}_u: \beta_{\text{Male}}, \beta_{\text{Age}}$ &  &  & .237 \\
 plot(predict(dirmod2), resid(dirmod2))
 ```
 
-```{r r-squared plot, fig.cap="Bayesian R-squared value for model 1 (a) and model 2 (b). The proportion of cases in which the R-squared value of model 2 exceeds that of model 1 is .99. Figure (c) shows the marginal (blue) and conditional (red) R-squared values for the posterior distribution. The marginal R-squared indicates the amount of variance explained by the fixed part of the model; the conditional R-squared indicates the amount of variance explained by the fixed and random part of the model.", fig.height=2, fig.width=7, eval=TRUE}
-library(latex2exp)
-library(ggplot2)
-# Plot r-squared
-# Model 1
-p1 <- dirmod2 %>% get_value("rsq") %>% plot() + theme_blm(text_size = 8) +
-  theme(axis.title = element_blank(),
-        axis.text.y = element_blank(),
-        plot.subtitle = element_blank()) +
-  labs(title = latex2exp::TeX("\\textbf{(b) Bayesian $R^2$ posterior (model 2)}"))
-# Model 2 (multilevel)
-veg <- ve_2 %>%
-  as.data.frame() %>%
-  rename("MR2" = V1, "CR2" = V2) %>%
-  #select(CR2) %>%
-  tidyr::gather(type, rsq)
-# Plot
-p2 <-  ggplot(veg, aes(x=rsq, fill=type)) +
-    geom_histogram(alpha=.4, color="black") +
-    theme_blm(text_size=8) +
-    scale_fill_brewer(palette="Set1") +
-    geom_vline(xintercept=veg %>% filter(type=="MR2") %>% 
-                 select(rsq) %>% pull() %>% 
-                 median(), linetype="dashed") +
-    geom_vline(xintercept=veg %>% filter(type=="CR2") %>% 
-                 select(rsq) %>% pull() %>% 
-                 median(), linetype="dashed") +
-    theme(axis.title = element_blank(),
-          axis.text.y = element_blank(),
-          legend.position = "none") +
-    labs(title = latex2exp::TeX("\\textbf{(c) Marginal and Conditional $R^2$ posterior}"))
 
-# Grid
-grid.arrange(p1, p2, ncol=2)
-```
 
 # References
