@@ -10,10 +10,6 @@ k <- 1000
 # Results
 sim_res <- array(0L, c(k, 3, 3))
 
-# Progress bar
-library(utils)
-pb <- txtProgressBar(min = 0, max = (k * (3 * 2)) + k, style = 3) # (k * (length(grid) * length(degrees))) + k [==>] (last k is for no violation)
-
 # Grid of values to test
 # See: generate_dataset in helpers.R (line 222)
 grid <- list(
@@ -32,6 +28,9 @@ grid <- list(
 )
 
 # For each test
+# Progress bar
+library(utils)
+pb <- txtProgressBar(min = 0, max = (k * (3 * 2)) + k, style = 3) # (k * (length(grid) * length(degrees))) + k [==>] (last k is for no violation)
 # keep track of total i for progress bar
 i_pb <- 0
 # For each assumption
@@ -78,7 +77,7 @@ for(j in seq_along(grid)) {
       # Save every 10 iterations
       if(i %% 10 == 0) {
         # Store data
-        saveRDS(sim_res, "experiments/ppc_simulated/tmp.rds")
+        saveRDS(grid, "experiments/2_Simulations_PPC/ppc_simulated/tmp.rds")
       }
 
     }
@@ -88,4 +87,4 @@ for(j in seq_along(grid)) {
 }
 
 # Store data
-saveRDS(sim_res, "experiments/ppc_simulated/final.rds")
+saveRDS(grid, "experiments/2_Simulations_PPC/ppc_simulated/final.rds")

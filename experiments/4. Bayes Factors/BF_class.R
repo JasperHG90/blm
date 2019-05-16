@@ -74,12 +74,12 @@ fit %>%
 
 library(bain)
 ## Compared to Bain
-regr <- lm(Compensation ~ Age + Male, directors)
+regr <- lm(Compensation ~ Age + Male + Sector, directors)
 regr$call$formula
 # Set seed
 set.seed(453)
 summary(regr)
-z<-bain(regr,"Male1 < Male0; Age > 0", standardize = TRUE)
+z<-bain(regr,"Male < .05; Age > 0", standardize = TRUE)
 z # Why is BF 4 ==> it is: (fit_hypothesis / complexity_hypothesis) / (fit_complement_of_hypothesis / complexity_complement_of_hypothesis)
 
 # In case of |u1 - u2| < .2sd ==> which sd!! are we referring to? p.35

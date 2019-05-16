@@ -5,6 +5,8 @@ date: "April 8, 2019"
 output:
   pdf_document: 
     number_sections: false
+bibliography: bib.bib
+geometry: margin=1.7cm
 header-includes:
  \usepackage{float}
  \restylefloat{table}
@@ -76,7 +78,247 @@ The boards of American companies consists of *executive* and *independent* direc
 
 The results indicate that we cannot conclude definitively that male independent directors receive a higher remuneration than female independent directors after controlling for age and sector. Model fit statistics and evaluation suggest that linear regression is not an appropriate method to analyse these data because director compensation is highly correlated within companies.  
 
-The paper is structured as follows. Section 1 outlines the hypotheses, model specification and reports the results of the analyses. In turn, section 2 elaborates on the differences between Frequentist and Bayesian statistical inference. Section three concludes.
+The paper is structured as follows. Section 2 elaborates on the differences between Frequentist and Bayesian statistical inference. In turn, section 1 outlines the hypotheses, model specification and reports the results of the analyses. Section three concludes.
+
+# Differences in Bayesian and Frequentist Inference
+
+For a large part, differences between Frequentist and Bayesian inference stems from their respective view of uncertainty, how this is captured by probabilities and, in particular, what *causes* this uncertainty. In the Frequentist framework, a probability is defined as the number of times an event will occur in the long run (@miller2014john, p.21). In other words, it is the limiting value of $m$ successes in a sequence of $n$ trials for a particular event, or:
+
+$$
+\tag{1}
+\begin{aligned}
+p = \lim_{n \to \infty} \frac{m}{n}
+\end{aligned}
+$$
+
+This definition has two important implications. The first is that talking about probability makes sense only in the context of infinite trials. The second implication is that probability converges to some *fixed* quantity as the number of trials go infinity, and our uncertainty about the true value of this quantity reduces as we repeatedly take more (or larger) samples. Hence, this definition implies that the only source of randomness by which our estimate $\hat{p}$ differs from the true value $p$ comes from the data [CITE], which may differ from sample to sample due to, for example, sampling error.
+
+The Bayesian framework considers probabilities as a means of quantifying uncertainty about knowledge (@gelman2013bayesian, pp. 11-13). Even though the 'true' parameter value may be fixed, we are limited by our knowledge of this value. Hence, the uncertainty by which we make statements about the world changes as we collect more information which is represented by the posterior distribution, which may be looked upon very loosely as the collection 'true' values conditional on how certain we are about the veracity of this knowledge.
+
+## Objective and Subjective Knowledge
+
+By the very definition of probability in the Frequentist framework, evidence can originate only from the data. This is not the case in Bayesian statistical inference, where inferences are based on a mix of domain expertise (*prior* or *belief*) and evidence from the data. This makes perfect sense in the Bayesian framework; if we are certain about our knowledge then we can constrain the parameter space by injecting what we know *a priori*. Hence, a Bayesian looks upon prior beliefs as just another source of knowledge that has been translated into a probability density. 
+
+```{r calculate prior variance effect}
+# Posterior shrinkage
+dirmod3 <- blm("Compensation ~ Sector + Age + Male",
+                data=directors) %>%
+  # Need to delete posterior when we change settings
+  # (only has an effect if posterior already present)
+  delete_posterior() %>%
+  # Set an informative prior on the coefficients
+  # Male (b4) is speculated to have 17% pay increase over women
+  set_prior("b4", mu = .17, sd=0.001) %>%
+  # Update sampling settings
+  set_sampling_options(chains = 2, iterations = 20000,
+                       burn = 4000, thinning=3) %>%
+  # Set initial values
+  # If we draw from the priors the starting values will be too large
+  # This is an issue for MH because it takes many more iterations to converge
+  set_initial_values(chain_1 = list("b" = c(4, 2, 3, 8, 10), "sigma"= 1),
+                     chain_2 = list("b" = c(2, 4, 7, 2, 3), "sigma"=2)) %>%
+  # Sample the posterior distribution
+  sample_posterior()
+
+# Change prior and run for another 600000 observations
+dirmod3 <- dirmod3 %>%
+  set_prior("b4", mu = .17, sd=0.01) %>%
+  update_posterior(iterations=20000)
+# Same
+dirmod3 <- dirmod3 %>%
+  set_prior("b4", mu = .17, sd=0.1) %>%
+  update_posterior(iterations=20000)
+
+# Save
+saveRDS(dirmod3, "data/model_effects_prior.rds")
+```
+
+```{r effect of prior variance, fig.height=2, fig.width=7, fig.cap="Effect of adjusting the prior variance of the coefficient for variable Male (a) on the posterior distribution (b). The mean is set at M=.17 which represents a 17 percent increase in compensation for males versus females. Reducing the prior variance represents increased certainty about the estimate of our domain knowledge and weights the information from the data less strongly compared to domain knowledge. The dashed lines indicate the value of the posterior means.", eval=FALSE}
+
+dirmod3 <- readRDS("data/model_effects_prior.rds")
+# Retrieve posterior samples for male variable, burn and label by prior variance 
+library(purrr)
+pd <- get_value(dirmod3, "posterior") %>%
+  get_value("samples") %>%
+  map(function(x) {
+    r1 <- x[4001:20000,"Male"]
+    r2 <- x[24001:40000, "Male"]
+    r3 <- x[44001:60000, "Male"]
+    return(
+      data.frame(
+        "Male" = c(r1, r2, r3),
+        "Prior" = factor(c(rep(1, length(r1)),rep(2, length(r2)), rep(3, length(r3))),
+                         labels = c("0.001", "0.01", "0.1"))
+      )
+    )
+  }) %>%
+  bind_rows()
+
+# Calculate SD by prior
+pd_sd <- pd %>%
+  group_by(Prior) %>%
+  summarize(psd = sd(Male),
+            pmn = mean(Male))
+
+# Posterior z-value
+zscore <- function(mean, sd, theta) (mean - theta) / sd
+z1 <- zscore(pd_sd$pmn[1], pd_sd$psd[1], .17)
+z2 <- zscore(pd_sd$pmn[2], pd_sd$psd[2], .17)
+z3 <- zscore(pd_sd$pmn[3], pd_sd$psd[3], .17)
+
+# Posterior scaling of sd
+ps1 <- pd_sd$psd[1]^2 / as.numeric(levels(pd_sd$Prior)[1])^2 # 841
+ps2 <- pd_sd$psd[2]^2 / as.numeric(levels(pd_sd$Prior)[2])^2 # 35
+ps3 <- pd_sd$psd[3]^2 / as.numeric(levels(pd_sd$Prior)[3])^2 # 0.53
+
+# Posterior means
+pms <- round(pd_sd$pmn, digits=3)
+
+library(ggplot2)
+library(ggpubr)
+priorvar <- ggplot(data.frame(
+  "Male" = c(rnorm(10000, mean=.17, sd=0.001), 
+             rnorm(10000, mean=.17, sd=.01), 
+             rnorm(10000, mean=.17, sd=.1)),
+  "Prior" = factor(c(rep(1, 10000), rep(2, 10000), rep(3, 10000)), labels = c("0.001", "0.01", "0.1"))
+  ),
+  aes(x=Male, fill=Prior)) +
+  geom_histogram(alpha=0.4, position="identity", color="black") +
+  theme_blm(text_size = 9) +
+  theme(axis.title = element_blank(),
+        axis.text.y=element_blank()) +
+  scale_fill_brewer(palette = "Set1",
+                    name="Prior variance") +
+  labs(title = "(a) Prior distribution")
+
+# Posterior distribution
+postvar <- ggplot(pd, aes(x=Male, fill=Prior)) +
+  geom_histogram(alpha=0.4, position="identity", color="black") +
+  theme_blm(text_size = 9) +
+  theme(axis.title = element_blank(),
+        axis.text.y=element_blank()) +
+  geom_vline(xintercept = pms[1], color=RColorBrewer::brewer.pal(3, "Set1")[1], 
+             linetype="dashed", size=1.2) +
+  geom_vline(xintercept = pms[2], color=RColorBrewer::brewer.pal(3, "Set1")[2], 
+             linetype="dashed", size=1.2) +
+  geom_vline(xintercept = pms[3], color=RColorBrewer::brewer.pal(3, "Set1")[3], 
+             linetype="dashed", size=1.2) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(title= "(b) Posterior distribution")
+
+# Arrange plots with common legend
+ggarrange(priorvar, postvar, ncol=2, common.legend=TRUE, legend="top")
+```
+
+The claim that the Frequentist approach is more objective would hold only if the data collection process, (pre-)processing steps and analysis are guaranteed to be objective. This is a tenuous assumption at best in the social sciences; statistics is fraught with subjective decisions during data collection, manipulation and analysis @berger1988statistical. Hence, the critique leveled at Bayesians boils down to the practice of incorporating domain knowledge *explicitly* through the use of a prior. It should be noted that, if an analyst chooses to use priors such that they represent a complete lack of knowledge (for example, a uniform distribution), results obtained using Frequentist and Bayesian methods often yield comparable results.
+
+## Methods of Estimation and Hypothesis Testing
+
+Whether a statistician regards the data or the parameters as a random variable determines their choice of estimation method. A Frequentist, believing that variation originates from data, will want to optimize the 'likelihood' of the data conditional on the parameters. That is, we find the *most likely combination* of parameters $\hat{\theta}$ that explain the data and that provide consistent and asymptotically unbiased estimators, or:
+
+$$
+\tag{1}
+\hat{\theta} = \arg \max_{\theta \in \Theta} \text{Log Likelihood}(\theta |\text{data}) 
+$$
+
+Conversely, given that a Bayesian thinks of the data as fixed and the parameters as random variables, they are interested in finding the distribution of the parameters and hence the source of uncertainty in our beliefs after seeing the evidence:
+
+$$
+\tag{2}
+p(\theta | \text{data}) = \frac{p(\text{data}|\theta) p(\theta)}{p(\text{data})}
+$$
+
+The question of how the definition of probability and the methods of estimation impact inference under these frameworks is illustrated by the difference in interpretation of the confidence interval and the credible interval. When we calculate the confidence interval, the boundaries of the confidence intervals are interpreted as random variables due to sampling error since they estimate the frequency of sampling means. Therefore, we should interpret it as ... With a credible interval, we do not have this source of variability, which gives rise to the definition that the parameter is contained in the credible interval with some probability because the parameter space is assumed to be known under the assumptions by which we arrived at the posterior distribution.
+
+Further implications are to be found in the way we test hypotheses in these frameworks. In the Frequentist framework, we usually partition parameter space into an acceptance and a rejection region based on some null and alternative hypothesis. On the basis of a test statistic, computed from the data, we then decide whether or not the result we observe is likely to occur due to chance. We use either confidence intervals or $p$-values to express support for the alternative hypothesis, but, importantly, we can never quantify support in favor of the null hypothesis. This is not so in the Bayesian Framework. Given that the data can be viewed as a means to update a prior belief, hypothesis testing is a relative statement about the degree to which the evidence found in the data supports this initial belief or contradicts it. 
+
+<!--
+TYPE I & II errors, advantages of bayes factor, not effect sizes
+-->
+
+## Predictions under the model
+
+Bayesian models yield the posterior probability distribution of the model parameters. This allows us to produce a posterior predictive distribution for each subject in the data set. Unlike Frequentist model results, such distributions can be transformed almost endlessly, and it provides us with a useful way to understand whether the model adheres to its core assumptions by means of *posterior predictive checks* (PPC). PPC require us to simulate data under the model and to compare the simulated outcome variable to the observed outcome variable, which results in a proportion sometimes called the Bayesian p-value. If we desire to interpret this p-value like we do the traditional, Fisherian p-value, then we must assume that, under the assumption that a particular test is not violated, the Bayesian p-value is uniformly distributed. Otherwise, we cannot interpret it as a proportion. We often find that this assumption does not hold true for posterior predictive checks. To this end, we can simulate data under various conditions to observe how the statistic behaves. This is illustrated in figure XX for two posterior predictive checks included in the R library blm.
+
+```{r ppc simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The color indicates the severity of the violation; the green bars indicate mild violation, blue indicates medium violation and red indicates severe violation. The script used to generate the data and run the simulations can be found on GitHub.", fig.width=7, fig.height=3, eval=TRUE}
+
+# Convenience function to flatten array
+flatten_array <- function(x) {
+  
+  # To list and return
+  lapply(1:dim(x)[3], function(y) {
+    ss <- x[,,y]
+    colnames(ss) <- c("normality", "heteroskedasticity", "independence")
+    # To df
+    ss <- as.data.frame(ss)
+    # Return
+    return(ss)
+  })
+  
+}
+
+# Read data
+normal <- readRDS("data/simulations/ppc_normal_data.rds")
+finsim <- readRDS("data/simulations/final.rds")
+
+normal <- finsim$noviolation$results %>%
+  flatten_array() %>%
+  bind_rows()
+heterosked <- finsim$heterosked$results %>% 
+  flatten_array() %>%
+  bind_rows(.id="severity") %>%
+  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
+indep <- finsim$indep$results %>% 
+  flatten_array() %>%
+  bind_rows(.id="severity") %>%
+  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
+
+# PPC heteroskedasticity, no violation
+p1 <- ggplot(data.frame(x=normal[,2]), aes(x=x)) +
+  geom_histogram(color="black", fill="lightgrey") +
+  scale_x_continuous(limits=c(0,1)) + 
+  theme_blm(text_size = 10) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_blank()) +
+  labs(title = "(a) PPC heteroskedasticity", subtitle="      no violations")
+# PPC independence, no violation
+p2 <- ggplot(data.frame(x=normal[,3]), aes(x=x)) +
+  geom_histogram(color="black", fill="lightgrey") +
+  scale_x_continuous(limits=c(0,1)) + 
+  theme_blm(text_size = 10) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_blank()) +
+  labs(title = "(b) PPC independence", subtitle="      no violations")
+# PPC heteroskedasticity, assumption violated
+p3 <- ggplot(heterosked, aes(x=heteroskedasticity, fill=severity)) +
+  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
+  theme_blm(text_size = 10) + 
+  scale_fill_brewer(palette = "Set1", direction=-1) +
+  scale_x_continuous(limits=c(-0.02,1)) +
+  theme(axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.text.y = element_blank(),
+      legend.position = "none") +
+  labs(title = "(c) PPC heteroskedasticity", subtitle="      assumption violated")
+# PPC independence, violated
+p4 <- ggplot(indep, aes(x=independence, fill=severity)) +
+  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
+  scale_fill_brewer(palette = "Set1", direction=-1) +
+  scale_x_continuous(limits=c(-0.02,1)) +
+  theme_blm(text_size = 10) +
+    theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        legend.position = "none") +
+  labs(title = "(d) PPC independence", subtitle="      assumption violated")
+
+# Merge plots
+grid.arrange(p1, p2, p3, p4)
+```
 
 # Methods & Results
 
@@ -99,13 +341,13 @@ $$
 
 Given that we measure the compensation on a log scale, the coefficients we derive from the model must be interpreted as change in percentages. This forces us to rethink the priors we set on the model. Additionally, even if we know very little of the effect of age on compensation (or gender for that matter), we can set some reasonable assumptions in terms of upper and lower bounds. For age, we now assume that, as age increases, compensation increases as well. But, given that we are not certain about the extent to which it increases, we set the standard deviation of this estimate to $.2$, representing a spread of approximately $20\%$^[For values close to $0$, $exp(x) \approx 1 + x$]. For gender, we know from earlier studies that the gender gap is $17\%$. However, theory suggests that the gender gap is lower or non-existent at top-tier firms. Hence, we set this prior a mean of $.1$ with a spread of $.1$, which reflects our uncertainty of the estimate. 
 
-We hypothesize that there is at most a small difference, which we will set at $5\%$, between the compensation of male and female directors.
+In accordance with the theory, we hypothesize that there is at most a small difference in compensation between male and female directors compared to the rest of the work force, which we will set at $5\%$.
 
 $$
-\text{H}_1\text{: } |\beta_{\text{Male}}| \leq .05
+\text{H}_1\text{: } \beta_{\text{Male}} \leq .05
 $$
 
-Furthermore, we hypothesize that age positively impacts a director's compensation.
+Furthermore, we hypothesize compensation only increases with age. That is:
 
 $$
 \text{H}_2\text{: } \beta_{\text{Age}} > 0 
@@ -117,6 +359,7 @@ $$
 \text{H}_u\text{: } \beta_\text{Male}, \beta_{\text{Age}}
 $$
 
+<!--
 These hypotheses will be included in the models we construct. (Hoitjtink p.24).
 
 PRA is the weight of a particular Bayes factor compared to the other hypotheses. That is, it is a proportion of the total evidence.
@@ -128,6 +371,7 @@ The quantities PRB are the Bayesian error probabilities
 BF sensitive to outliers (Hoijtink pp.31-32) ==> check for outliers before BF. Also violation of model assumptions using ppc. We should use a robust BF but we don't have that. Anyway, interpret the BF with a grain of salt.
 
 Bayes' Factor is sensitive to the choice of prior ==> something about the size of complexity. (Hoijtink pp.29-30)
+-->
 
 ```{r model1, include = FALSE}
 # Model 2: Age, gender and sector -----
@@ -156,7 +400,7 @@ dirmod2 <- dirmod2 %>%
   # Age centered at 0 with .2 variance
   set_prior("b3", mu = 0, sd = .2) %>%
   # Males (b4) are speculated to have 17% pay increase over women
-  set_prior("b4", mu = .17, sd=0.1) %>%
+  set_prior("b4", mu = .1, sd=.1) %>%
   # Change the sampler of Age to metropolis hastings (random walk)
   # Lambda parameter controls the variance of the (normal) proposal distribution
   set_sampler("b3", type="MH", lambda=0.01) %>%
@@ -171,8 +415,8 @@ dirmod2 <- dirmod2 %>%
   # Compute null model (the intercept-only model)
   compute_null_model() %>%
   # Set hypotheses
-  set_hypothesis("H1", "|b0 - (b0 + b4)| < .05") %>% # Gender: less than 5 percent difference
-  set_hypothesis("H2", "b3 > 0") %>%                 # Age: larger than 0
+  set_hypothesis("H1", "b4 < .05") %>% # Gender: less than 5 percent difference
+  set_hypothesis("H2", "b3 > 0") %>%   # Age: larger than 0
   # Sample the posterior distribution
   sample_posterior()
 
@@ -285,7 +529,6 @@ dirmod2 %>%
 # Save this model
 saveRDS(dirmod2, "models/model2.rds")
 ```
-
 
 ```{r PPC results, eval=FALSE, fig.width=7, fig.height=2, fig.cap="A random subset of observed and simulated correlation coefficients for model 1 (left) and model 2 (right). The figure shows that the observed residuals (in red) are much more correlated than is reasonable under the model (represented by the blue, simulated values)."}
 # Collect ppc results
@@ -480,7 +723,7 @@ $$
 \end{aligned}
 $$
 
-Where $\gamma_{00}$ is the overall intercept and $u_{0j}$ is a company-specific error term. Notice that the fit of this model is much better than that of the previous models, indicating that the multilevel approach seems appropriate (mention DIC). The marginal and conditional R-squared values [CITE] are $R^2_{\text{M}} = .0056; \ 95\% \ \text{CCI}=[.0008, .015]$ and $R^2_{\text{C}} = .5398; \ 95\% \ \text{CCI}=[.4807, .6]$ respectively. This indicates that the fixed part of the model (age) explains almost no variation in the data, but the fixed and random parts together explain some $54\%$ of the total variation. Hence, it appears that director compensation is  that we do not have the right variables at either level 1 or 2 that would help us explain the heterogeneity in comepnsation among directors within boards and between boards.
+Where $\gamma_{00}$ is the overall intercept and $u_{0j}$ is a company-specific error term. Notice that the fit of this model is much better than that of the previous models ($DIC=280$), indicating that the multilevel approach seems appropriate. The marginal and conditional R-squared values (@nakagawa2013general). [The marginal R-squared takes into account only the fixed part of the variance, while the conditional R-squared takes into account the fixed and random parts] are $R^2_{\text{M}} = .0056; \ 95\% \ \text{CCI}=[.0008, .015]$ and $R^2_{\text{C}} = .5398; \ 95\% \ \text{CCI}=[.4807, .6]$ respectively. This indicates that the fixed part of the model (age) explains almost no variation in the data, but the fixed and random parts together explain some $54\%$ of the total variation. Hence, we can be confident that director compensation is best modelled using company-specific intercepts, but that we do not have the right variables at either level 1 or 2 that would help us explain the heterogeneity in compensation among directors within boards and between boards.
 
 ```{r MLM level-1 predictors}
 # Initial values
@@ -611,40 +854,41 @@ mve <- apply(ve_2, 2, median)
 \cline{2-4} 
 \\[-1.8ex] & \multicolumn{3}{c}{Compensation (GBR '000, logged)} \\ 
 \\[-1.8ex] & (1) & (2) & (3)\\ 
-\\[-1.8ex] & Linear & Linear & Linear mixed effects \\
+\\[-1.8ex] & Intercept-only & Full model & Linear mixed effects \\
 \\[-1.8ex] & (blm) & (blm) & (JAGS) \\
 \hline \\[-1.8ex] 
 \textit{(a) Fixed} & & & \\
-Constant & 4.991  (4.936, 5.046) & 4.821 (4.732, 4.910) & 4.991 (4.877, 5.110) \\ 
-SectorBasic Materials &  & .225 (.079, .370) &  \\ 
-SectorServices &  & .292 (.169, .414) &  \\ 
-Male & .065 ($-$.085, .215) & .153 (.095, .209) & \\ 
-Age & .008 (0.000, .017) & .009 (.001, .017) & .001 (.0035, .0155) \\ 
+Constant & 4.991 (4.935, 5.048) & 4.820 (4.731, 4.901) & 4.993 (4.875, 5.112) \\ 
+SectorBasic Materials &  & .225 (.082, .37) &  \\ 
+SectorServices &  & .294 (.172, .415) &  \\ 
+Male & & .062 ($-$.08, .205) & \\ 
+Age & & .010 (.002, .018) & .009 (.003, .015) \\ 
 \hline \\[-1.8ex] 
 \textit{(b) Random} & & & \\
-$\sigma^2_e$ & .516 & .501 & .342 \\
-$\sigma^2_{u0}$ & & & .399\\
+$\sigma^2_e$ & .52 & .5 & .342 (.315, .372) \\
+$\sigma^2_{u0}$ & & & .399 (.322, .504) \\
 \hline \\[-1.8ex] 
 \textit{(c) Model Fit} \\
 Observations & 336 & 336 & 336 \\
 Companies & & & 52 \\
-DIC & 508 & 488 & 280 \\ 
-Penalty. & 4 & 6 & 47 \\ 
-R$^{2}$ & .021 & .098 & .006 (M), .536 (C) \\ 
-BF & .112 & 37.596 & \\
+DIC & 513 & 488 & 281 \\ 
+Penalty. & 2 & 6 & 49 \\ 
+R$^{2}$ & 0 & .09 & .006 (M), .536 (C) \\ 
 \hline \\[-1.8ex] 
 \textit{(d) Post. Pred. Checks} & & & \\
-Normality & .361 & .353 &  \\
-Homoskedasticity & .326 & .607 & \\
-Independence & 0 & 0 & \\
+Normality &  & .357 &  \\
+Homoskedasticity &  & .612 & \\
+Independence &  & 0 & \\
 \hline \\[-1.8ex] 
-\textit{(e) Bayes' Factors} & & & \\
-$\text{H}_1$ & 4.5 & 5.2 &  \\
-$\text{H}_2$ & 3.4 & 6 & \\
-$\text{H}_2$ & .3 & .2 & \\
+\textit{(e) Bayes' Factors (model 2 only)} & & & \\
+Hypothesis & BF (complexity, fit) & PMPa & PMPb \\
+\hline \\[-1.8ex] 
+$\text{H}_1: \beta_\text{Male} \leq .05$ & 4294.5 (.812, 1) & .382 & .291  \\
+$\text{H}_2: \beta_{\text{Age}} > 0$ & 129.8 (.498, .992) & .618 & .472 \\
+$\text{H}_u: \beta_{\text{Male}}, \beta_{\text{Age}}$ &  &  & .237 \\
 \hline 
 \hline \\[-1.8ex] 
-\textit{Note:}  & \multicolumn{3}{r}{Baseline is sector 'Financials' for models (1) and (2)} \\
+\textit{Note:}  & \multicolumn{3}{r}{Baseline is sector 'Financials' for models (1) and (2).} \\
 \end{tabular} 
 \end{small}
 \end{table}
@@ -689,265 +933,4 @@ p2 <-  ggplot(veg, aes(x=rsq, fill=type)) +
 grid.arrange(p1, p2, ncol=2)
 ```
 
-# Differences in Bayesian and Frequentist inference
-
-https://en.wikipedia.org/wiki/Probability_interpretations
-
-## Definition of probability and the source of uncertainty 
-
-For a large part, differences between Frequentist and Bayesian inference stems from their respective view of uncertainty and how this is captured by probabilities [CITE]. In the Frequentist framework, probabilities are looked upon as the limiting value of the number of $k$ successes in a sequence of $n$ trials [CITE], or:
-
-$$
-\tag{1}
-\begin{aligned}
-p = \lim_{n \to \infty} \frac{k}{n}
-\end{aligned}
-$$
-
-The implications of this definition are that (1) probabilities make sense only in the context of infinite trials, and (2) the probability is *fixed* in the population and our uncertainty about it reduces as we repeatedly take more (or larger) samples. In particular, this definition implies that the only source of randomness by which our estimate $\hat{p}$ differs from the true value $p$ comes from the data [CITE], which may differ from sample to sample due to, for example, sampling error.
-
-The Bayesian framework looks upon probabilities as a means of quantifying uncertainty about knowledge [CITE]. Even though the 'true' parameter value may be fixed, we are limited by our knowledge of this value. Hence, the uncertainty by which we make statements about the world changes as we collect more information which is represented by the posterior distribution, which may be looked upon very loosely as the collection 'true' values conditional on how certain we are about the veracity of this knowledge.
-
-## Epistemological differences about what constitutes knowledge
-
-In Frequentist statistical inference, evidence may originate only from the data. This is not the case in Bayesian statistical inference, where inferences are based on a mix of domain expertise (*prior* or *belief*) and evidence from the data. This makes perfect sense in the Bayesian framework; if we are uncertain about our knowledge then we can constrain the parameter space by injecting what we *do* know. Hence, a Bayesian looks upon prior beliefs as just another source of knowledge that has been translated into a probability density. The exact definition of the prior belief affects the results to the degree to which we feel certain of its veracity. This is illustrated in the figure below: a strong belief in our prior knowledge (represented by a small variance) leads to a more constrained posterior.
-
-```{r calculate prior variance effect}
-# Posterior shrinkage
-dirmod3 <- blm("Compensation ~ Sector + Age + Male",
-                data=directors) %>%
-  # Need to delete posterior when we change settings
-  # (only has an effect if posterior already present)
-  delete_posterior() %>%
-  # Set an informative prior on the coefficients
-  # Male (b4) is speculated to have 17% pay increase over women
-  set_prior("b4", mu = .17, sd=0.001) %>%
-  # Update sampling settings
-  set_sampling_options(chains = 2, iterations = 20000,
-                       burn = 4000, thinning=3) %>%
-  # Set initial values
-  # If we draw from the priors the starting values will be too large
-  # This is an issue for MH because it takes many more iterations to converge
-  set_initial_values(chain_1 = list("b" = c(4, 2, 3, 8, 10), "sigma"= 1),
-                     chain_2 = list("b" = c(2, 4, 7, 2, 3), "sigma"=2)) %>%
-  # Sample the posterior distribution
-  sample_posterior()
-
-# Change prior and run for another 600000 observations
-dirmod3 <- dirmod3 %>%
-  set_prior("b4", mu = .17, sd=0.01) %>%
-  update_posterior(iterations=20000)
-# Same
-dirmod3 <- dirmod3 %>%
-  set_prior("b4", mu = .17, sd=0.1) %>%
-  update_posterior(iterations=20000)
-
-# Save
-saveRDS(dirmod3, "data/model_effects_prior.rds")
-```
-
-```{r effect of prior variance, fig.height=2, fig.width=7, fig.cap="Effect of adjusting the prior variance of the coefficient for variable Male (a) on the posterior distribution (b). The mean is set at M=.17 which represents a 17 percent increase in compensation for males versus females. Reducing the prior variance represents increased certainty about the estimate of our domain knowledge and weights the information from the data less strongly compared to domain knowledge. The dashed lines indicate the value of the posterior means.", eval=TRUE}
-
-dirmod3 <- readRDS("data/model_effects_prior.rds")
-# Retrieve posterior samples for male variable, burn and label by prior variance 
-library(purrr)
-pd <- get_value(dirmod3, "posterior") %>%
-  get_value("samples") %>%
-  map(function(x) {
-    r1 <- x[4001:20000,"Male"]
-    r2 <- x[24001:40000, "Male"]
-    r3 <- x[44001:60000, "Male"]
-    return(
-      data.frame(
-        "Male" = c(r1, r2, r3),
-        "Prior" = factor(c(rep(1, length(r1)),rep(2, length(r2)), rep(3, length(r3))),
-                         labels = c("0.001", "0.01", "0.1"))
-      )
-    )
-  }) %>%
-  bind_rows()
-
-# Calculate SD by prior
-pd_sd <- pd %>%
-  group_by(Prior) %>%
-  summarize(psd = sd(Male),
-            pmn = mean(Male))
-
-# Posterior z-value
-zscore <- function(mean, sd, theta) (mean - theta) / sd
-z1 <- zscore(pd_sd$pmn[1], pd_sd$psd[1], .17)
-z2 <- zscore(pd_sd$pmn[2], pd_sd$psd[2], .17)
-z3 <- zscore(pd_sd$pmn[3], pd_sd$psd[3], .17)
-
-# Posterior scaling of sd
-ps1 <- pd_sd$psd[1]^2 / as.numeric(levels(pd_sd$Prior)[1])^2 # 841
-ps2 <- pd_sd$psd[2]^2 / as.numeric(levels(pd_sd$Prior)[2])^2 # 35
-ps3 <- pd_sd$psd[3]^2 / as.numeric(levels(pd_sd$Prior)[3])^2 # 0.53
-
-# Posterior means
-pms <- round(pd_sd$pmn, digits=3)
-
-library(ggplot2)
-library(ggpubr)
-priorvar <- ggplot(data.frame(
-  "Male" = c(rnorm(10000, mean=.17, sd=0.001), 
-             rnorm(10000, mean=.17, sd=.01), 
-             rnorm(10000, mean=.17, sd=.1)),
-  "Prior" = factor(c(rep(1, 10000), rep(2, 10000), rep(3, 10000)), labels = c("0.001", "0.01", "0.1"))
-  ),
-  aes(x=Male, fill=Prior)) +
-  geom_histogram(alpha=0.4, position="identity", color="black") +
-  theme_blm(text_size = 9) +
-  theme(axis.title = element_blank(),
-        axis.text.y=element_blank()) +
-  scale_fill_brewer(palette = "Set1",
-                    name="Prior variance") +
-  labs(title = "(a) Prior distribution")
-
-# Posterior distribution
-postvar <- ggplot(pd, aes(x=Male, fill=Prior)) +
-  geom_histogram(alpha=0.4, position="identity", color="black") +
-  theme_blm(text_size = 9) +
-  theme(axis.title = element_blank(),
-        axis.text.y=element_blank()) +
-  geom_vline(xintercept = pms[1], color=RColorBrewer::brewer.pal(3, "Set1")[1], 
-             linetype="dashed", size=1.2) +
-  geom_vline(xintercept = pms[2], color=RColorBrewer::brewer.pal(3, "Set1")[2], 
-             linetype="dashed", size=1.2) +
-  geom_vline(xintercept = pms[3], color=RColorBrewer::brewer.pal(3, "Set1")[3], 
-             linetype="dashed", size=1.2) +
-  scale_fill_brewer(palette = "Set1") +
-  labs(title= "(b) Posterior distribution")
-
-# Arrange plots with common legend
-ggarrange(priorvar, postvar, ncol=2, common.legend=TRUE, legend="top")
-```
-
-The claim that the Frequentist approach is more objective would hold only if the data collection process, (pre-)processing steps and analysis are guaranteed to be objective. This is a tenuous assumption at best in the social sciences; the way in which we collect data is fraught with subjective decisions during data collection, manipulation and analysis [CITE]. Data, in and of itself, is not objective [CITE], and the critique leveled at Bayesians boils down to the practice of incorporating domain knowledge *explicitly* through the use of a prior.
-
-## Methods of estimation and hypothesis testing
-
-Whether a statistician regards the data or the parameters as a random variable determines their choice of estimation method. A Frequentist, believing that variation originates from data, will want to optimize the 'likelihood' of the data conditional on the parameters. That is, we find the *most likely combination* of parameters $\hat{\theta}$ that explain the data and that provide consistent and asymptotically unbiased estimators, or:
-
-$$
-\tag{1}
-\hat{\theta} = \arg \max_{\theta \in \Theta} \text{Log Likelihood}(\theta |\text{data}) 
-$$
-
-Conversely, given that a Bayesian thinks of the data as fixed and the parameters as random variables, they are interested in finding the distribution of the parameters and hence the source of variance:
-
-$$
-\tag{2}
-p(\theta | \text{data}) = \frac{p(\text{data}|\theta) p(\theta)}{p(\text{data})}
-$$
-
-The question of how the definition of probability and the methods of estimation impact inference under these frameworks is illustrated by the difference in interpretation of the confidence interval and the credible interval. When we calculate the confidence interval [REFER TO CENTRAL LIMIT THEOREM/FREQUENCY OF SAMPLING MEANS], the boundaries of the confidence intervals are interpreted as random variables due to sampling error since they estimate the frequency of sampling means. With a credible interval, we do not have this source of variability, which gives rise to the definition that the parameter is contained in the credible interval with some probability because the parameter space is assumed to be known under the assumptions by which we arrived at the posterior distribution [CHECK].
-
-Further implications are to be found in the way we test hypotheses in these frameworks. In the Frequentist framework, we usually partition parameter space into an acceptance and a rejection region based on some null and alternative hypothesis. On the basis of a test statistic, computed from the data, we then decide whether or not the result we observe is likely to occur due to chance.
-
-* Type I && II
-* Test statistic
-* probability of a hypothesis given the data
-
-This is not so in the Bayesian Framework. Given that the data or the evidence can be viewed as a means to update a prior belief, hypothesis testing focuses on the degree to which the evidence found in the data supports this initial belief.
-
---> Probability of the null hypothesis (p 161, 162 Berger & Benny). "Flipping" of the hypothesis 
-
-- Endless transformations on posterior distribution ==> not possible in frequentist except when calculating mean/variances ==> see freq cartoon book
-
-- Frequentists obscure the interpretation process, Bayesian obscure the posterior distribution collection process
-
-Frequentist statistics obscures the interpretation of critical statistics to the point where students learn the heuristics ('p-value is significant') before truly understanding what that heuristic means. Conversely, Bayesian statistics provides an explicit description of a model and its assumptions and has an intuitive interpretation of statistical results. However, the approach obfuscates the estimation method by using the arcane process of Markov Chain Monte Carlo (MCMC) sampling. 
-
-<!-- Legacy
-The effect of changing the prior variance can be summarized using a posterior shrinking factor (CITE BETANCOURT) and posterior z-score. The shrinking factor shows us the factor by which the variance of the posterior distribution shrinks or expands compared to the prior variance. The posterior z-score tells us the direction and magnitude by which the posterior mean shifts compared to the prior mean; if we are confident in the precision of our domain knowledge (resulting in small prior variance), the resulting posterior weights this information strongly and we end up with a posterior mean that lies closer to the prior mean (represented by the z-score). However, given that we have small variance, and if this is not corroborated by the data, then the shrinkage factor will be large. 
--->
-
-
-## Other material
-
-If we desire to interpret this p-value like we do the traditional, Fisherian p-value, then we must assume that, under the assumption that a particular test is not violated, the Bayesian p-value is uniformly distributed. Otherwise, we cannot interpret it as a proportion. Hence, we desire $p_{\text{posterior}} = P(x \leq X)$. We often find that this assumption does not hold true for posterior predictive checks. To this end, we can simulate the assumption when it holds [CHANGE]. This is illustrated in figure XX for the posterior predictive checks included in the R library blm.
-
-```{r ppc simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The color indicates the severity of the violation; the green bars indicate mild violation, blue indicates medium violation and red indicates severe violation. The script used to generate the data and run the simulations may be found here.", fig.width=7, fig.height=3, eval=TRUE}
-
-# Convenience function to flatten array
-flatten_array <- function(x) {
-  
-  # To list and return
-  lapply(1:dim(x)[3], function(y) {
-    ss <- x[,,y]
-    colnames(ss) <- c("normality", "heteroskedasticity", "independence")
-    # To df
-    ss <- as.data.frame(ss)
-    # Return
-    return(ss)
-  })
-  
-}
-
-# Read data
-normal <- readRDS("data/simulations/ppc_normal_data.rds")
-finsim <- readRDS("data/simulations/final.rds")
-heterosked <- finsim$heterosked$results %>% 
-  flatten_array() %>%
-  bind_rows(.id="severity") %>%
-  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
-indep <- finsim$indep$results %>% 
-  flatten_array() %>%
-  bind_rows(.id="severity") %>%
-  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
-
-# PPC heteroskedasticity, no violation
-p1 <- ggplot(data.frame(x=normal[,2]), aes(x=x)) +
-  geom_histogram(color="black", fill="lightgrey") +
-  scale_x_continuous(limits=c(0,1)) + 
-  theme_blm(text_size = 10) +
-  theme(axis.title.x = element_blank(),
-        axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        axis.text.x = element_blank()) +
-  labs(title = "(a) PPC heteroskedasticity", subtitle="      no violations")
-# PPC independence, no violation
-p2 <- ggplot(data.frame(x=normal[,3]), aes(x=x)) +
-  geom_histogram(color="black", fill="lightgrey") +
-  scale_x_continuous(limits=c(0,1)) + 
-  theme_blm(text_size = 10) +
-  theme(axis.title.x = element_blank(),
-        axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        axis.text.x = element_blank()) +
-  labs(title = "(b) PPC independence", subtitle="      no violations")
-# PPC heteroskedasticity, assumption violated
-p3 <- ggplot(heterosked, aes(x=heteroskedasticity, fill=severity)) +
-  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
-  theme_blm(text_size = 10) + 
-  scale_fill_brewer(palette = "Set1", direction=-1) +
-  scale_x_continuous(limits=c(-0.02,1)) +
-  theme(axis.title.x = element_blank(),
-      axis.title.y = element_blank(),
-      axis.text.y = element_blank(),
-      legend.position = "none") +
-  labs(title = "(c) PPC heteroskedasticity", subtitle="      assumption violated")
-# PPC independence, violated
-p4 <- ggplot(indep, aes(x=independence, fill=severity)) +
-  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
-  scale_fill_brewer(palette = "Set1", direction=-1) +
-  scale_x_continuous(limits=c(-0.02,1)) +
-  theme_blm(text_size = 10) +
-    theme(axis.title.x = element_blank(),
-        axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        legend.position = "none") +
-  labs(title = "(d) PPC independence", subtitle="      assumption violated")
-
-# Merge plots
-grid.arrange(p1, p2, p3, p4)
-```
-
 # References
-
-Lynch, S. M. (2007). Introduction to applied Bayesian statistics and estimation for social scientists. Springer Science & Business Media. Chapter 9.2
-
-Aarts, E. (2019). Introduction to multilevel analysis and the basic two-level regression model, week 1 notes [powerpoint presentation]. *Introduction to Multilevel Analysis*, Utrecht University.
-
-Nakagawa, S., & Schielzeth, H. (2013). A general and simple method for obtaining R2 from generalized linear mixed‐effects models. Methods in Ecology and Evolution, 4(2), 133-142.

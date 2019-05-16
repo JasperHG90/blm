@@ -291,7 +291,9 @@ compute_hypothesis_fit <- function(hypothesis_i, posterior, y_sd) {
   for(i in seq_along(post_samples)) {
 
     # Assign value to local scope. i.e. this has the effect of b0 <- value
-    assign(params_in_hyp[i], posterior[,params_in_hyp[i]] %>% scale_coef(y_sd))
+    assign(params_in_hyp[i], posterior[,params_in_hyp[i]] %>%
+             scale_coef(y_sd)
+           )
 
   }
 
