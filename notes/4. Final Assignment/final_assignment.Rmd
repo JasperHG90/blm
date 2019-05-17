@@ -6,7 +6,7 @@ output:
   pdf_document: 
     number_sections: false
 bibliography: bib.bib
-geometry: margin=1.7cm
+geometry: margin=2.5cm
 header-includes:
  \usepackage{float}
  \restylefloat{table}
