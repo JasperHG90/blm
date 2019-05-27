@@ -14,7 +14,7 @@ blm_setup(...)
 }
 \examples{
 \dontrun{
-# blm_setup()
+blm_setup()
 }
 
 }

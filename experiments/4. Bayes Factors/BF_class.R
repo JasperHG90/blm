@@ -43,10 +43,10 @@ fit <- blm("Compensation ~ Age + Male", data=directors) %>%
   set_sampling_options(iterations=k, chains=2, thinning=5) %>%
   # Set reasonable priors
   #set_prior("b1", mu=.01, sd=.2) %>% # 1 % increase / every year ==> 20% spread
-  #set_prior("b2", mu=.05, sd=.03) %>%
+  set_prior("b2", mu=0, sd=1) %>%
   # Set hypotheses
   # H1: Males earn about the same as females
-  set_hypothesis("H1", "b0 + b2 < b0") %>%
+  set_hypothesis("H1", "b2 > 0 & b2 < .01") %>%
   # H2: Directors only earn more as they get older
   set_hypothesis("H2", "b1 > 0") %>%
   #H3: Sectors are ordered as: mu_services > mu_basic materials > mu_financial
@@ -74,12 +74,13 @@ fit %>%
 
 library(bain)
 ## Compared to Bain
-regr <- lm(Compensation ~ Age + Male + Sector, directors)
+regr <- lm(Compensation ~ Age + Male, directors)
 regr$call$formula
 # Set seed
 set.seed(453)
 summary(regr)
-z<-bain(regr,"Male < .05; Age > 0", standardize = TRUE)
+z<-bain(regr,"Male > 0 & Male < .1; Age > 0", standardize = FALSE)
+
 z # Why is BF 4 ==> it is: (fit_hypothesis / complexity_hypothesis) / (fit_complement_of_hypothesis / complexity_complement_of_hypothesis)
 
 # In case of |u1 - u2| < .2sd ==> which sd!! are we referring to? p.35
