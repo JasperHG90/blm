@@ -292,27 +292,13 @@ $$
 \end{aligned}
 $$
 
-Given that we measure the compensation on a log scale, the coefficients we derive from the model must be interpreted as change in percentages. This forces us to rethink the priors we set on the model. We assume that, as age increases, compensation increases as well. Given that we are not certain about the extent to which it increases, we set the the mean to $.05$ and the standard deviation of this estimate to $.2$, representing a spread of approximately $20\%$. We know from earlier studies that male executive directors earn $8-25\%$ more than female directors [@bell2005women]. Due to the lack of research with respect to the remuneration of independent directors, we will take this as a baseline and set this prior a mean of $.165$ with a variance of $.1$, which reflects our uncertainty of the prior knowledge. 
+Given that we measure the compensation on a log scale, the coefficients we derive from the model must be interpreted as change in percentages. This forces us to rethink the priors we specify. We assume that, as age increases, compensation increases as well. Given that we are not certain about the extent to which it increases, we set the the mean to $.05$ and the standard deviation of this estimate to $.2$, representing a spread of approximately $20\%$. We know from earlier studies that male executive directors earn $8-25\%$ more than female directors [@bell2005women]. Due to the lack of research with respect to the remuneration of independent directors, we will take this as a baseline and set this prior a mean of $.165$ with a variance of $.1$, which reflects our uncertainty of the prior knowledge. 
 
 In accordance with our expectations, we hypothesize that male directors earn some $5-20\%$ more than their female counterparts ($H_1$) and that compensation only increases with age ($H_2$). $H_u$ is the unconstrained hypothesis.
 
 $$
 \text{H}_1\text{: } .05 < \beta_{\text{Male}} < .20 \ \ \ \ \ \ \ \text{H}_2\text{: } \beta_{\text{Age}} > 0 \ \ \ \ \ \ \ \text{H}_u\text{: } \beta_\text{Male}, \beta_{\text{Age}}
 $$
-
-<!--
-These hypotheses will be included in the models we construct. (Hoitjtink p.24).
-
-PRA is the weight of a particular Bayes factor compared to the other hypotheses. That is, it is a proportion of the total evidence.
-
-PRB is the probability of the marginal likelihood of each hypothesis, or $P(H_i | model)$. In essence, this functions as an indication of error probabilities; if we 'cut' the parameter space into many pieces, so does our confidence in our hypothesis go down.
-
-The quantities PRB are the Bayesian error probabilities 
-
-BF sensitive to outliers (Hoijtink pp.31-32) ==> check for outliers before BF. Also violation of model assumptions using ppc. We should use a robust BF but we don't have that. Anyway, interpret the BF with a grain of salt.
-
-Bayes' Factor is sensitive to the choice of prior ==> something about the size of complexity. (Hoijtink pp.29-30)
--->
 
 ```{r model1 and 2, include = FALSE}
 # Model 2: Age and Gender -----
@@ -638,7 +624,7 @@ $$
 \end{aligned}
 $$
 
-Where $\gamma_{00}$ is the overall intercept and $u_{0j}$ is a company-specific error term. The DIC of $281$ indicates that the multilevel approach is appropriate, given that this model fits better than the regular regression model. The marginal and conditional R-squared values [@nakagawa2013general]^[The marginal R-squared takes into account only the fixed part of the variance, while the conditional R-squared takes into account the fixed and random parts. See [@nakagawa2013general]] are $R^2_{\text{M}} = .0056; \ 95\% \ \text{CCI}=[.0008, .015]$ and $R^2_{\text{C}} = .5398; \ 95\% \ \text{CCI}=[.4807, .6]$ respectively. This indicates that the fixed part of the model (age) explains almost no variation in the data, but the fixed and random parts together explain some $54\%$ of the total variation. 
+Where $\gamma_{00}$ is the overall intercept and $u_{0j}$ is a company-specific error term. The DIC of $281$ indicates that the multilevel approach is appropriate, given that this model fits better than the regular regression model. The marginal and conditional R-squared values [@nakagawa2013general]^[The marginal R-squared takes into account only the fixed part of the variance, while the conditional R-squared takes into account the fixed and random parts. See [@nakagawa2013general]] are $R^2_{\text{M}} = .0056; \ 95\% \ \text{CCI}=[.0008, .015]$ and $R^2_{\text{C}} = .5398; \ 95\% \ \text{CCI}=[.4807, .6]$ respectively. These values suggest that the fixed part of the model (age) explains almost no variation in the data, but the fixed and random parts together explain some $54\%$ of the total variation. 
 
 ```{r MLM level-1 predictors}
 # Initial values
