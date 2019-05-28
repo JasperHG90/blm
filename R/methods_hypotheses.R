@@ -39,8 +39,8 @@ summary.hypotheses <- function(x) {
   hyps <- c(hyps, "Hu:")
 
   # Make results
-  res <- matrix(0, ncol=5, nrow=length(hyps))
-  colnames(res) <- c("complexity", "fit", "BF_c", "Pr_a", "Pr_b")
+  res <- matrix(0, ncol=6, nrow=length(hyps))
+  colnames(res) <- c("complexity", "fit", "BF_c", "BF_u", "Pr_a", "Pr_b")
   row.names(res) <- hyps
 
   # Get complexity
@@ -62,15 +62,16 @@ summary.hypotheses <- function(x) {
   res[,1] <- c(comp, 0)
   res[,2] <- c(fit, 0)
   res[,3] <- c(BF_c, 0)
-  res[,4] <- c(Pr_a, 0)
-  res[,5] <- c(Pr_b, Pr_bu)
+  res[,4] <- c(BF_u, 0)
+  res[,5] <- c(Pr_a, 0)
+  res[,6] <- c(Pr_b, Pr_bu)
 
   # Round
   res <- round(res, digits=3)
 
   # Set H0 values to 0
   H0_row <- nrow(res)
-  res[H0_row, -5] <- NA
+  res[H0_row, -6] <- NA
 
   # To df
   df <- as.data.frame(res)

@@ -1,12 +1,11 @@
 ---
-title: 'The Effect of Gender on Director Compensation'
+title: 'The Gender Gap in Independent Director Compensation'
 author: "Jasper Ginn (s6100848)"
 date: "April 8, 2019"
 output:
   pdf_document:
     number_sections: false
 bibliography: bib.bib
-csl: chicago.csl
 geometry: margin=2.5cm
 header-includes:
  \usepackage{float}
@@ -73,35 +72,128 @@ blm_setup()
 
 # Introduction
 
-The gender gap in compensation remains a pervasive problem despite efforts to achieve income parity between men and women in the private and public sector. The boards of American companies consists of *executive* and *independent* directors. Execute directors are employed by the firm and usually have high positions within the company (for example the Chief Executive Officer), while independent directors are concerned primarily with oversight. In this paper, I examine the gender gap in compensation among $336$ independent directors in three sectors and $52$ companies using Bayesian Linear Regression.
+The gender gap in compensation remains a pervasive problem despite efforts to achieve income parity between men and women. In this paper, I examine the gender gap in compensation among $336$ independent directors in three sectors and $52$ companies using Bayesian Linear Regression. The boards of American companies consists of *executive* and *independent* directors. Execute directors are employed by the firm and usually have high managerial positions within the company, while independent directors are concerned primarily with oversight. 
 
-The results indicate that we cannot conclude definitively that male independent directors receive a higher remuneration than female independent directors after controlling for age. Model fit statistics and evaluation suggest that linear regression is not an appropriate method to analyse these data because director compensation is highly correlated within companies.  
+The results indicate that we cannot conclude that male independent directors receive a higher remuneration than female independent directors after controlling for age. Model fit statistics and evaluation suggest that linear regression is not an appropriate method to analyse these data because director compensation is highly correlated within companies.  
 
 The paper is structured as follows. Section one elaborates on the differences between Frequentist and Bayesian statistical inference. In turn, section two outlines the hypotheses, model specification and reports the results of the analyses. Section three concludes.
 
 # Differences in Bayesian and Frequentist Inference
 
-Many differences between Frequentist and Bayesian inference originate in their respective view of uncertainty, how this is captured by probabilities and what causes this uncertainty. In the Frequentist framework, a probability is defined as the number of times an event will occur in the long run^[@miller2014john, p.21]. In other words, it is the limiting value of $m$ successes in a sequence of $n$ trials for a particular event, or $p = \lim_{n \to \infty} \frac{m}{n}$.
+Many differences between Frequentist and Bayesian inference originate in their respective view of uncertainty, how this is captured by probabilities and what causes this uncertainty. In the Frequentist framework, a probability is defined as the number of times an event will occur in the long run. In other words, it is the limiting value of $m$ successes in a sequence of $n$ trials for a particular event, or $p = \lim_{n \to \infty} \frac{m}{n}$. [@miller2014john, p.21].
 
-This definition has two implications. The first is that talking about probability makes sense only in the context of infinite trials. The second implication is that probability converges to some fixed quantity as the number of trials go to infinity, and our uncertainty about the true value of this quantity reduces as we repeatedly take more (or larger) samples. In turn, this implies that the only source of randomness by which our estimate $\hat{p}$ differs from the true value $p$ comes from the data, which may differ from sample to sample due to, for example, sampling error.^[@miller2014john]
+This definition has two implications. The first is that talking about probability makes sense only in the context of infinite trials. The second is that probability converges to some fixed quantity as the number of trials go to infinity, and our uncertainty about the true value of this quantity reduces as we repeatedly take more (or larger) samples. In turn, this implies that the only source of randomness by which our estimate $\hat{p}$ differs from the true value $p$ comes from the data, which may differ from sample to sample due to, for example, sampling error. [@miller2014john]
 
-The Bayesian framework considers probabilities as a means of quantifying uncertainty about knowledge.^[@gelman2013bayesian, pp. 11-13] Even though the 'true' parameter value may be fixed, we are limited by our knowledge of this value. The uncertainty in our knowledge will change as we collect more information and is represented by the posterior distribution.
+The Bayesian framework considers probabilities as a means of quantifying uncertainty about knowledge [@gelman2013bayesian, pp. 11-13]. Even though the 'true' parameter value may be fixed, we are limited by our knowledge of this value. The uncertainty in our knowledge will hopefully (but not necessarily) decrease as we collect more information and is represented by the posterior distribution.
 
-## Objective and Subjective Knowledge
+### Objective and Subjective Knowledge
 
-A Frequentist believes that evidence can only originate from the data. This is not the case in Bayesian statistical inference, where inferences are based on a mix of domain expertise (*prior* or *belief*) and evidence from the data. This makes perfect sense in the Bayesian framework; if we are certain about our knowledge then we can constrain the parameter space by injecting what we know *a priori*. In other words, a Bayesian looks upon prior beliefs as just another source of knowledge that has been translated into a probability density. 
+A Frequentist believes that evidence can only originate from the data. This is not the case in Bayesian statistical inference, where inferences are based on a mix of domain expertise (*prior* or *belief*) and evidence from the data. This makes perfect sense in the Bayesian framework; if we are certain about our knowledge then we can constrain the parameter space by injecting what we know *a priori*. In other words, a Bayesian looks upon prior beliefs as just another source of knowledge that have been translated into a probability density. 
 
-The claim that the Frequentist approach is more objective only holds if one regards the data collection process, (pre-)processing steps and analysis as guaranteed to be objective. This is a tenuous assumption at best in the social sciences; statistics is fraught with subjective decisions during data collection, manipulation and analysis^[@berger1988statistical], and the charge of subjectivity leveled at Bayesians boils down to the practice of incorporating domain knowledge *explicitly* through the use of a prior distribution. 
+The claim that the Frequentist approach is more objective only holds if one regards the data collection process, (pre-)processing steps and analysis as guaranteed to be objective. This is a tenuous assumption at best in the social sciences; statistics is fraught with subjective decisions during data collection, manipulation and analysis [@berger1988statistical], and the charge of subjectivity leveled at Bayesians boils down to the practice of incorporating domain knowledge *explicitly* through the use of a prior distribution. 
 
-## Methods of Estimation and Hypothesis Testing
+### Methods of Estimation and Hypothesis Testing
 
-Whether a statistician regards the data or the parameters as a random variable determines their choice of estimation method. A Frequentist, believing that variation originates from data, will want to find the most likely combination of parameters $\hat{\theta}$ that explain the data and that provide consistent and asymptotically unbiased estimators. Conversely, given that a Bayesian thinks of the data as fixed and the parameters as random variables, they are interested in finding the distribution of the parameters and hence the source of uncertainty in our beliefs after seeing the evidence. The different estimation methods provide different predictions; Maximum Likelihood (ML) estimates yield point estimates and MCMC methods yield posterior predictive distributions. The latter can be used to evaluate, for example, the fit of the model by means of Posterior Predictive Checks (PPP).
+Whether a statistician regards the data or the parameters as a random variable determines their choice of estimation method. A Frequentist will want to find the most likely combination of parameters $\hat{\theta}$ that explain the data and that provide consistent and asymptotically unbiased estimators. Conversely, given that a Bayesian thinks of the data as fixed and the parameters as random variables, they are interested in finding the distribution of the parameters and hence the source of uncertainty in our beliefs after seeing the evidence [@miller2014john, ch.8]. The different estimation methods provide a different type of prediction under the model; whereas Maximum Likelihood (ML) used by Frequentists estimates yield point estimates, MCMC methods employed by Bayesians yield posterior probability distributions. The latter can be used to evaluate, for example, the fit of the model by means of Posterior Predictive Checks (PPP).
 
 <!--
 Bayesian models yield the posterior probability distribution of the model parameters. This allows us to produce a posterior predictive distribution for each subject in the data set. Unlike Frequentist model results, such distributions  provide us with a useful way to understand whether the model adheres to its core assumptions by means of *posterior predictive checks* (PPC). PPC require us to simulate data under the model and to compare the simulated outcome variable to the observed outcome variable, which results in a proportion sometimes called the Bayesian p-value. If we desire to interpret this p-value like we do the traditional, Fisherian p-value, then we must assume that, under the assumption that a particular test is not violated, the Bayesian p-value is uniformly distributed. We often find that this assumption does not hold true for posterior predictive checks. To this end, we can simulate data under various conditions to observe how the statistic behaves. This is illustrated in figure 1 below for two posterior predictive checks included in the R library blm.
 -->
 
-```{r ppc simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The color indicates the severity of the violation; the green bars indicate mild violation, blue indicates medium violation and red indicates severe violation. The script used to generate the data and run the simulations can be found on GitHub.", fig.width=7, fig.height=3, eval=TRUE}
+```{r simulation script}
+## Simulation study for PPC
+## Plan: Run the plans below ==> without any violations and violating to different degrees
+
+library(blm)
+blm_setup()
+
+# iterations
+k <- 1000
+
+# Results
+sim_res <- array(0L, c(k, 3, 3))
+
+# Grid of values to test
+# See: generate_dataset in helpers.R (line 222)
+grid <- list(
+  "noviolation" = list(
+    "results" = array(0L, c(k, 3, 1)),
+    "degrees" = 1 # Degrees will be ignored if no violation but it eases coding in the for-loop below
+  ),
+  "heterosked" = list(
+    "degrees" = c("mild" = 1, "medium"=3, "severe" = 5),
+    "results" = sim_res
+  ),
+  "indep" = list(
+    "degrees" = c("mild"=0.1, "medium"=0.5, "severe"=0.9), # Determines 'ar' param for an arima.sim
+    "results" = sim_res
+  )
+)
+
+# For each test
+# Progress bar
+library(utils)
+pb <- txtProgressBar(min = 0, max = (k * (3 * 2)) + k, style = 3) # (k * (length(grid) * length(degrees))) + k [==>] (last k is for no violation)
+# keep track of total i for progress bar
+i_pb <- 0
+# For each assumption
+for(j in seq_along(grid)) {
+
+  # For each degree
+  for(d in seq_along(grid[[j]][["degrees"]])) {
+
+    # For each simulation
+    for(i in 1:k) {
+
+      # Increment i_pb
+      i_pb <- i_pb + 1
+
+      # Set pb
+      setTxtProgressBar(pb, i_pb)
+
+      # Unroll data
+      noviolation <- ifelse(j == 1, TRUE, FALSE)
+      heteroskedastic <- ifelse(j == 2, TRUE, FALSE)
+      independence <- !heteroskedastic & !noviolation
+
+      # Simulate data
+      dat <-blm::blmsim(n = 100, j=2, binary = 0, heteroskedastic = heteroskedastic,
+                        correlated_errors = independence, degree=grid[[j]][["degrees"]][[d]])
+
+      # Unroll
+      df <- as.data.frame(cbind(dat$y, dat$X[,-1]))
+      # Names
+      colnames(df) <- c("y", paste0("x", 1:(ncol(df) - 1)))
+
+      # Blm object
+      bfit <- blm("y ~ .", data=df) %>%
+        set_sampling_options(iterations = 15000, burn = 2000, chains = 1) %>%
+        sample_posterior() %>%
+        # PPC
+        evaluate_ppc(p=1)
+
+      # Store ppc
+      ppcr <- get_value(bfit, "ppc")
+      # Store results
+      grid[[j]][["results"]][i, , d] <- c(ppcr$results$normality, ppcr$results$homosked, ppcr$results$independence)
+
+      # Save every 10 iterations
+      if(i %% 10 == 0) {
+        # Store data
+        saveRDS(grid, "experiments/2_Simulations_PPC/ppc_simulated/tmp.rds")
+      }
+
+    }
+
+  }
+
+}
+
+# Store data
+saveRDS(grid, "experiments/2_Simulations_PPC/ppc_simulated/final.rds")
+```
+
+```{r ppc simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The color indicates the severity of the violation; the green bars indicate mild violation, blue indicates medium violation and red indicates severe violation.", fig.width=7, fig.height=3, eval=TRUE}
 
 # Convenience function to flatten array
 flatten_array <- function(x) {
@@ -181,9 +273,9 @@ p4 <- ggplot(indep, aes(x=independence, fill=severity)) +
 grid.arrange(p1, p2, p3, p4)
 ```
 
-The way in which we think about statistical inference under these frameworks is illustrated by the difference in interpretation of the confidence interval and the credible interval. When we calculate the confidence interval, the upper and lower boundaries of the confidence interval are interpreted as random variables due to sampling error. Therefore, we should interpret it as ... With a credible interval, we do not have this source of variability, which gives rise to the definition that the parameter is contained in the credible interval with some probability because the parameter space is assumed to be known under the assumptions by which we arrived at the posterior distribution.
+The way in which we think about statistical inference under these frameworks is illustrated by the difference in interpretation of the confidence interval and the credible interval. When we calculate the confidence interval, the upper and lower confidence limited should be interpreted as random variables because they vary across samples. Crucially, they do not reflect probabilities but confidence in our point estimates [@miller2014john, pp.317-320]. A credible interval, being associated with a posterior distribution, necessarily deals with probability statements such that we can say that the parameter is contained in the credible interval with some probability (e.g. $95\%$) [@lynch2007introduction, p.58].
 
-Further implications are to be found in the way we test hypotheses in these frameworks. In the Frequentist framework, we usually partition parameter space into an acceptance and a rejection region based on some null and alternative hypothesis. On the basis of a test statistic, computed from the data, we then decide whether or not the result we observe is likely to occur due to chance. We use either confidence intervals or $p$-values to express support for the alternative hypothesis, but, importantly, we can never quantify support in favor of the null hypothesis. This is not so in the Bayesian Framework. Given that the data can be viewed as a means to update a prior belief, hypothesis testing is a relative statement about the degree to which the evidence found in the data supports this initial belief or contradicts it. 
+Further implications are to be found in the way we test hypotheses in these frameworks. In the Frequentist framework, we usually partition the parameter space into an acceptance and a rejection region based on some null and alternative hypothesis. On the basis of a test statistic, computed from the data, we then decide whether or not the result we observe is likely to occur due to chance. We use either confidence intervals or $p$-values to express support for the alternative hypothesis, but, importantly, we can never quantify support in favor of the null hypothesis [@miller2014john, pp.337-339]. This is not so in the Bayesian Framework. Given that the data can be viewed as a means to update a prior belief, hypothesis testing using Bayes Factors is a relative statement about the degree to which the evidence found in the data supports one hypothesis over another [@hoijtink2019tutoial]. 
 
 <!--
 TYPE I & II errors, advantages of bayes factor, not effect sizes
@@ -191,14 +283,7 @@ TYPE I & II errors, advantages of bayes factor, not effect sizes
 
 # Methods & Results
 
-This section describes the results of the statistical analysis. Table XX below shows the descriptive statistics for each variable. The outcome variable **compensation** is given in thousands of Great British pounds and has been log-transformed. The variable **Age** has been grand-mean centered to facilitate interpretation and estimation. Some $44\%$ of the data has been deleted due to missingness on one of the variables, which leaves us with $336$ observations.
-
-```{r descriptive statistics, eval=FALSE, results='asis'}
-out <- capture.output(stargazer::stargazer(directors_with_na, summary=TRUE, median=TRUE))
-cat(paste0(out[-1:-3], "\n"))
-```
-
-The model is given by the following equation:
+This section describes the results of the statistical analysis. The outcome variable compensation is given in thousands of Great British pounds and has been log-transformed. The variable age has been grand-mean centered to facilitate interpretation and estimation. Some $44\%$ of the data has been deleted due to missingness on one of the variables, which leaves us with $336$ observations, $60$ of whom are female and $276$ are male.  The model is given by the following equation:
 
 $$
 \begin{aligned}
@@ -207,12 +292,12 @@ $$
 \end{aligned}
 $$
 
-Given that we measure the compensation on a log scale, the coefficients we derive from the model must be interpreted as change in percentages. This forces us to rethink the priors we set on the model. We assume that, as age increases, compensation increases as well. Given that we are not certain about the extent to which it increases, we set the the mean to $.05$ and the standard deviation of this estimate to $.2$, representing a spread of approximately $20\%$. We know from earlier studies that male executive directors earn $8-25\%$ more than female directors.^[@bell2005women] Due to the lack of research with respect to the remuneration of independent directors, we will take this as a baseline and set this prior a mean of $.165$ with a variance of $.1$, which reflects our uncertainty of the prior knowledge. 
+Given that we measure the compensation on a log scale, the coefficients we derive from the model must be interpreted as change in percentages. This forces us to rethink the priors we set on the model. We assume that, as age increases, compensation increases as well. Given that we are not certain about the extent to which it increases, we set the the mean to $.05$ and the standard deviation of this estimate to $.2$, representing a spread of approximately $20\%$. We know from earlier studies that male executive directors earn $8-25\%$ more than female directors [@bell2005women]. Due to the lack of research with respect to the remuneration of independent directors, we will take this as a baseline and set this prior a mean of $.165$ with a variance of $.1$, which reflects our uncertainty of the prior knowledge. 
 
-In accordance with the available evidence, we hypothesize that male directors earn more than their female counterparts and that compensation only increases with age. $H_u$ is the unconstrained hypothesis.
+In accordance with our expectations, we hypothesize that male directors earn some $5-20\%$ more than their female counterparts ($H_1$) and that compensation only increases with age ($H_2$). $H_u$ is the unconstrained hypothesis.
 
 $$
-\text{H}_1\text{: } \beta_{\text{Male}} > 0 \ \ \ \ \ \ \ \text{H}_2\text{: } \beta_{\text{Age}} > 0 \ \ \ \ \ \ \ \text{H}_u\text{: } \beta_\text{Male}, \beta_{\text{Age}}
+\text{H}_1\text{: } .05 < \beta_{\text{Male}} < .20 \ \ \ \ \ \ \ \text{H}_2\text{: } \beta_{\text{Age}} > 0 \ \ \ \ \ \ \ \text{H}_u\text{: } \beta_\text{Male}, \beta_{\text{Age}}
 $$
 
 <!--
@@ -229,7 +314,7 @@ BF sensitive to outliers (Hoijtink pp.31-32) ==> check for outliers before BF. A
 Bayes' Factor is sensitive to the choice of prior ==> something about the size of complexity. (Hoijtink pp.29-30)
 -->
 
-```{r model1, include = FALSE}
+```{r model1 and 2, include = FALSE}
 # Model 2: Age and Gender -----
 
 # Create the model
@@ -244,33 +329,41 @@ dirmod2 <- dirmod2 %>%
   # Need to delete posterior when we change settings
   # (only has an effect if posterior already present)
   delete_posterior() %>%
+  
   # Change the uninformative priors for the intercept and the sectors
   # We are reasoning in percentage change now. So uninformative priors should reflect this
   # on the same scale. (except the intercept)
   set_prior("b0", mu = 0, sd = 100) %>%
   # Set an informative prior on the coefficients
   # Age centered at 0 with .2 variance
-  set_prior("b1", mu = 0, sd = .2) %>%
+  set_prior("b1", mu = .05, sd = .2) %>%
   # Males (b2) are speculated to have 17% pay increase over women
-  set_prior("b2", mu = .1, sd=.1) %>%
+  set_prior("b2", mu = .165, sd=.1) %>%
+  
   # Change the sampler of Age to metropolis hastings (random walk)
   # Lambda parameter controls the variance of the (normal) proposal distribution
   set_sampler("b1", type="MH", lambda=0.01) %>%
   # Update sampling settings
   set_sampling_options(chains = 2, iterations = 80000,
                        burn = 15000, thinning=5) %>%
+  
   # Set initial values
   # If we draw from the priors the starting values will be too large
   # This is an issue for MH because it takes many more iterations to converge
   set_initial_values(chain_1 = list("b" = runif(3, 0, 10), "sigma"=1),
                      chain_2 = list("b" = runif(3, 0, 10), "sigma"=2)) %>%
+  
   # Compute null model (the intercept-only model)
   compute_null_model() %>%
+  
   # Set hypotheses
-  set_hypothesis("H1", "b2 > 0") %>% # Gender: larger than 0
+  set_hypothesis("H1", "b2 > 0.05 & b2 < .2") %>% # Gender: larger than 0
   set_hypothesis("H2", "b1 > 0") %>%   # Age: larger than 0
+  
   # Sample the posterior distribution
   sample_posterior()
+
+## Convergence checks
 
 # Print model specification
 print(dirmod2)
@@ -298,27 +391,21 @@ plot(dirmod2, "density") # OK
 # Did the null model converge?
 plot(dirmod2, "nullmodel") # OK
 
+## Summary of results
+
 # Summary
 summary(dirmod2)
 # ==> Male not a predictor
-# ==> age a predictor
+# ==> age not a predictor
 # ==> Both sectors increase compensation for directors
 
-# Compare hypotheses with Bain
-library(bain)
-## Compared to Bain
-regr <- lm(Compensation ~ Age + Male, directors)
-# Set seed
-summary(regr)
-z<-bain(regr,"Male > 0; Age > 0", standardize = FALSE)
-z # This bayes factor differs because we set a different prior ==> therefore the complexity is not the same.
-
 # R-squared value
-
 # Plot
 plot(dirmod2$rsq)
 median(dirmod2$rsq$rsquared) # R-squared ~ .089
 quantile(dirmod2$rsq$rsquared, c(0.025, 0.25, 0.5, 0.75, 0.975)) # 95% CCI [.045, .15]
+
+## Posterior predictive checks
 
 # Posterior predictive checks
 dirmod2 <- dirmod2 %>%
@@ -334,7 +421,8 @@ errs <- data.frame(
 
 library(ggplot2)
 # Color residuals by company
-p1 <- ggplot(errs, aes(x=predicted_model, y=residuals_model, color=as.factor(company))) +
+p1 <- ggplot(errs, aes(x=predicted_model, y=residuals_model, 
+                       color=as.factor(company))) +
   geom_point() +
   theme_blm() +
   theme(legend.position="none")
@@ -377,20 +465,24 @@ dirmod2 %>%
 dirmod2 %>%
   get_value("null_model") %>%
   get_value("DIC") %>%
-  summary() # ==> 513 so the model above fits significantly better
+  summary() # ==> 513 so the model above is not really a much better fit.
 
 # Save this model
 saveRDS(dirmod2, "models/model2.rds")
 ```
 
-The model results are presented in table XX. The convergence diagnostics show that the posterior distributions have forgotten their initial states and have converged to their stable distributions. There is no trace of autocorrelation and the Gelman-Rubin statistic is close to $1$, indicating that the chains have converged to the same stationary distribution. The DIC for the model of interest (model 2) is $508$ compared to $513$ for the intercept-only model (model 1). The difference between the DIC scores indicates that the model fits better than the intercept-only model, but only marginally. The MC error, which should be less than $5\%$ of the standard deviation, is negligible.
+The model results are presented in table 1. The convergence diagnostics show that the posterior distributions have forgotten their initial states and have converged to their stable distributions. There is no trace of autocorrelation and the Gelman-Rubin statistic is close to $1$, indicating that the chains have converged to the same stationary distribution. The DIC for the model of interest (model 2) is $508$ compared to $513$ for the intercept-only model (model 1). The difference between the DIC scores indicates that the model fits better than the intercept-only model, but only marginally. The MC error, which should be less than $5\%$ of the standard deviation, is negligible.
 
-The model results indicate that gender is not a predictor of director compensation $(\beta_{\text{male}} = .067; 95\% \ \ \text{CCI} = [-.08, .214])$. The CCI and standard deviation for this coefficient indicate that there is a lot of uncertainty in this estimate. Age is also not a predictor has a small, positive effect on director compensation $(\beta_{\text{age}} = .008; 95\% \ \ \text{CCI} = [-.00, .017])$. The lack of explanatory power provided by the variables that we observed in the parameter estimates and DIC is also reflected by the $R^2$ value given that the 95% CCI contains values close to $0$ (see also figure 2). The median $R^2$ value for this model is $R^2 = .021; 95\% \ \ \text{CCI} = [.002, .059])$ [CITE GELMAN], indicating that, using these variables, we explain some $2\%$ of the variance in compensation.  
+The model results indicate that gender is not a predictor of director compensation $(\beta_{\text{male}} = .067; 95\% \ \ \text{CCI} = [-.08, .214])$. The CCI and standard deviation for this coefficient indicate that there is a lot of uncertainty in this estimate. Age is also not a predictor and has a small, positive effect on director compensation $(\beta_{\text{age}} = .008; 95\% \ \ \text{CCI} = [-.00, .017])$. This small value may be explained by the fact that the average director in the sample is around $62$ years old and age (serving as a proxy for experience) matters less for compensation. The median $R^2$ value for this model is $R^2 = .021; 95\% \ \ \text{CCI} = [.002, .059])$ [@gelman2018r], indicating that we explain some $2\%$ of the variance in compensation.  
 
-From the posterior predictive checks (table 1), we observe that the data violate the independence assumption of the model $(p_{\text{independence}} = 0$. That is, directors who are in the same board tend to are more similar to each other than directors from other boards. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards. Indeed, the results of the random effects model shows that the intra-class correlation coefficient $\rho$ equals $57\%$, meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The complete multilevel analysis of this data can be found [here](https://github.com/JasperHG90/blm/blob/master/notes/6.%20Linear%20Mixed%20Effects%20in%20JAGS/multiJags.pdf).] 
+The support for in the data $H_1$ versus $H_c$^[$H_c$ is the complement of $H_1$. Given that we only have inequality constraints, $H_1$ is evaluated against $H_c$ and not $H_u$. See [@hoijtink2019tutoial]] is very small ($BF=1.243$). The evidence that age has a positive impact on compensation ($H_2$) has more support after observing the data ($BF=24.9$), and $H_2$ has $20$ times more support in the data than $H_1$. The posterior model probabilities (PMPb in table 1) indicate that we should prefer $H_2$ over $H_1$. However, this preference comes with a high error probability (approximately $55\%$).
+
+The posterior predictive checks (table 1) suggest that the data violate the independence assumption of the model $(p_{\text{independence}} = 0)$. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards and directors tend to are more similar to their co-directors in the same boards in terms of compensation. 
 
 ```{r MLM intercept-only model}
 library(rjags)
+library(blm)
+library(dplyr)
 
 # Reload directors
 data("directors")
@@ -537,17 +629,16 @@ saveRDS(resm1, "models/ML_interceptonly.rds")
 saveRDS(DICm1, "models/ML_io_DIC.rds")
 ```
 
-Given the hierarchical nature of the data, we next run a linear mixed effects model. This model corresponds to the following equation.
+Given the hierarchical nature of the data, we next run a linear mixed effects model. The intra-class correlation coefficient shows that a large portion of the variance is found at the company level ($\rho = 57\%; \ 95\% CCI=[.451, .686]$), meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The complete multilevel analysis of this data can be found [here](https://github.com/JasperHG90/blm/blob/master/notes/6.%20Linear%20Mixed%20Effects%20in%20JAGS/multiJags.pdf).] The final model corresponds to the following equation.
 
 $$
-\tag{3}
 \begin{aligned}
 \widehat{\log(\text{compensation}_i)} = 
 &\gamma_{00} + u_{0j} + \gamma_{10}\cdot [\text{Age}_{ij} - \overline{\text{Age}}]) + e_{ij}
 \end{aligned}
 $$
 
-Where $\gamma_{00}$ is the overall intercept and $u_{0j}$ is a company-specific error term. Notice that the fit of this model is much better than that of the previous models ($DIC=280$), indicating that the multilevel approach seems appropriate. The marginal and conditional R-squared values (@nakagawa2013general)^[The marginal R-squared takes into account only the fixed part of the variance, while the conditional R-squared takes into account the fixed and random parts] are $R^2_{\text{M}} = .0056; \ 95\% \ \text{CCI}=[.0008, .015]$ and $R^2_{\text{C}} = .5398; \ 95\% \ \text{CCI}=[.4807, .6]$ respectively. This indicates that the fixed part of the model (age) explains almost no variation in the data, but the fixed and random parts together explain some $54\%$ of the total variation. Hence, we can be confident that director compensation is best modelled using company-specific intercepts, but that we do not have the right variables at either the company or individual level that would help us explain the heterogeneity in compensation among directors within boards and between boards.
+Where $\gamma_{00}$ is the overall intercept and $u_{0j}$ is a company-specific error term. The DIC of $281$ indicates that the multilevel approach is appropriate, given that this model fits better than the regular regression model. The marginal and conditional R-squared values [@nakagawa2013general]^[The marginal R-squared takes into account only the fixed part of the variance, while the conditional R-squared takes into account the fixed and random parts. See [@nakagawa2013general]] are $R^2_{\text{M}} = .0056; \ 95\% \ \text{CCI}=[.0008, .015]$ and $R^2_{\text{C}} = .5398; \ 95\% \ \text{CCI}=[.4807, .6]$ respectively. This indicates that the fixed part of the model (age) explains almost no variation in the data, but the fixed and random parts together explain some $54\%$ of the total variation. 
 
 ```{r MLM level-1 predictors}
 # Initial values
@@ -604,8 +695,12 @@ params <- c("sigma_e", "sigma_u0", "gamma_00", "gamma_10")
 # Run the chain
 resm2 <- coda.samples(mod_io, variable.names = params, n.iter=500000, thin = 10)
 
+# Convergence?
+plot(resm21) # Ok
+gelman.plot(resm2) # Ok
+
 # DIC
-DICm2 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD") # 280.9 => +- 9 difference
+DICm2 <- dic.samples(mod_io, thin=5, n.iter=20000, type="pD") # 281 => +- 7 difference
 
 # Calculate variance explained
 # MAP values for model 1
@@ -669,6 +764,7 @@ mve <- apply(ve_2, 2, median)
 
 ```{r r-squared plot, fig.cap="Bayesian R-squared value for model 1 (a) and model 2 (b). The proportion of cases in which the R-squared value of model 2 exceeds that of model 1 is .99. Figure (c) shows the marginal (blue) and conditional (red) R-squared values for the posterior distribution. The marginal R-squared indicates the amount of variance explained by the fixed part of the model; the conditional R-squared indicates the amount of variance explained by the fixed and random part of the model.", fig.height=2, fig.width=7, eval=TRUE}
 library(latex2exp)
+library(gridExtra)
 library(ggplot2)
 # Plot r-squared
 # Model 1
@@ -703,6 +799,10 @@ p2 <-  ggplot(veg, aes(x=rsq, fill=type)) +
 grid.arrange(p1, p2, ncol=2)
 ```
 
+# Conclusion
+
+The analysis shows that gender is not a predictor of compensation for independent directors. There are some clear limitations to this analysis. Firstly, I have to delete some $44\%$ of the data during missingness. Secondly, the results indicate that there is a lot of uncertainty in the estimation of the gender effect, which is exemplified by the large standard deviation of the posterior distribution. Furthermore, director compensation is best modeled using company-specific intercepts, but we do not have the right variables at either the company or individual level that would help us explain the heterogeneity in compensation among directors within boards and between boards. Future research should focus on collecting more complete data and other covariates such as the percentage of female directors.
+
 \begin{table}[H] \centering 
 \begin{small}
   \caption{Model results } 
@@ -718,36 +818,35 @@ grid.arrange(p1, p2, ncol=2)
 \\[-1.8ex] & (blm) & (blm) & (JAGS) \\
 \hline \\[-1.8ex] 
 \textit{(a) Fixed} & & & \\
-Constant & 4.991 (4.935, 5.048) & 4.820 (4.731, 4.901) & 4.993 (4.875, 5.112) \\ 
-Male & & .062 ($-$.08, .205) & \\ 
-Age & & .010 (.002, .018) & .009 (.003, .015) \\ 
+Constant & 4.991 (4.935, 5.046) & 4.991 (4.936, 5.046) & 4.993 (4.875, 5.112) \\ 
+Male & & .071 ($-$.075, .219) & \\ 
+Age & & .008 ($-$.00, .017) & .009 (.003, .015) \\ 
 \hline \\[-1.8ex] 
 \textit{(b) Random} & & & \\
-$\sigma^2_e$ & .52 & .5 & .342 (.315, .372) \\
+$\sigma^2_e$ & .52 (.482, .56) & .516 (.479, .558) & .342 (.315, .372) \\
 $\sigma^2_{u0}$ & & & .399 (.322, .504) \\
 \hline \\[-1.8ex] 
 \textit{(c) Model Fit} \\
 Observations & 336 & 336 & 336 \\
 Companies & & & 52 \\
-DIC & 513 & 488 & 281 \\ 
-Penalty. & 2 & 6 & 49 \\ 
-R$^{2}$ & 0 & .09 & .006 (M), .536 (C) \\ 
+DIC & 513 & 409 & 281 \\ 
+Penalty. & 2 & 4 & 49 \\ 
+R$^{2}$ & & .021 & .006 (M), .536 (C) \\ 
 \hline \\[-1.8ex] 
 \textit{(d) Post. Pred. Checks} & & & \\
-Normality &  & .357 &  \\
-Homoskedasticity &  & .612 & \\
+Normality &  & .362 &  \\
+Homoskedasticity &  & .321 & \\
 Independence &  & 0 & \\
 \hline \\[-1.8ex] 
 \textit{(e) Bayes' Factors (model 2 only)} & & & \\
 Hypothesis & BF (complexity, fit) & PMPa & PMPb \\
 \hline \\[-1.8ex] 
-$\text{H}_1: \beta_\text{Male} \leq .05$ & 4294.5 (.812, 1) & .382 & .291  \\
-$\text{H}_2: \beta_{\text{Age}} > 0$ & 129.8 (.498, .992) & .618 & .472 \\
-$\text{H}_u: \beta_{\text{Male}}, \beta_{\text{Age}}$ &  &  & .237 \\
+$\text{H}_1: \beta_\text{Male} > 0$ & 1.243 (.512, .566) & .403 & .295  \\
+$\text{H}_2: \beta_{\text{Age}} > 0$ & 24.86 (.594, .972) & .597 & .438 \\
+$\text{H}_u: \beta_{\text{Male}}, \beta_{\text{Age}}$ &  &  & .267 \\
 \hline 
 \end{tabular} 
 \end{small}
 \end{table}
 
-# Conclusion
-
+# References

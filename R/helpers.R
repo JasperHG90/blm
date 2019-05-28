@@ -227,8 +227,8 @@ compute_hypothesis_complexity <- function(hypothesis_i, priors, y_sd) {
     prinf <- priors[[x]]
 
     # Draw
-    rnorm(50000, prinf$mu, prinf$sd) %>%
-      scale_coef(y_sd)
+    rnorm(50000, prinf$mu, prinf$sd) #%>%
+      #scale_coef(y_sd)
 
   })
 
@@ -291,8 +291,8 @@ compute_hypothesis_fit <- function(hypothesis_i, posterior, y_sd) {
   for(i in seq_along(post_samples)) {
 
     # Assign value to local scope. i.e. this has the effect of b0 <- value
-    assign(params_in_hyp[i], posterior[,params_in_hyp[i]] %>%
-             scale_coef(y_sd)
+    assign(params_in_hyp[i], posterior[,params_in_hyp[i]] #%>%
+             #scale_coef(y_sd)
            )
 
   }
