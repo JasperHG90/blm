@@ -92,180 +92,7 @@ The claim that the Frequentist approach is more objective only holds if one rega
 
 ### Methods of Estimation and Hypothesis Testing
 
-Whether a statistician regards the data or the parameters as a random variable determines their choice of estimation method. A Frequentist will want to find the most likely combination of parameters $\hat{\theta}$ that explain the data and that provide consistent and asymptotically unbiased estimators. Conversely, given that a Bayesian thinks of the data as fixed and the parameters as random variables, they are interested in finding the distribution of the parameters and hence the source of uncertainty in our beliefs after seeing the evidence [@miller2014john, ch.8]. The different estimation methods provide a different type of prediction under the model; whereas Maximum Likelihood (ML) used by Frequentists estimates yield point estimates, MCMC methods employed by Bayesians yield posterior probability distributions. The latter can be used to evaluate, for example, the fit of the model by means of Posterior Predictive Checks (PPP).
-
-```{r simulation script}
-## Simulation study for PPC
-## Plan: Run the plans below ==> without any violations and violating to different degrees
-
-library(blm)
-blm_setup()
-
-# iterations
-k <- 1000
-
-# Results
-sim_res <- array(0L, c(k, 3, 3))
-
-# Grid of values to test
-# See: generate_dataset in helpers.R (line 222)
-grid <- list(
-  "noviolation" = list(
-    "results" = array(0L, c(k, 3, 1)),
-    "degrees" = 1 # Degrees will be ignored if no violation but it eases coding in the for-loop below
-  ),
-  "heterosked" = list(
-    "degrees" = c("mild" = 1, "medium"=3, "severe" = 5),
-    "results" = sim_res
-  ),
-  "indep" = list(
-    "degrees" = c("mild"=0.1, "medium"=0.5, "severe"=0.9), # Determines 'ar' param for an arima.sim
-    "results" = sim_res
-  )
-)
-
-# For each test
-# Progress bar
-library(utils)
-pb <- txtProgressBar(min = 0, max = (k * (3 * 2)) + k, style = 3) # (k * (length(grid) * length(degrees))) + k [==>] (last k is for no violation)
-# keep track of total i for progress bar
-i_pb <- 0
-# For each assumption
-for(j in seq_along(grid)) {
-
-  # For each degree
-  for(d in seq_along(grid[[j]][["degrees"]])) {
-
-    # For each simulation
-    for(i in 1:k) {
-
-      # Increment i_pb
-      i_pb <- i_pb + 1
-
-      # Set pb
-      setTxtProgressBar(pb, i_pb)
-
-      # Unroll data
-      noviolation <- ifelse(j == 1, TRUE, FALSE)
-      heteroskedastic <- ifelse(j == 2, TRUE, FALSE)
-      independence <- !heteroskedastic & !noviolation
-
-      # Simulate data
-      dat <-blm::blmsim(n = 100, j=2, binary = 0, heteroskedastic = heteroskedastic,
-                        correlated_errors = independence, degree=grid[[j]][["degrees"]][[d]])
-
-      # Unroll
-      df <- as.data.frame(cbind(dat$y, dat$X[,-1]))
-      # Names
-      colnames(df) <- c("y", paste0("x", 1:(ncol(df) - 1)))
-
-      # Blm object
-      bfit <- blm("y ~ .", data=df) %>%
-        set_sampling_options(iterations = 15000, burn = 2000, chains = 1) %>%
-        sample_posterior() %>%
-        # PPC
-        evaluate_ppc(p=1)
-
-      # Store ppc
-      ppcr <- get_value(bfit, "ppc")
-      # Store results
-      grid[[j]][["results"]][i, , d] <- c(ppcr$results$normality, ppcr$results$homosked, ppcr$results$independence)
-
-      # Save every 10 iterations
-      if(i %% 10 == 0) {
-        # Store data
-        saveRDS(grid, "experiments/2_Simulations_PPC/ppc_simulated/tmp.rds")
-      }
-
-    }
-
-  }
-
-}
-
-# Store data
-saveRDS(grid, "experiments/2_Simulations_PPC/ppc_simulated/final.rds")
-```
-
-```{r ppc simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The color indicates the severity of the violation; the green bars indicate mild violation, blue indicates medium violation and red indicates severe violation.", fig.width=7, fig.height=3, eval=TRUE}
-
-# Convenience function to flatten array
-flatten_array <- function(x) {
-  
-  # To list and return
-  lapply(1:dim(x)[3], function(y) {
-    ss <- x[,,y]
-    colnames(ss) <- c("normality", "heteroskedasticity", "independence")
-    # To df
-    ss <- as.data.frame(ss)
-    # Return
-    return(ss)
-  })
-  
-}
-
-# Read data
-normal <- readRDS("data/simulations/ppc_normal_data.rds")
-finsim <- readRDS("data/simulations/final.rds")
-
-normal <- finsim$noviolation$results %>%
-  flatten_array() %>%
-  bind_rows()
-heterosked <- finsim$heterosked$results %>% 
-  flatten_array() %>%
-  bind_rows(.id="severity") %>%
-  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
-indep <- finsim$indep$results %>% 
-  flatten_array() %>%
-  bind_rows(.id="severity") %>%
-  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
-
-# PPC heteroskedasticity, no violation
-p1 <- ggplot(data.frame(x=normal[,2]), aes(x=x)) +
-  geom_histogram(color="black", fill="lightgrey") +
-  scale_x_continuous(limits=c(0,1)) + 
-  theme_blm(text_size = 10) +
-  theme(axis.title.x = element_blank(),
-        axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        axis.text.x = element_blank()) +
-  labs(title = "(a) PPC heteroskedasticity", subtitle="      no violations")
-# PPC independence, no violation
-p2 <- ggplot(data.frame(x=normal[,3]), aes(x=x)) +
-  geom_histogram(color="black", fill="lightgrey") +
-  scale_x_continuous(limits=c(0,1)) + 
-  theme_blm(text_size = 10) +
-  theme(axis.title.x = element_blank(),
-        axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        axis.text.x = element_blank()) +
-  labs(title = "(b) PPC independence", subtitle="      no violations")
-# PPC heteroskedasticity, assumption violated
-p3 <- ggplot(heterosked, aes(x=heteroskedasticity, fill=severity)) +
-  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
-  theme_blm(text_size = 10) + 
-  scale_fill_brewer(palette = "Set1", direction=-1) +
-  scale_x_continuous(limits=c(-0.02,1)) +
-  theme(axis.title.x = element_blank(),
-      axis.title.y = element_blank(),
-      axis.text.y = element_blank(),
-      legend.position = "none") +
-  labs(title = "(c) PPC heteroskedasticity", subtitle="      assumption violated")
-# PPC independence, violated
-p4 <- ggplot(indep, aes(x=independence, fill=severity)) +
-  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
-  scale_fill_brewer(palette = "Set1", direction=-1) +
-  scale_x_continuous(limits=c(-0.02,1)) +
-  theme_blm(text_size = 10) +
-    theme(axis.title.x = element_blank(),
-        axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        legend.position = "none") +
-  labs(title = "(d) PPC independence", subtitle="      assumption violated")
-
-# Merge plots
-grid.arrange(p1, p2, p3, p4)
-```
+Whether a statistician regards the data or the parameters as a random variable determines their choice of estimation method. A Frequentist will want to find the most likely combination of parameters $\hat{\theta}$ that explain the data and that provide consistent and asymptotically unbiased estimators. Conversely, given that a Bayesian thinks of the data as fixed and the parameters as random variables, they are interested in finding the distribution of the parameters and hence the source of uncertainty in our beliefs after seeing the evidence [@miller2014john, ch.8]. 
 
 The way in which we think about statistical inference under these frameworks is illustrated by the difference in interpretation of the confidence interval and the credible interval. When we calculate the confidence interval, the upper and lower confidence limited should be interpreted as random variables because they vary across samples. Crucially, they do not reflect probabilities but confidence in our point estimates [@miller2014john, pp.317-320]. A credible interval, being associated with a posterior distribution, necessarily deals with probability statements such that we can say that the parameter is contained in the credible interval with some probability (e.g. $95\%$) [@lynch2007introduction, p.58].
 
@@ -447,13 +274,196 @@ dirmod2 %>%
 saveRDS(dirmod2, "models/model2.rds")
 ```
 
-The model results are presented in table 1. The variable age is sampled using a random-walk Metropolis-Hastings (MH) step. Unlike the Gibbs sampler, which samples full conditional posteriors, the MH step draws samples from a non-normalized posterior distribution using a normal proposal density. The convergence diagnostics show that the posterior distributions have forgotten their initial states and have converged to their stable distributions. There is no trace of autocorrelation and the Gelman-Rubin statistic is close to $1$, indicating that the chains have converged to the same stationary distribution. Roughly $43\%$ of samples for age drawn using the MH algorithm are accepted. The DIC for the model of interest (model 2) is $508$ compared to $513$ for the intercept-only model (model 1). The difference between the DIC scores indicates that the model fits better than the intercept-only model, but the difference in scores of $5$ does not convince that model 2 is an improvement over model 1. The MC error, which should be less than $5\%$ of the standard deviation, is negligible.
+The model results are presented in table 1. The variable age is sampled using a random-walk Metropolis-Hastings (MH) step. Unlike the Gibbs sampler, which samples full conditional posteriors, the MH step draws samples from a non-normalized posterior distribution using a normal proposal density. The convergence diagnostics show that the posterior distributions have forgotten their initial states and have converged to their stable distributions. There is no trace of autocorrelation and the Gelman-Rubin statistic is close to $1$, indicating that the chains have converged to the same stationary distribution. Roughly $43\%$ of samples for age drawn using the MH algorithm are accepted. The DIC for the model of interest (model 2) is $509$ compared to $513$ for the intercept-only model (model 1). The difference between the DIC scores indicates that the model fits better than the intercept-only model, but the difference in scores of $4$ does not convince that model 2 is an improvement over model 1. The MC error, which should be less than $5\%$ of the standard deviation, is negligible.
 
-The model results indicate that gender is not a predictor of director compensation $(\beta_{\text{male}} = .067; 95\% \ \ \text{CCI} = [-.08, .214])$. The CCI and standard deviation for this coefficient indicate that there is a lot of uncertainty in this estimate. Age is also not a predictor and has a small, positive effect on director compensation $(\beta_{\text{age}} = .008; 95\% \ \ \text{CCI} = [-.00, .017])$. The median $R^2$ value for this model is $R^2 = .021; 95\% \ \ \text{CCI} = [.002, .059])$ [@gelman2018r], indicating that we explain some $2\%$ of the variance in compensation.  
+The model results indicate that gender is not a predictor of director compensation $(\beta_{\text{male}} = .071; 95\% \ \ \text{CCI} = [-.075, .219])$. The CCI and standard deviation for this coefficient indicate that there is a lot of uncertainty in this estimate. Age is also not a predictor and has a small, positive effect on director compensation $(\beta_{\text{age}} = .008; 95\% \ \ \text{CCI} = [-.00, .017])$. The median $R^2$ value for this model is $R^2 = .021; 95\% \ \ \text{CCI} = [.002, .059])$ [@gelman2018r], indicating that we explain some $2\%$ of the variance in compensation.  
 
 The support for in the data $H_1$ versus $H_c$^[$H_c$ is the complement of $H_1$. Given that we only have inequality constraints, $H_1$ is evaluated against $H_c$ and not $H_u$. See [@hoijtink2019tutoial]] is very small ($BF=1.243$). The evidence that age has a positive impact on compensation ($H_2$) has more support after observing the data ($BF=24.9$), and $H_2$ has $20$ times more support in the data than $H_1$. The posterior model probabilities (PMPb in table 1) indicate that we should prefer $H_2$ over $H_1$. However, this preference comes with a high error probability (approximately $55\%$).
 
-The posterior predictive checks (table 1) suggest that the data violate the independence assumption $(p_{\text{independence}} = 0)$, which is checked by repeatedly simulating outcome data under the model and comparing the correlation of lagged residuals on simulated and observed outcome data. This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards and directors tend to are more similar to their co-directors in the same boards in terms of compensation. 
+```{r simulation script}
+## Simulation study for PPC
+## Plan: Run the plans below ==> without any violations and violating to different degrees
+
+library(blm)
+blm_setup()
+
+# iterations
+k <- 1000
+
+# Results
+sim_res <- array(0L, c(k, 3, 3))
+
+# Grid of values to test
+# See: generate_dataset in helpers.R (line 222)
+grid <- list(
+  "noviolation" = list(
+    "results" = array(0L, c(k, 3, 1)),
+    "degrees" = 1 # Degrees will be ignored if no violation but it eases coding in the for-loop below
+  ),
+  "heterosked" = list(
+    "degrees" = c("mild" = 1, "medium"=3, "severe" = 5),
+    "results" = sim_res
+  ),
+  "indep" = list(
+    "degrees" = c("mild"=0.1, "medium"=0.5, "severe"=0.9), # Determines 'ar' param for an arima.sim
+    "results" = sim_res
+  )
+)
+
+# For each test
+# Progress bar
+library(utils)
+pb <- txtProgressBar(min = 0, max = (k * (3 * 2)) + k, style = 3) # (k * (length(grid) * length(degrees))) + k [==>] (last k is for no violation)
+# keep track of total i for progress bar
+i_pb <- 0
+# For each assumption
+for(j in seq_along(grid)) {
+
+  # For each degree
+  for(d in seq_along(grid[[j]][["degrees"]])) {
+
+    # For each simulation
+    for(i in 1:k) {
+
+      # Increment i_pb
+      i_pb <- i_pb + 1
+
+      # Set pb
+      setTxtProgressBar(pb, i_pb)
+
+      # Unroll data
+      noviolation <- ifelse(j == 1, TRUE, FALSE)
+      heteroskedastic <- ifelse(j == 2, TRUE, FALSE)
+      independence <- !heteroskedastic & !noviolation
+
+      # Simulate data
+      dat <-blm::blmsim(n = 100, j=2, binary = 0, heteroskedastic = heteroskedastic,
+                        correlated_errors = independence, degree=grid[[j]][["degrees"]][[d]])
+
+      # Unroll
+      df <- as.data.frame(cbind(dat$y, dat$X[,-1]))
+      # Names
+      colnames(df) <- c("y", paste0("x", 1:(ncol(df) - 1)))
+
+      # Blm object
+      bfit <- blm("y ~ .", data=df) %>%
+        set_sampling_options(iterations = 15000, burn = 2000, chains = 1) %>%
+        sample_posterior() %>%
+        # PPC
+        evaluate_ppc(p=1)
+
+      # Store ppc
+      ppcr <- get_value(bfit, "ppc")
+      # Store results
+      grid[[j]][["results"]][i, , d] <- c(ppcr$results$normality, ppcr$results$homosked, ppcr$results$independence)
+
+      # Save every 10 iterations
+      if(i %% 10 == 0) {
+        # Store data
+        saveRDS(grid, "experiments/2_Simulations_PPC/ppc_simulated/tmp.rds")
+      }
+
+    }
+
+  }
+
+}
+
+# Store data
+saveRDS(grid, "experiments/2_Simulations_PPC/ppc_simulated/final.rds")
+```
+
+```{r ppc simulations, fig.cap="Distributions of posterior predictive p-values for 1.000 simulated data sets. In plots (a) and (b), the simulated data are drawn from a normal without any violations of the linear regression assumptions. In plot (c), the assumption of homoskedasticity is violated in each of the simulations. In plot (d), the assumption of independence of errors is violated in each of the simulations. The color indicates the severity of the violation; the green bars indicate mild violation, blue indicates medium violation and red indicates severe violation.", fig.width=7, fig.height=3, eval=TRUE}
+
+# Convenience function to flatten array
+flatten_array <- function(x) {
+  
+  # To list and return
+  lapply(1:dim(x)[3], function(y) {
+    ss <- x[,,y]
+    colnames(ss) <- c("normality", "heteroskedasticity", "independence")
+    # To df
+    ss <- as.data.frame(ss)
+    # Return
+    return(ss)
+  })
+  
+}
+
+# Read data
+finsim <- readRDS("data/simulations/final.rds")
+
+normal <- finsim$noviolation$results %>%
+  flatten_array() %>%
+  bind_rows()
+heterosked <- finsim$heterosked$results %>% 
+  flatten_array() %>%
+  bind_rows(.id="severity") %>%
+  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
+indep <- finsim$indep$results %>% 
+  flatten_array() %>%
+  bind_rows(.id="severity") %>%
+  mutate(severity = factor(severity, labels = finsim$heterosked$degrees %>% names()))
+
+# PPC heteroskedasticity, no violation
+p1 <- ggplot(data.frame(x=normal[,2]), aes(x=x)) +
+  geom_histogram(color="black", fill="lightgrey") +
+  scale_x_continuous(limits=c(0,1)) + 
+  theme_blm(text_size = 10) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_blank()) +
+  labs(title = "(a) PPC heteroskedasticity", subtitle="      no violations")
+# PPC independence, no violation
+p2 <- ggplot(data.frame(x=normal[,3]), aes(x=x)) +
+  geom_histogram(color="black", fill="lightgrey") +
+  scale_x_continuous(limits=c(0,1)) + 
+  theme_blm(text_size = 10) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_blank()) +
+  labs(title = "(b) PPC independence", subtitle="      no violations")
+# PPC heteroskedasticity, assumption violated
+p3 <- ggplot(heterosked, aes(x=heteroskedasticity, fill=severity)) +
+  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
+  theme_blm(text_size = 10) + 
+  scale_fill_brewer(palette = "Set1", direction=-1) +
+  scale_x_continuous(limits=c(-0.02,1)) +
+  theme(axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.text.y = element_blank(),
+      legend.position = "none") +
+  labs(title = "(c) PPC heteroskedasticity", subtitle="      assumption violated")
+# PPC independence, violated
+p4 <- ggplot(indep, aes(x=independence, fill=severity)) +
+  geom_histogram(color="black", alpha=0.4, position = "identity")  + 
+  scale_fill_brewer(palette = "Set1", direction=-1) +
+  scale_x_continuous(limits=c(-0.02,1)) +
+  theme_blm(text_size = 10) +
+    theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        legend.position = "none") +
+  labs(title = "(d) PPC independence", subtitle="      assumption violated")
+
+# Merge plots
+grid.arrange(p1, p2, p3, p4)
+```
+
+The posterior predictive checks (table 1) suggest that the data violate the independence assumption $(p_{\text{independence}} = 0)$, which is checked by repeatedly simulating outcome data under the model and comparing the correlation of lagged residuals on simulated and observed outcome data. The posterior predictive p-value then represents the proportion of cases where $r_{\text{sim}} > r_{\text{obs}}$. Both of the posterior predictive checks included in the R library blm show an approximately uniform distribution when there are no violations (figure 1).  
+
+This is not unexpected: the data are hierarchical in nature such that individuals are nested in boards and directors tend to are more similar to their co-directors in the same boards in terms of compensation. Given the hierarchical nature of the data, we next run a linear mixed effects model. The intra-class correlation coefficient shows that a large portion of the variance is found at the company level ($\rho = 57\%; \ 95\% CCI=[.451, .686]$), meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The complete multilevel analysis of this data can be found [here](https://github.com/JasperHG90/blm/blob/master/notes/6.%20Linear%20Mixed%20Effects%20in%20JAGS/multiJags.pdf).] The final model corresponds to the following equation.
+
+$$
+\begin{aligned}
+\widehat{\log(\text{compensation}_i)} = 
+&\gamma_{00} + u_{0j} + \gamma_{10}\cdot [\text{Age}_{ij} - \overline{\text{Age}}]) + e_{ij}
+\end{aligned}
+$$
+
+Where $\gamma_{00}$ is the overall intercept and $u_{0j}$ is a company-specific error term. The DIC of $281$ indicates that the multilevel approach is appropriate, given that this model fits better than the regular regression model. The marginal and conditional R-squared values [@nakagawa2013general]^[The marginal R-squared takes into account only the fixed part of the variance, while the conditional R-squared takes into account the fixed and random parts. See [@nakagawa2013general]] are $R^2_{\text{M}} = .0056; \ 95\% \ \text{CCI}=[.00, .015]$ and $R^2_{\text{C}} = .5398; \ 95\% \ \text{CCI}=[.4807, .6]$ respectively. These values suggest that the fixed part of the model (age) explains almost no variation in the data, but the fixed and random parts together explain some $54\%$ of the total variation. 
 
 ```{r MLM intercept-only model}
 library(rjags)
@@ -604,17 +614,6 @@ quantile(ve, c(0.025, .25, .5, .75, .975))
 saveRDS(resm1, "models/ML_interceptonly.rds")
 saveRDS(DICm1, "models/ML_io_DIC.rds")
 ```
-
-Given the hierarchical nature of the data, we next run a linear mixed effects model. The intra-class correlation coefficient shows that a large portion of the variance is found at the company level ($\rho = 57\%; \ 95\% CCI=[.451, .686]$), meaning that the expected correlation of two randomly picked directors from the same company is $\hat{r}=.573$.^[The complete multilevel analysis of this data can be found [here](https://github.com/JasperHG90/blm/blob/master/notes/6.%20Linear%20Mixed%20Effects%20in%20JAGS/multiJags.pdf).] The final model corresponds to the following equation.
-
-$$
-\begin{aligned}
-\widehat{\log(\text{compensation}_i)} = 
-&\gamma_{00} + u_{0j} + \gamma_{10}\cdot [\text{Age}_{ij} - \overline{\text{Age}}]) + e_{ij}
-\end{aligned}
-$$
-
-Where $\gamma_{00}$ is the overall intercept and $u_{0j}$ is a company-specific error term. The DIC of $281$ indicates that the multilevel approach is appropriate, given that this model fits better than the regular regression model. The marginal and conditional R-squared values [@nakagawa2013general]^[The marginal R-squared takes into account only the fixed part of the variance, while the conditional R-squared takes into account the fixed and random parts. See [@nakagawa2013general]] are $R^2_{\text{M}} = .0056; \ 95\% \ \text{CCI}=[.0008, .015]$ and $R^2_{\text{C}} = .5398; \ 95\% \ \text{CCI}=[.4807, .6]$ respectively. These values suggest that the fixed part of the model (age) explains almost no variation in the data, but the fixed and random parts together explain some $54\%$ of the total variation. 
 
 ```{r MLM level-1 predictors}
 # Initial values
@@ -777,7 +776,7 @@ grid.arrange(p1, p2, ncol=2)
 
 # Conclusion
 
-The analysis shows that gender is not a predictor of compensation for independent directors. There are some clear limitations to this analysis. Firstly, I have to delete some $44\%$ of the data during missingness. Secondly, the results indicate that there is a lot of uncertainty in the estimation of the gender effect, which is exemplified by the large standard deviation of the posterior distribution. Furthermore, director compensation is best modeled using company-specific intercepts, but we do not have the right variables at either the company or individual level that would help us explain the heterogeneity in compensation among directors within boards and between boards. Future research should focus on collecting more complete data and other covariates such as the percentage of female directors.
+The analysis shows that gender is not a predictor of compensation for independent directors. There are some clear limitations to this analysis. Firstly, I have to delete some $44\%$ of the data during missingness. Secondly, the results indicate that there is a lot of uncertainty in the estimation of the gender effect, which is exemplified by the large standard deviation of the posterior distribution. Furthermore, director compensation is best modeled using company-specific intercepts, but we do not have the right variables at either the company or individual level that would help us explain the heterogeneity in compensation among directors within boards and between boards. Future research should focus on collecting more complete data and more informative covariates.
 
 \begin{table}[H] \centering 
 \begin{small}
@@ -805,7 +804,7 @@ $\sigma^2_{u0}$ & & & .399 (.322, .504) \\
 \textit{(c) Model Fit} \\
 Observations & 336 & 336 & 336 \\
 Companies & & & 52 \\
-DIC & 513 & 409 & 281 \\ 
+DIC & 513 & 509 & 281 \\ 
 Penalty. & 2 & 4 & 49 \\ 
 R$^{2}$ & & .021 & .006 (M), .536 (C) \\ 
 \hline \\[-1.8ex] 
@@ -817,7 +816,7 @@ Independence &  & 0 & \\
 \textit{(e) Bayes' Factors (model 2 only)} & & & \\
 Hypothesis & BF (complexity, fit) & PMPa & PMPb \\
 \hline \\[-1.8ex] 
-$\text{H}_1: \beta_\text{Male} > 0$ & 1.243 (.512, .566) & .403 & .295  \\
+$\text{H}_1: .2 > \beta_\text{Male} > .05$ & 1.243 (.512, .566) & .403 & .295  \\
 $\text{H}_2: \beta_{\text{Age}} > 0$ & 24.86 (.594, .972) & .597 & .438 \\
 $\text{H}_u: \beta_{\text{Male}}, \beta_{\text{Age}}$ &  &  & .267 \\
 \hline 
