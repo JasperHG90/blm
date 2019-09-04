@@ -1,6 +1,6 @@
 # Bayesian Linear Model (`blm`)
 
-I created this R library to implement some core Bayesian ideas taught in the course "Introduction to Bayesian Statitics" at Utrecht University. Secondly, it also provided me with an opportunity to further practice [Julia](https://julialang.org/). Julia code is fast, but needs to compile on the first run. Hence, the highly repetitive nature of the code for Bayesian estimation (small functions that are repeatedly used) makes Julia an ideal programming language to run Markov Chain Monte Carlo (MCMC) samplers.
+I created this R library to implement some core Bayesian ideas taught in the course "Introduction to Bayesian Statistics" at Utrecht University. Secondly, it also provided me with an opportunity to further practice [Julia](https://julialang.org/). Julia code is fast, but needs to compile on the first run. Hence, the highly repetitive nature of the code for Bayesian estimation (small functions that are repeatedly used) makes Julia an ideal programming language to run Markov Chain Monte Carlo (MCMC) samplers.
 
 Thanks to the R library [JuliaCall](https://github.com/Non-Contradiction/JuliaCall), it is possible to create a near-seamless bridge between R code and Julia code (much like the [Reticulate](https://rstudio.github.io/reticulate/) library does for Python). This bridge is used as follows:
 
